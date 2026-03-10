@@ -1,0 +1,26 @@
+﻿
+---
+version: 2.0
+
+#构建环境
+env:
+  label: CloudBuildVM # 构建资源标签
+
+
+#构建参数定义, 构建脚本可从环境变量中读取使用这些参数
+params:
+  - name: product
+    value: cloudbuild2.0
+
+#构建步骤
+steps:
+  PRE_BUILD: # 构建准备步骤
+    - checkout # 检出当前源码库
+  BUILD: # 构建执行步骤
+    - build_execute: # 执行构建
+        command: "echo hello ${product}." # 构建命令，如sh build.sh 或 make 或 mvn clean package
+        accelerate: false # 是否启用分布式加速(jiffy)
+        check: true # 是否启用构建检查
+  POST_BUILD:  # 构建后步骤
+    - version_set # 本步骤仅适用于云龙流水线触发构建，若使用MR及其他方式触发构建，请注释本行
+    
