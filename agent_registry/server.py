@@ -58,7 +58,7 @@ async def limit_url_length(request: Request, call_next):
 
 @app.post("/rest/a2a-t/v1/agent-register", response_model=bool, summary="Register a new agent")
 @limiter.limit(_REQUEST_RATE_LIMIT)
-async def register_agent(agent: AgentCard):
+async def register_agent(request: Request, agent: AgentCard):
     """
     Register a new agent. The combination (name, provider.organization) must be unique.
     Returns True if registered, False if duplicate.
@@ -76,6 +76,7 @@ async def register_agent(agent: AgentCard):
 @app.put("/rest/a2a-t/v1/update_agent/{name}", response_model=bool, summary="Full update (replace) an agent")
 @limiter.limit(_REQUEST_RATE_LIMIT)
 async def update_agent_full(
+        request: Request,
         name: str = Path(..., description="Agent name"),
         organization: str = Query(..., description="Agent organization"),
         agent_data: AgentCard = Body(..., description="Full agent data")
