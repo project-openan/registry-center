@@ -1,3 +1,12 @@
 .idea
 /venv
 /logs
+common/__pycache__
+common/llm/__pycache__
+common/llm/config/__pycache__
+common/llm/provider/__pycache__
+common/cert/__pycache__
+common/log/__pycache__
+agent_registry/logs
+agent_registry/__pycache__
+agent_registry/model/__pycache__
