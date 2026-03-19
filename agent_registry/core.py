@@ -5,10 +5,8 @@ from typing import List, Dict, Tuple, Optional
 from a2a.types import AgentCard
 from loguru import logger
 
-from agent_registry.config import PERSISTENCE_FILE, DEFAULT_LLM_TYPE, MAX_REGISTER_NUM
+from agent_registry.config import PERSISTENCE_FILE, MAX_REGISTER_NUM
 from agent_registry.persistence import save_to_file, load_from_file
-from common.llm.config.llm_config import LLMType, get_llm_config_by_type
-from common.llm.provider.llm_provider_registry import get_or_create_llm_instance
 
 
 class RegistryCore:
@@ -18,8 +16,7 @@ class RegistryCore:
     Supports persistence to a JSON file.
     """
 
-    def __init__(self, llm_type: LLMType = DEFAULT_LLM_TYPE, persistence_file: str = PERSISTENCE_FILE):
-        self.llm = get_or_create_llm_instance(get_llm_config_by_type(llm_type))
+    def __init__(self, persistence_file: str = PERSISTENCE_FILE):
         self.persistence_file = persistence_file
         # Internal storage of Agents: key is (name, organization) Tuple, value is AgentCard
         self._agents: Dict[Tuple[str, str], AgentCard] = {}

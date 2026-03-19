@@ -10,8 +10,7 @@ from slowapi.util import get_remote_address
 from starlette import status
 from starlette.responses import Response
 
-from agent_registry.config import (DEFAULT_LLM_TYPE,
-                                   PERSISTENCE_FILE,
+from agent_registry.config import (PERSISTENCE_FILE,
                                    MAX_REQUEST_BODY_SIZE,
                                    MAX_URL_LENGTH,
                                    MAX_REQUEST_RATE)
@@ -32,7 +31,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # --- Dependency Injection ---
 def get_registry() -> RegistryCore:
-    return RegistryCore(llm_type=DEFAULT_LLM_TYPE, persistence_file=PERSISTENCE_FILE)
+    return RegistryCore(persistence_file=PERSISTENCE_FILE)
 
 
 # --- Middleware ---
