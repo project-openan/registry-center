@@ -24,7 +24,10 @@ from agent_registry.config import (
     MAX_REQUEST_RATE,
 )
 from agent_registry.core import RegistryCore
+from agent_registry.flow_control import FlowController
+from agent_registry.middleware import ConnectionLimitMiddleware, TimeoutMiddleware
 from agent_registry.model.validated_agentcard import ValidatedAgentCard
+from common.util.config_util import get_conf
 
 # ---------- Rate Limiter Setup (In-Memory) ----------
 # Use in-memory storage for single-node deployments. Counts reset on restart.
@@ -89,6 +92,18 @@ app = FastAPI(
     version="2.0.0",
 )
 
+config = get_conf()
+flow_controller = FlowController(config)
+
+app.add_middleware(
+    ConnectionLimitMiddleware,
+    max_connections=int(config.get("connection.max", 11))
+)
+
+app.add_middleware(
+    TimeoutMiddleware,
+    timeout_seconds=int(config.get("connection.timeout", 30))
+)
 
 # ---------- Dependency: Registry Core (Singleton) ----------
 @lru_cache(maxsize=1)
