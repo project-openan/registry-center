@@ -41,7 +41,6 @@ def parse_rate_limit(interface_name: str):
     Parse a rate limit string like "10/minute" into a RateLimitItem.
     Returns None if parsing fails.
     """
-    print("查询流控：is： ", config.get('flowcontrol.ratelimit.register', 1))
     rate_string = f"{int(config.get('flowcontrol.ratelimit.register', 1))}/second" if interface_name == "register" else f"{int(config.get('flowcontrol.ratelimit.query', 10))}/second"
     items = parse_many(rate_string)
     return items[0] if items else None
