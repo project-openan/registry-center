@@ -24,7 +24,6 @@ from agent_registry.config import (
     MAX_REQUEST_RATE,
 )
 from agent_registry.core import RegistryCore
-from agent_registry.flow_control import FlowController
 from agent_registry.middleware import ConnectionLimitMiddleware, TimeoutMiddleware
 from agent_registry.model.validated_agentcard import ValidatedAgentCard
 from common.util.config_util import get_conf
@@ -93,7 +92,6 @@ app = FastAPI(
 )
 
 config = get_conf()
-flow_controller = FlowController(config)
 
 app.add_middleware(
     ConnectionLimitMiddleware,
