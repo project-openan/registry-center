@@ -25,7 +25,7 @@ class ValidatedAgentCard(AgentCard):
     @field_validator('description')
     @classmethod
     def validate_description(cls, description: str) -> str:
-        if len(description) > 10:
+        if len(description) > 1000:
             raise ValueError('The agent description can contain a maximum of 1000 characters.')
         return description
 
@@ -38,21 +38,21 @@ class ValidatedAgentCard(AgentCard):
 
     @field_validator('version')
     @classmethod
-    def validate_url(cls, version: str) -> str:
+    def validate_version(cls, version: str) -> str:
         if len(version) > 50:
             raise ValueError('The agent version can contain a maximum of 50 characters.')
         return version
 
     @field_validator('default_input_modes')
     @classmethod
-    def validate_name(cls, default_input_modes: list[str]) -> list[str]:
+    def validate_default_input_modes(cls, default_input_modes: list[str]) -> list[str]:
         if len(default_input_modes) > 100:
             raise ValueError('The agent default_input_modes can contain a maximum of 100 params.')
         return default_input_modes
 
     @field_validator('default_output_modes')
     @classmethod
-    def validate_name(cls, default_output_modes: list[str]) -> list[str]:
+    def validate_default_output_modes(cls, default_output_modes: list[str]) -> list[str]:
         if len(default_output_modes) > 100:
             raise ValueError('The agent default_output_modes can contain a maximum of 100 params.')
         return default_output_modes
