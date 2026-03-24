@@ -78,7 +78,6 @@ def _extract_certificate_info(cert: x509.Certificate) -> CertObj:
         'valid_to': cert.not_valid_after_utc.isoformat(),
         'version': cert.version,
         'public_key': cert.public_key(),
-        'signature_algorithm': cert.signature_algorithm_oid._name,
         'org_cert': cert
     }
     obj = CertObj.from_dict(info)
