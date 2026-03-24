@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from loguru import logger
@@ -43,7 +43,7 @@ def add_module_logger(module_prefix: str):
         level="INFO",
         rotation=lambda message, file: (
                 os.stat(file.name).st_size > 10 * 1024 * 1024
-                or datetime.now().date() != datetime.fromtimestamp(os.path.getctime(file.name)).date()
+                or datetime.now(tz=timezone.utc).date() != datetime.fromtimestamp(os.path.getctime(file.name)).date()
         ),
         retention="30 days",
         encoding="utf-8",
@@ -58,7 +58,7 @@ def add_module_logger(module_prefix: str):
         level="ERROR",
         rotation=lambda message, file: (
                 os.stat(file.name).st_size > 10 * 1024 * 1024
-                or datetime.now().date() != datetime.fromtimestamp(os.path.getctime(file.name)).date()
+                or datetime.now(tz=timezone.utc).date() != datetime.fromtimestamp(os.path.getctime(file.name)).date()
         ),
         retention="30 days",
         encoding="utf-8",

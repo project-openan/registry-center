@@ -93,17 +93,22 @@ class ValidatedAgentCard(AgentCard):
         if capabilities.extensions is not None:
             if len(capabilities.extensions) > MAX_NUMBER_OF_AGENT_EXTENSION:
                 raise ValueError(
-                    f'The number of supported protocol extensions of the agent can not exceed {MAX_NUMBER_OF_AGENT_EXTENSION}.')
+                    f'The number of supported protocol extensions of the agent can not exceed'
+                    f' {MAX_NUMBER_OF_AGENT_EXTENSION}.')
             for extension in capabilities.extensions:
                 extension_json = extension.model_dump_json()
                 if len(extension_json) > AGENT_EXTENSION_MAX_LENGTH:
                     raise ValueError(
-                        f'Agent extension JSON length exceeds the maximum allowed length of {AGENT_EXTENSION_MAX_LENGTH}')
+                        f'Agent extension JSON length exceeds the maximum allowed length of'
+                        f' {AGENT_EXTENSION_MAX_LENGTH}')
         return capabilities
 
     @model_validator(mode='after')
     def validate_provider(self):
-        if self.provider and hasattr(self.provider, 'url') and self.provider.url:
+        url_validation = hasattr(self.provider, 'url') and self.provider.url
+        orgnization_validation = hasattr(self.provider, 'orgnization') and self.provider.orgnization and len(
+                self.provider.orgnization) > ORGNIZATION_MAX_LENGTH
+        if self.provider and url_validation:
             if len(self.provider.url) > URL_MAX_LENGTH:
                 raise ValueError(f"The URL for the agent provider's website or relevant documentation can contain "
                                  f"a maximum of {URL_MAX_LENGTH} characters.")
@@ -112,7 +117,6 @@ class ValidatedAgentCard(AgentCard):
                 HttpUrl(self.provider.url)
             except Exception as e:
                 raise ValueError('Provider URL must be a valid web URL.') from e
-        if self.provider and hasattr(self.provider, 'orgnization') and self.provider.orgnization and len(
-                self.provider.orgnization) > ORGNIZATION_MAX_LENGTH:
+        if self.provider and orgnization_validation:
             raise ValueError(f'The agent orgnization can contain a maximum of {ORGNIZATION_MAX_LENGTH} characters.')
         return self

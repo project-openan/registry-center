@@ -1,6 +1,7 @@
 import datetime
 import os
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 from cryptography import x509
@@ -44,11 +45,12 @@ class PathValidator:
         return ValidationResult(True, "")
 
 
-class AbstractValidatorLink:
+class AbstractValidatorLink(ABC):
     def __init__(self, conf_obj: ConfObj):
         self.conf_obj = conf_obj
         self.link = self.build_link()
 
+    @abstractmethod
     def build_link(self):
         pass
 
@@ -134,7 +136,8 @@ class CerContentValidator(CommonContentValidator):
                 # 2. 密钥算法、长度校验，cer只校验公钥，因为没有私钥
                 if not self.validate_public_key_length(cert_obj.public_key):
                     return ValidationResult(False,
-                                            f"Certificate key algorithm or length does not meet requirements. {self.conf_tip}")
+                                            f"Certificate key algorithm or length does not meet requirements."
+                                            f"{self.conf_tip}")
 
             # 3. 有效期校验，单独跑一把，确保每本证书的有效期对比的currentTime是一个
             if not self.validate_certificate_validity(x509_obj):
@@ -184,14 +187,18 @@ class PrivateKeyValidator(CommonContentValidator):
             if not self.password_verify(self.password_bytes.decode(DEFAULT_ENCODING)):
                 return ValidationResult(False,
                                         f"PEM privatekey password is too week, please check the password complexity! "
-                                        f"Min length is {self.min_length} and must contains at least two of the following character types: "
-                                        f"digits, uppercase letters, lowercase letters, special characters (`~!@#$%^&*()-_=+|[{{}}];:'\",<.>/?), and spaces.")
+                                        f"Min length is {self.min_length} and "
+                                        f"must contains at least two of the following character types: "
+                                        f"digits, uppercase letters, "
+                                        f"lowercase letters, special characters (`~!@#$%^&*()-_=+|[{{}}];:'\",<.>/?), "
+                                        f"and spaces.")
             # 2. 读取cer证书，验证密码是否有效
             private_key = cert_parser.parse_pem_files(self.cert_path, self.password_bytes)
             # 3. 校验私钥算法及长度
             if not self.validate_private_key_length(private_key):
                 return ValidationResult(False,
-                                        f"Certificate key algorithm or length does not meet requirements. {self.conf_tip}")
+                                        f"Certificate key algorithm or length does not meet requirements."
+                                        f" {self.conf_tip}")
             # 4. 校验私钥文件里的公钥和cer里面的公钥是否一致
             server_obj = cert_parser.parse_cer_certificate(self.server_path)
             if len(server_obj.cert_list) == 0 or server_obj.cert_list[0].public_key != private_key.public_key():

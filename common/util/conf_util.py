@@ -40,7 +40,7 @@ def set_ssl_folder_permissions():
     # 设置目录权限为700
     os.chmod(SSL_PATH, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     # 遍历目录中的所有文件，权限设置为600，不会有递归的情况
-    for root, dirs, files in os.walk(SSL_PATH):
+    for root, _, files in os.walk(SSL_PATH):
         for file_name in files:
             file_path = os.path.join(root, file_name)
             # 设置文件权限600
