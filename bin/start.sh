@@ -8,13 +8,16 @@ NC='\033[0m'
 # Get the absolute path of the script's directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-TARGET_DIR="${SCRIPT_DIR}/agent_registry"
+ROOT_DIR="${SCRIPT_DIR}/.."
+TARGET_DIR="${SCRIPT_DIR}/../agent_registry"
 
-if [ -d "$TARGET_DIR" ]; then
-    TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+if [ -d "$ROOT_DIR" ]; then
+    ROOT_DIR="$(cd "$ROOT_DIR" && pwd)"
+    cd $ROOT_DIR
+    echo "Current working directory: $(pwd)"
 else
-    echo "Error: Target directory does not exist: $TARGET_DIR"
-    exit 1
+  echo "The project root path does not exist."
+  exit 1
 fi
 
 # get user information
@@ -47,25 +50,26 @@ export APP_USER="$CURRENT_USER"
 export APP_UID="$CURRENT_UID"
 export APP_GID="$CURRENT_GID"
 
-# Change to target directory
-cd "$TARGET_DIR" || {
-    echo "Error: Cannot enter directory $TARGET_DIR"
+# Check if target directory exists
+if [ -d "$TARGET_DIR" ]; then
+    echo "Target directory exists:$TARGET_DIR"
+else
+    echo "Error: Target directory does not exist: $TARGET_DIR"
     exit 1
-}
+fi
 
-PYTHON_SCRIPT="start.py"
-
-# Check if Python script exists
-if [ ! -f "$PYTHON_SCRIPT" ]; then
-    echo "Error: Python script $PYTHON_SCRIPT does not exist in $TARGET_DIR"
+# Check if Python script 'start.py' exists in the target directory
+PYTHON_SCRIPT="${TARGET_DIR}/start.py"
+if [ -f "$PYTHON_SCRIPT" ]; then
+    echo "Python script found:$PYTHON_SCRIPT"
+else
+    echo "Error: Python script start.py does not exist in $TARGET_DIR"
     exit 1
 fi
 
 # Start the Python script
 echo "Starting Python script: $PYTHON_SCRIPT"
-python "$PYTHON_SCRIPT"
+python -m agent_registry.start
 
 EXIT_CODE=$?
 echo "$EXIT_CODE"
-
-exit 0

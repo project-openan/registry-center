@@ -1,8 +1,8 @@
-def encrypt(plaintext: str) -> str:
-    # need to impl by user
-    return plaintext
+
+DEFAULT_ENCODING = 'utf-8'
 
 
-def decrypt(ciphertext: str) -> str:
-    # need to impl by user
-    return ciphertext
+def decrypt(ciphertext: str) -> bytes:
+    # TODO: need to impl by user
+    return ciphertext.encode(DEFAULT_ENCODING)
+

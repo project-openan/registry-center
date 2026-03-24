@@ -59,35 +59,28 @@ class AuditLogger:
             load_configs(log_config_path, log_config)
         return log_config
 
-    def audit(self,
-              operation_name: str,
-              level: str,
-              result: str,
-              object_name: str,
-              details: Dict[str, Any] = None,
-              client_ip: str = "",
-              user_name: str = ""):
+    def audit(self, log_entry: Dict[str, Any]):
         """
-        记录审计日志
-        :param operation_name: 操作名称，如“启动服务”
-        :param level: 级别：danger、normal、info
-        :param result: 成功/失败
-        :param object_name: 操作对象，如“Agent”
-        :param details: 补充信息
-        :param client_ip: 客户端IP，REST接口使用
-        :param user_name: 用户名，命令行使用
+        :param log_entry: 审计日志条目，包含以下字段：
+                          operation_name: 操作名称
+                          level: 级别
+                          result: 成功/失败
+                          object_name: 操作对象
+                          details: 补充信息
+                          client_ip: 客户端IP
+                          user_name: 用户名
         """
-        log_entry = {
+        log_data = {
             "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "clientIP": client_ip,
-            "userName": user_name,
-            "level": level,
-            "operationName": operation_name,
-            "object": object_name,
-            "result": result,
-            "details": details or {}
+            "clientIP": log_entry.get("client_ip", ""),
+            "userName": log_entry.get("user_name", ""),
+            "level": log_entry["level"],
+            "operationName": log_entry["operation_name"],
+            "object": log_entry["object_name"],
+            "result": log_entry["result"],
+            "details": log_entry.get("details", {})
         }
-        self._write_log(log_entry)
+        self._write_log(log_data)
 
     def _get_file_size(self) -> int:
         """获取当前日志文件大小，若不存在返回0"""

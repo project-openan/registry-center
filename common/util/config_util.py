@@ -33,22 +33,23 @@ def get_conf() -> Dict[str, Any]:
 
 
 def load_configs(conf_path, config):
-    if os.path.exists(conf_path):
-        with open(conf_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-
-                # Processing Comments
-                if '#' in line:
-                    line = line[:line.index('#')].strip()
-
-                if '=' in line:
-                    key, value = line.split('=', 1)
-                    key = key.strip()
-                    value = value.strip()
-
-                    config[key.lower()] = value
-    else:
+    if not os.path.exists(conf_path):
         logger.error(f"Error: The configuration file {conf_path} does not exist.")
+        return
+    with open(conf_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            # Processing Comments
+            if '#' in line:
+                line = line[:line.index('#')].strip()
+
+            if '=' in line:
+                key, value = line.split('=', 1)
+                key = key.strip()
+                value = value.strip()
+
+                config[key.lower()] = value
+

@@ -9,10 +9,9 @@ from uvicorn import config
 from agent_registry.server import app
 from common.cert.cert_validater import CertValidator
 from common.log.audit_logger import audit_logger, LogLevel, OperationResult, OperatorObject, OperationName
-from common.util.conf_util import conf_singleton_obj, load_cert_password
+from common.util.cipher_util import DEFAULT_ENCODING
+from common.util.conf_util import conf_singleton_obj, load_cert_password, set_ssl_folder_permissions
 from common.util.config_util import get_conf
-
-
 
 
 def get_user_info_from_env():
@@ -27,12 +26,14 @@ def get_user_info_from_env():
 
 def record_startup_log():
     server_config = get_conf()
-    audit_logger.audit(operation_name=OperationName.START_SERVICE,
-                       level=LogLevel.DANGER,
-                       result=OperationResult.SUCCESS,
-                       object_name=OperatorObject.SERVICE,
-                       details={"ip": server_config.get("ip", ""), "port": server_config.get("port", "")},
-                       user_name=get_user_info_from_env().get('username'))
+    audit_logger.audit({
+        "operation_name": OperationName.START_SERVICE,
+        "level": LogLevel.DANGER,
+        "result": OperationResult.FAILURE,
+        "object_name": OperatorObject.SERVICE,
+        "details": {"ip": server_config.get("ip", ""), "port": server_config.get("port", "")},
+        "user_name": get_user_info_from_env().get('username')
+    })
 
 
 app.add_event_handler("startup", record_startup_log)
@@ -84,7 +85,7 @@ class CustomUvicornServer:
             # 私钥路径
             ssl_keyfile=self.conf_obj.ssl_keyfile,
             # 私钥密码
-            ssl_keyfile_password=load_cert_password(self.conf_obj.ssl_keyfile_password),
+            ssl_keyfile_password=load_cert_password(self.conf_obj.ssl_keyfile_password).decode(DEFAULT_ENCODING),
             # 信任证书
             ssl_ca_certs=self.conf_obj.ssl_ca_certs,
             # 是否校验客户端证书，填了如果浏览器没证书就没法访问了
@@ -105,16 +106,20 @@ def main():
         result = CertValidator(conf_obj).validate()
         if not result.is_valid:
             sys.exit(result.message)
+        # 通过校验后修改etc/ssl文件夹权限为700，里面文件权限为600
+        set_ssl_folder_permissions()
         # 创建并启动服务器
         server = CustomUvicornServer(server_config, conf_obj)
         server.run()
     except Exception as e:
-        audit_logger.audit(operation_name=OperationName.START_SERVICE,
-                           level=LogLevel.DANGER,
-                           result=OperationResult.FAILURE,
-                           object_name=OperatorObject.SERVICE,
-                           details={"ip": server_config.get("ip", ""), "port": server_config.get("port", "")},
-                           user_name=get_user_info_from_env().get('username'))
+        audit_logger.audit({
+            "operation_name": OperationName.START_SERVICE,
+            "level": LogLevel.DANGER,
+            "result": OperationResult.FAILURE,
+            "object_name": OperatorObject.SERVICE,
+            "details": {"ip": server_config.get("ip", ""), "port": server_config.get("port", "")},
+            "user_name": get_user_info_from_env().get('username')
+        })
 
 
 if __name__ == "__main__":

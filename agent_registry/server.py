@@ -197,14 +197,14 @@ def _check_agent_limit(registry: RegistryCore, client_ip: str, details: dict) ->
     """检查注册数量是否超过上限，若超过则记录审计日志并抛出异常。"""
     if len(registry.get_agents()) >= int(config.get('agent.num.max', 40)):
         details["message"] = "Agent registration limit exceeded."
-        audit_logger.audit(
-            operation_name=OperationName.REGISTER_AGENT,
-            level=LogLevel.MINOR,
-            result=OperationResult.FAILURE,
-            object_name=OperatorObject.AGENT,
-            details=details,
-            client_ip=client_ip,
-        )
+        audit_logger.audit({
+            "operation_name": OperationName.REGISTER_AGENT,
+            "level": LogLevel.MINOR,
+            "result": OperationResult.FAILURE,
+            "object_name": OperatorObject.AGENT,
+            "details": details,
+            "client_ip": client_ip
+        })
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Agent registration limit exceeded.",
@@ -216,14 +216,14 @@ def _check_duplicate_agent(agent: ValidatedAgentCard, registry: RegistryCore, cl
     key = _make_agent_key(agent.name, agent.provider.organization)
     if key in registry.get_agents():
         details["message"] = "Registration skipped: duplicate agent."
-        audit_logger.audit(
-            operation_name=OperationName.REGISTER_AGENT,
-            level=LogLevel.MINOR,
-            result=OperationResult.FAILURE,
-            object_name=OperatorObject.AGENT,
-            details=details,
-            client_ip=client_ip,
-        )
+        audit_logger.audit({
+            "operation_name": OperationName.REGISTER_AGENT,
+            "level": LogLevel.MINOR,
+            "result": OperationResult.FAILURE,
+            "object_name": OperatorObject.AGENT,
+            "details": details,
+            "client_ip": client_ip
+        })
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Registration skipped: duplicate agent ({agent.name}, {agent.provider.organization})",
@@ -239,31 +239,37 @@ async def _perform_registration(
     """执行实际的注册操作，处理可能的 ValueError 和其他异常，并记录对应日志。"""
     try:
         success = await registry.register(agent)
-        audit_logger.audit(operation_name=OperationName.REGISTER_AGENT,
-                           level=LogLevel.MINOR,
-                           result=OperationResult.SUCCESS,
-                           object_name=OperatorObject.AGENT,
-                           details=details,
-                           client_ip=client_ip)
+        audit_logger.audit({
+            "operation_name": OperationName.REGISTER_AGENT,
+            "level": LogLevel.MINOR,
+            "result": OperationResult.SUCCESS,
+            "object_name": OperatorObject.AGENT,
+            "details": details,
+            "client_ip": client_ip
+        })
         return success
     except ValueError as e:
         details["message"] = str(e)
-        audit_logger.audit(operation_name=OperationName.REGISTER_AGENT,
-                           level=LogLevel.MINOR,
-                           result=OperationResult.FAILURE,
-                           object_name=OperatorObject.AGENT,
-                           details=details,
-                           client_ip=client_ip)
+        audit_logger.audit({
+            "operation_name": OperationName.REGISTER_AGENT,
+            "level": LogLevel.MINOR,
+            "result": OperationResult.FAILURE,
+            "object_name": OperatorObject.AGENT,
+            "details": details,
+            "client_ip": client_ip
+        })
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
         ) from e
     except Exception as e:
-        audit_logger.audit(operation_name=OperationName.REGISTER_AGENT,
-                           level="Minor",
-                           result=OperationResult.FAILURE,
-                           object_name=OperatorObject.AGENT,
-                           details=details,
-                           client_ip=client_ip)
+        audit_logger.audit({
+            "operation_name": OperationName.REGISTER_AGENT,
+            "level": LogLevel.MINOR,
+            "result": OperationResult.FAILURE,
+            "object_name": OperatorObject.AGENT,
+            "details": details,
+            "client_ip": client_ip
+        })
         logger.error(f"Unexpected error in register: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

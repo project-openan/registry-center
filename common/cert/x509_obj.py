@@ -7,7 +7,6 @@ class CertObj:
     valid_to = None
     version = None
     public_key = None
-    signature_algorithm = None
     org_cert = None
 
 
@@ -21,7 +20,6 @@ class CertObj:
         obj.valid_to = cert_dict.get('valid_to', '')
         obj.version = cert_dict.get('version', '')
         obj.public_key = cert_dict.get('public_key', None)
-        obj.signature_algorithm = cert_dict.get('signature_algorithm', '')
         obj.org_cert = cert_dict.get('org_cert', None)
         return obj
 

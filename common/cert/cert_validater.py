@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
 from common.cert import cert_parser
 from common.cert.x509_obj import X509Obj
+from common.util.cipher_util import DEFAULT_ENCODING
 from common.util.conf_obj import ConfObj
 from common.util.conf_util import load_cert_password
 from common.util.constant_param import CONFIG_FILE_PATH
@@ -147,22 +149,64 @@ class CerContentValidator(CommonContentValidator):
 
 
 class PrivateKeyValidator(CommonContentValidator):
-    def __init__(self, cert_path: str, password: str = None, conf_tip=""):
+    # 定义字符类型
+    digit_pattern = re.compile(r'[0-9]')
+    upper_pattern = re.compile(r'[A-Z]')
+    lower_pattern = re.compile(r'[a-z]')
+    special_pattern = re.compile(r'[`~!@#$%^&*()-_=+|[{}];:\'",<.>/? ]')
+
+    patterns = [digit_pattern, upper_pattern, lower_pattern, special_pattern]
+
+    min_length = 8
+
+    def __init__(self, cert_path: str, password_bytes: bytes = None, server_path="", conf_tip=""):
         super().__init__(cert_path=cert_path, conf_tip=conf_tip)
-        self.password = password
+        self.password_bytes = password_bytes
+        self.server_path = server_path
+
+    def password_verify(self, plaintext: str) -> bool:
+        """
+        至少8个字符，至少包含两种字符（数字、大写字母、小写字母、特殊字符`~!@# $%^& *()-_=+ |[{}];:'",<.>/? 和空格 ）
+        :param plaintext: 待校验的密码明文
+        :return: 如果密码符合复杂度要求，返回True；否则返回False
+        """
+        # 至少8个字符
+        if len(plaintext) < self.min_length:
+            return False
+        # 计算密码中包含的字符类型数量
+        char_types = sum(bool(re.search(pattern, plaintext)) for pattern in self.patterns)
+        # 至少包含两种字符类型
+        if char_types < 2:
+            return False
+
+        return True
 
     def validate(self) -> ValidationResult:
         try:
-            # 读取cer证书，验证密码是否有效
-            private_key = cert_parser.parse_pem_files(self.cert_path, self.password)
-            # 校验私钥算法及长度
+            # 1. 校验密码复杂度
+            if not self.password_verify(self.password_bytes.decode(DEFAULT_ENCODING)):
+                return ValidationResult(False,
+                                        f"PEM privatekey password is too week, please check the password complexity! "
+                                        f"Min length is {self.min_length} and must contains at least two of the following character types: "
+                                        f"digits, uppercase letters, lowercase letters, special characters (`~!@#$%^&*()-_=+|[{{}}];:'\",<.>/?), and spaces.")
+            # 2. 读取cer证书，验证密码是否有效
+            private_key = cert_parser.parse_pem_files(self.cert_path, self.password_bytes)
+            # 3. 校验私钥算法及长度
             if not self.validate_private_key_length(private_key):
                 return ValidationResult(False,
-                                        f"Certificate key algorithm or length does not meet requirements. "
-                                        f"{self.conf_tip}")
+                                        f"Certificate key algorithm or length does not meet requirements. {self.conf_tip}")
+            # 4. 校验私钥文件里的公钥和cer里面的公钥是否一致
+            server_obj = cert_parser.parse_cer_certificate(self.server_path)
+            if len(server_obj.cert_list) == 0 or server_obj.cert_list[0].public_key != private_key.public_key():
+                return ValidationResult(False,
+                                        f"The PEM private key does not match the CER identity certificate. "
+                                        f"Please check \"ssl_certfile\" or \"ssl_keyfile\" config "
+                                        f"in \"etc/conf/server.conf\" file and try again.")
             return ValidationResult(True, f"PEM privatekey validation passed! {self.cert_path}")
         except Exception as e:
             return ValidationResult(False, f"{e} {self.conf_tip}")
+        finally:
+            self.password_bytes = b''
 
 
 class CRLValidator(CommonContentValidator):
@@ -245,8 +289,9 @@ class CertValidator:
 
         # 3. 读取私钥，验证密码是否有效，校验私钥算法及长度
         key_path = self.conf_obj.ssl_keyfile
-        password = load_cert_password(self.conf_obj.ssl_keyfile_password)
-        result = PrivateKeyValidator(cert_path=key_path, password=password, conf_tip="ssl_keyfile").validate()
+        password_bytes = load_cert_password(self.conf_obj.ssl_keyfile_password)
+        result = PrivateKeyValidator(cert_path=key_path, password_bytes=password_bytes,
+                                     server_path=self.conf_obj.ssl_certfile, conf_tip="ssl_keyfile").validate()
         if not result.is_valid:
             return result
         # 4. 读取crl，验证crl格式和有效期
