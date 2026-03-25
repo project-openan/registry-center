@@ -39,8 +39,7 @@ def load_cert_password(password_path: str) -> bytes:
 
 def set_ssl_folder_permissions():
     if platform.system().lower() != "linux":
-        # Unsupported system type!
-        logger.error(f"Unsupported system type: {platform.system().lower()}")
+        logger.info(f"current system type is: {platform.system().lower()}")
         return
     # 设置目录权限为700
     os.chmod(SSL_PATH, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
