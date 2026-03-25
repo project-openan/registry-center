@@ -2,7 +2,6 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
 from loguru import logger
 
 _LOG_DIR = Path("logs")
@@ -15,7 +14,6 @@ LOG_FORMAT = (
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
     "<level>{message}</level>"
 )
-
 
 def add_module_logger(module_prefix: str):
     """
@@ -35,6 +33,9 @@ def add_module_logger(module_prefix: str):
         backtrace=False,
         colorize=True,
     )
+
+    # 临时保存当前 umask
+    original_umask = os.umask(0o226)
 
     # Regular log file
     logger.add(
@@ -65,3 +66,8 @@ def add_module_logger(module_prefix: str):
         compression="zip",
         enqueue=True,
     )
+
+    logger.info("Logger initialized (file permissions set to 440)")
+
+    # 恢复原来的 umask
+    os.umask(original_umask)
