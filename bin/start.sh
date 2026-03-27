@@ -49,6 +49,7 @@ fi
 export APP_USER="$CURRENT_USER"
 export APP_UID="$CURRENT_UID"
 export APP_GID="$CURRENT_GID"
+export OPENSSL_CONF="${ROOT_DIR}/etc/conf/custom_openssl.cnf"
 
 # Check if target directory exists
 if [ -d "$TARGET_DIR" ]; then
