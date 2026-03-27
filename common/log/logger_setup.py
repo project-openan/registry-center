@@ -15,6 +15,7 @@ LOG_FORMAT = (
     "<level>{message}</level>"
 )
 
+
 def add_module_logger(module_prefix: str):
     """
     Configures logging for a module with console and file outputs.
