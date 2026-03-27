@@ -21,7 +21,8 @@ from starlette.responses import Response
 
 from agent_registry.config import (
     MAX_REQUEST_BODY_SIZE,
-    MAX_URL_LENGTH,
+    MAX_URL_LENGTH, CONN_TIMEOUT, CONN_MAX, FLOW_CTL_PARALLEL_REGISTER, FLOW_CTL_PARALLEL_QUERY, FLOW_CTL_REGISTER,
+    FLOW_CTL_QUERY, AGENT_NUM_MAX,
 )
 from agent_registry.core import RegistryCore
 from agent_registry.registry_instance import get_registry
@@ -49,8 +50,8 @@ def parse_rate_limit(interface_name: str):
     """
     # Mapping from interface name to config key and default value
     config_map = {
-        "register": ("flowcontrol.ratelimit.register", 10),
-        "query": ("flowcontrol.ratelimit.query", 10),
+        "register": (FLOW_CTL_REGISTER, 10),
+        "query": (FLOW_CTL_QUERY, 10),
     }
 
     # Get the corresponding config entry
@@ -142,16 +143,16 @@ config = get_conf()
 
 app.add_middleware(
     ConnectionLimitMiddleware,
-    max_connections=int(config.get("connection.max", 11))
+    max_connections=int(config.get(CONN_MAX, 11))
 )
 
 app.add_middleware(
     TimeoutMiddleware,
-    timeout_seconds=int(config.get("connection.timeout", 30))
+    timeout_seconds=int(config.get(CONN_TIMEOUT, 30))
 )
 
-register_semaphore = anyio.Semaphore(int(config.get("flowcontrol.parallelism.registe", 1)))
-query_semaphore = anyio.Semaphore(int(config.get("flowcontrol.parallelism.query", 10)))
+register_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_REGISTER, 1)))
+query_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_QUERY, 10)))
 
 
 # ---------- Middleware ----------
@@ -192,7 +193,7 @@ async def security_middleware(request: Request, call_next):
 # ---------- Routes ----------
 def _check_agent_limit(registry: RegistryCore, client_ip: str, details: dict) -> None:
     """检查注册数量是否超过上限，若超过则记录审计日志并抛出异常。"""
-    if len(registry.get_agents()) >= int(config.get('agent.num.max', 40)):
+    if len(registry.get_agents()) >= int(config.get(AGENT_NUM_MAX, 40)):
         details["message"] = "Agent registration limit exceeded."
         audit_handle.handle({
             "operation_name": OperationName.REGISTER_AGENT,
