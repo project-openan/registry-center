@@ -86,7 +86,7 @@ class CustomUvicornServer:
         self.conf_obj = conf_obj
 
     def run(self):
-        os.environ.setdefault(FORWARDED_ALLOW_IPS, self.server_config.get(FORWARDED_ALLOW_IPS))
+        os.environ.setdefault("FORWARDED_ALLOW_IPS", self.server_config.get(FORWARDED_ALLOW_IPS))
         server_config = uvicorn.Config(
             app=app,
             host=self.server_config.get("ip", "127.0.0.1"),
