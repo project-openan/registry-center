@@ -74,10 +74,12 @@ def my_create_ssl_context(
         return ctx
     except Exception as e:
         logger.error(f"ssl_context set error: {e}")
-        sys.exit(f"ssl_context set error: {e}")
+        raise SystemExit(f"ssl_context set error: {e}")
+
 
 # 由于原版config不支持加载crl，因此扩展crl支持
 config.create_ssl_context = my_create_ssl_context
+
 
 class CustomUvicornServer:
     """Customized Uvicorn server, which is used to add additional security configurations."""

@@ -205,7 +205,8 @@ async def _check_agent_limit(registry: RegistryCore, client_ip: str, details: di
         )
 
 
-async def _check_duplicate_agent(agent: ValidatedAgentCard, registry: RegistryCore, client_ip: str, details: dict) -> None:
+async def _check_duplicate_agent(agent: ValidatedAgentCard, registry: RegistryCore, client_ip: str,
+                                 details: dict) -> None:
     """检查是否已存在相同 (name, organization) 的 agent，若存在则记录并抛出异常。"""
     key = _make_agent_key(agent.name, agent.provider.organization)
     if key in registry.get_agents():
