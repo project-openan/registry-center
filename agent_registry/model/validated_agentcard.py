@@ -30,9 +30,9 @@ class ValidatedAgentCard(AgentCard):
     def validate_name(cls, v: str) -> str:
         if len(v) > NAME_MAX_LENGTH:
             raise ValueError(f'The agent name can contain a maximum of {NAME_MAX_LENGTH} characters.')
-        """验证名称仅包含字母、数字、下划线、空格和制表符"""
+        """验证名称仅包含字母、数字、下划线和空格"""
         if not _NAME_PATTERN.fullmatch(v):
-            raise ValueError('The name can contain only letters, digits, underscores (_), spaces, and tabs.')
+            raise ValueError('The name can contain only letters, digits, underscores (_), spaces.')
         return v
 
     @field_validator('description')
