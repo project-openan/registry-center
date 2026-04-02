@@ -1,0 +1,33 @@
+{
+    "LOG": true,
+    "LOG_LEVEL": "debug",
+    "HOST": "127.0.0.1",
+    "PORT": 3457,
+    "APIKEY": "",
+    "API_TIMEOUT_MS": "600000",
+    "PROXY_URL": "",
+    "transformers": [],
+    "Providers": [
+        {
+            "name": "MiniMax",
+            "api_base_url": "http://10.117.124.115:8080/v1/chat/completions",
+            "api_key": "sk-1234",
+            "models": [
+                "MiniMax-M2.5-ABTest"
+            ]
+        }
+    ],
+    "StatusLine": {
+        "enabled": false,
+        "currentStyle": "default",
+        "default": {
+            "modules": []
+        },
+        "powerline": {
+            "modules": []
+        }
+    },
+    "Router": {
+        "default": "MiniMax,MiniMax-M2.5-ABTest"
+    }
+}
