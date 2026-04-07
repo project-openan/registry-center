@@ -53,7 +53,7 @@ def parse_pem_files(cert_path: str, password: bytes = None) -> PrivateKeyTypes:
     except Exception as e:
         exception = e
         if not isinstance(e, CertParseException):
-            # 过滤原始信息，防止敏感信息泄漏
+            # 过滤原始解析异常信息，防止敏感信息泄漏
             exception = CertParseException("Parse private key error! ")
         raise exception
 

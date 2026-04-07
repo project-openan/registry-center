@@ -233,7 +233,7 @@ class CRLValidator(CommonContentValidator):
             # 读取CRL
             crl_list = cert_parser.parse_crl_list(self.cert_path)
             self.crl_list_data = crl_list
-            # 1. 校验CRL格式: X.509v2，有扩展的是v2，没有扩展的是v1
+            # 1. 校验CRL格式：X.509v2，有扩展的是v2，没有扩展的是v1
             is_v2 = len(crl_list.extensions) > 0
             if not is_v2:
                 return ValidationResult(False, f"CRL format is not X.509v2. {self.conf_tip}")
