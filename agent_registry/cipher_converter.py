@@ -63,7 +63,7 @@ class CipherConverter:
             if cipher.startswith('TLS_'):
                 cipher = cipher[4:]
 
-            # 替换 _WITH_ 为 _
+            # 替换 _WITH_ 为 -
             cipher = cipher.replace('_WITH_', '-')
 
             # 替换其他下划线为连字符
