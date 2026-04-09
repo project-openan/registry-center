@@ -77,7 +77,7 @@ AgentCard作为多个Agent之间交互的中转站，需要频繁接受各个Age
 }
 ```
 
-### 2.4 JWS签名结构和待签名数据说明
+### 2.4 JWS签名结构说明
 
 #### JWS签名结构
 
@@ -85,7 +85,7 @@ AgentCard作为多个Agent之间交互的中转站，需要频繁接受各个Age
 
 ```
 待签名的数据 = base64url(protected) + "." + base64url(payload)
-signature = sign(待签名的数据, private_key)
+signature = sign(待签名的数据， private_key)
 ```
 
 #### 待签名数据（payload）的定义
@@ -93,112 +93,6 @@ signature = sign(待签名的数据, private_key)
 **重要**：待签名的数据（payload）是整个AgentCard的JSON字符串，**但不包含signatures字段**。
 
 这是为了防止循环引用，确保签名的完整性和一致性。
-
-#### 签名生成过程详解
-
-**步骤1：准备protected头**
-```json
-{
-    "alg": "ES256",
-    "typ": "JOSE", 
-    "kid": "key-1",
-    "jku": "https://10.10.10.10:26335/agent/jwks.json"
-}
-```
-
-**步骤2：准备AgentCard数据作为payload（不包含signatures字段）**
-```json
-{
-    "name": "TestAgent",
-    "provider": {
-        "organization": "TestOrg",
-        "url": "https://test.org"
-    },
-    "description": "Test Description",
-    "capabilities": {
-        "skills": ["text-generation", "code-generation"],
-        "input_modes": ["text/plain", "application/json"],
-        "output_modes": ["text/plain", "application/json"]
-    },
-    "default_input_modes": ["text/plain"],
-    "default_output_modes": ["text/plain"],
-    "url": "https://agent.test",
-    "version": "1.0.0",
-    "skills": [
-        {
-            "id": "skill-1",
-            "name": "TestSkill",
-            "description": "Test Skill Description",
-            "tags": ["test", "skill"],
-            "input_modes": ["text/plain"],
-            "output_modes": ["text/plain"]
-        }
-    ]
-}
-```
-
-**步骤3：base64url编码**
-```python
-protected_encoded = base64url_encode(json.dumps(protected_header))
-# 结果: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpPU0UiLCJraWQiOiJrZXktMSIsImprdSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vYWdlbnQvandrcy5qc29uIn0"
-
-payload_encoded = base64url_encode(json.dumps(agent_card_without_signatures, sort_keys=True))
-# 结果: "eyJuYW1lIjoiVGVzdEFnZW50IiwicHJvdmlkZXIiOnsib3JnYW5pemF0aW9uIjoiVGVzdE9yZyIsInVybCI6Imh0dHBzOi8vdGVzdC5vcmci..."
-```
-
-**步骤4：构造待签名的数据**
-```python
-data_to_sign = protected_encoded + "." + payload_encoded
-# 结果: "eyJhbGci...+."+.eyJuYW1lIjoiVGVzdEFnZW50Ii..."
-```
-
-**步骤5：生成签名**
-```python
-signature = sign(data_to_sign, private_key)
-signature_encoded = base64url_encode(signature)
-# 结果: "QFdkNLNszlGj3z3u0YQGt_T9LixY3qtdQpZmsTdDHDe3fXV9y9-B3m2-XgCpzuhiLt8E0tV6HXoZKHv4GtHgKQ"
-```
-
-**步骤6：构造最终的signatures字段**
-```json
-"signatures": [
-    {
-        "protected": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpPU0UiLCJraWQiOiJrZXktMSIsImprdSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vYWdlbnQvandrcy5qc29uIn0",
-        "signature": "QFdkNLNszlGj3z3u0YQGt_T9LixY3qtdQpZmsTdDHDe3fXV9y9-B3m2-XgCpzuhiLt8E0tV6HXoZKHv4GtHgKQ"
-    }
-]
-```
-
-#### 服务端验签时的数据处理
-
-**步骤1：从请求中提取signatures字段**
-```python
-signatures = request_data["signatures"]
-```
-
-**步骤2：从请求中移除signatures字段，得到原始payload**
-```python
-agent_card_copy = request_data.copy()
-del agent_card_copy["signatures"]
-payload_json = json.dumps(agent_card_copy, sort_keys=True)
-payload_encoded = base64url_encode(payload_json)
-```
-
-**步骤3：对每个签名对象进行验证**
-```python
-for sig_obj in signatures:
-    protected_encoded = sig_obj["protected"]
-    signature_encoded = sig_obj["signature"]
-    
-    # 重新构造待签名的数据
-    data_to_verify = protected_encoded + "." + payload_encoded
-    
-    # 验证签名
-    is_valid = verify(data_to_verify, signature_encoded, public_key)
-    
-    if is_valid:
-        return "验签通过"
-```
 
 #### JWS签名结构总结
 
@@ -214,73 +108,7 @@ for sig_obj in signatures:
 1. **payload不包含signatures字段**：防止循环引用和签名无限嵌套
 2. **JSON序列化要一致**：客户端和服务端使用相同的序列化方式（如`sort_keys=True`）
 3. **base64url编码**：使用URL安全的base64url编码，不是标准的base64
-4. **字段顺序敏感**：JSON字段的顺序会影响签名结果，需要保持一致性
-5. **编码格式**：使用UTF-8编码进行JSON序列化
-
-#### 客户端签名生成示例代码
-
-```python
-import json
-import base64
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes, serialization
-
-def generate_agent_card_signature(agent_card_data, private_key):
-    """
-    为AgentCard生成JWS签名
-    
-    Args:
-        agent_card_data: AgentCard字典（不包含signatures字段）
-        private_key: ECDSA私钥
-    
-    Returns:
-        dict: 包含signatures字段的完整AgentCard
-    """
-    # 步骤1：准备protected头
-    protected_header = {
-        "alg": "ES256",
-        "typ": "JOSE",
-        "kid": "key-1",
-        "jku": "https://10.10.10.10:26335/agent/jwks.json"
-    }
-    
-    # 步骤2：序列化payload（AgentCard数据）
-    payload_json = json.dumps(agent_card_data, sort_keys=True)
-    
-    # 步骤3：base64url编码
-    protected_encoded = base64url_encode(json.dumps(protected_header))
-    payload_encoded = base64url_encode(payload_json)
-    
-    # 步骤4：构造待签名的数据
-    data_to_sign = protected_encoded + "." + payload_encoded
-    
-    # 步骤5：生成签名
-    signature = private_key.sign(
-        data_to_sign.encode('utf-8'),
-        ec.ECDSA(hashes.SHA256())
-    )
-    signature_encoded = base64url_encode(signature)
-    
-    # 步骤6：构造signatures字段
-    signatures = [
-        {
-            "protected": protected_encoded,
-            "signature": signature_encoded
-        }
-    ]
-    
-    # 步骤7：返回完整的AgentCard
-    result = agent_card_data.copy()
-    result["signatures"] = signatures
-    
-    return result
-
-def base64url_encode(data):
-    """URL安全的base64编码"""
-    if isinstance(data, str):
-        data = data.encode('utf-8')
-    return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
-```
+4. **字段顺序敏感**：JSON字段的顺序会影响签名结果
 
 ## 3. 验签流程设计
 
@@ -309,35 +137,47 @@ def base64url_encode(data):
     │         │
    否         是
     │         │
-    │         │ 3. 从后台获取所有配置的公钥
+    │         │ 3. 遍历signatures数组
     │         ▼
     │  ┌─────────────────────────────────┐
-    │  │   后台有配置公钥？              │
+    │  │   读取signatures[i].protected.kid│
     │  └────────┬────────────────────────┘
     │  ┌─────────┴─────────┐
     │  │                   │
-    │  是                  否
+    │  │ 4. 优先从后台存储的公钥中寻找
+    │  │   根据kid查找是否存在该id
     │  │                   │
-    │  │ 4. 逐一用配置公钥验签
-    │  │   - 成功一次即通过
-    │  │   - 全部失败则继续
-    │  │                   │
-    │  │                   │ 5. 从protected.jku获取临时公钥
-    │  │                   ▼
-    │  │           ┌─────────────────────────────────┐
-    │  │           │   成功获取临时公钥？           │
-    │  │           └────────┬────────────────────────┘
-    │  │       ┌───────────┴───────────┐
-    │  │       │                       │
-    │  │      是                       否
-    │  │       │                       │
-    │  │       │ 6. 用临时公钥验签     │
-    │  │       │                       │
-    │  │       │ 7. 返回验签结果        │
-    │  │       │                       │
-    │  └───────┴───────────────────────┘
+    │  │ 5. 存在该id的公钥？
+    │  │  ┌─────────┴─────────┐
+    │  │  │                   │
+    │  │  是                  否
+    │  │  │                   │
+    │  │  │ 6. 使用后台公钥验签
+    │  │  │   成功则通过
+    │  │  │                   │
+    │  │  │                   │ 7. 从protected.jku获取jwks.json
+    │  │  │                   ▼
+    │  │  │           ┌─────────────────────────────────┐
+    │  │  │           │   成功获取JWKS？               │
+    │  │  │           └────────┬────────────────────────┘
+    │  │  │       ┌───────────┴───────────┐
+    │  │  │       │                       │
+    │  │  │      是                       否
+    │  │  │       │                       │
+    │  │  │       │ 8. 根据kid从JWKS中获取公钥
+    │  │  │       │                       │
+    │  │  │       │ 9. 使用临时公钥验签
+    │  │  │       │                       │
+    │  │  │       │ 10. 返回验签结果
+    │  │  │       │                       │
+    │  │  └───────┴───────────────────────┘
+    │  │
+    │  │ 11. 两次都未获取到公钥 → 验签失败
+    │  │
+    │  └──────────────────────────────────→ 返回错误
     │
-    │ 8. 无signatures字段 → 验签失败
+
+    │ 12. 无signatures字段 → 验签失败
     │
     └──────────────────────────────────→ 返回错误
 ```
@@ -347,34 +187,50 @@ def base64url_encode(data):
 #### 步骤1：检查验签开关
 - 检查配置文件中的验签开关状态
 - 如果关闭，跳过验签直接处理业务逻辑
-- 如果开启（默认），进入验签流程
+- 如果开启（默认），`进入验签流程
 
 #### 步骤2：提取signatures字段
 - 从请求体中提取`signatures`字段
 - 如果不存在，返回验签失败错误
 
-#### 步骤3：从后台获取配置公钥
-- 调用公钥管理器获取所有配置的公钥
-- 公钥存储在后台数据库或文件中
+#### 步骤3：遍历signatures数组
+- 对`signatures`数组中的每个签名对象进行处理
+- 支持密钥轮转场景
 
-#### 步骤4：使用配置公钥验签
-- 遍历所有配置的公钥
-- 对每个签名对象，逐一用配置公钥验签
-- **只要有一个公钥验签成功，即视为验签通过**
-- 如果所有配置公钥都验签失败，继续下一步
+#### 步骤4：读取kid
+- 从`signatures[i].protected`中解码获取`kid`（密钥ID）
+- `kid`用于标识和查找对应的公钥
 
-#### 步骤5：从jku获取临时公钥
+#### 步骤5：优先从后台存储的公钥中寻找
+- 根据从请求头中获取的`organization`和`agent-name`
+- 构造文件路径：`/etc/sign_verify/jwks/{organization}/{agent-name}.json`
+- 从该文件中查找是否存在对应`kid`的公钥
+
+#### 步骤6：使用后台公钥验签
+- 如果找到对应`kid`的公钥，使用该公钥进行验签
+- 使用a2a-sdk提供的API进行验签
+- 验签成功则视为验签通过
+
+#### 步骤7：从jku获取临时公钥
+- 如果后台未找到对应`kid`的公钥
 - 从`protected`字段解码获取`jku` (JWK Set URL)
 - 发送HTTP请求到`jku`获取JWKS (JSON Web Key Set)
-- 从JWKS中提取对应的公钥
 
-#### 步骤6：使用临时公钥验签
+#### 步骤8：从JWKS中获取公钥
+- 从JWKS中根据`kid`查找对应的公钥
+- 如果找不到，继续下一个签名对象
+
+#### 步骤9：使用临时公钥验签
 - 使用从`jku`获取的临时公钥验签
+- 使用a2a-sdk提供的API进行验签
 - **不缓存临时公钥**（每次都重新获取）
 
-#### 步骤7：返回验签结果
+#### 步骤10：返回验签结果
 - 验签成功：继续处理业务逻辑
-- 验签失败：返回验签失败错误
+- 验签失败：继续下一个签名对象
+
+#### 步骤11：验签失败
+- 如果所有签名对象都验签失败，返回验签失败错误
 
 ## 4. 数据模型设计
 
@@ -398,36 +254,29 @@ class ProtectedHeader(BaseModel):
     jku: str = Field(..., description="JWK Set URL")
 ```
 
-### 4.3 公钥配置模型
-
-```python
-class PublicKeyConfig(BaseModel):
-    """公钥配置模型"""
-    key_id: str = Field(..., description="公钥唯一标识")
-    public_key: str = Field(..., description="PEM格式公钥")
-    algorithm: str = Field(..., description="签名算法")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    status: str = Field(default="active", description="状态：active/inactive")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-```
-
-### 4.4 JWK模型
+### 4.3 JWK模型
 
 ```python
 class JWK(BaseModel):
     """JSON Web Key模型"""
-    kty: str = Field(..., description="密钥类型，如EC, RSA")
+    kty: str = Field(..., description="密钥类型，仅支持EC或RSA")
     kid: str = Field(..., description="密钥ID")
     use: str = Field(default="sig", description="密钥用途")
-    alg: str = Field(..., description="算法，如ES256")
+    alg: str = Field(..., description="算法，如ES256, RS256")
     crv: Optional[str] = Field(None, description="曲线，如P-256")
     x: str = Field(..., description="X坐标（ECDSA）或模数（RSA）")
     y: Optional[str] = Field(None, description="Y坐标（ECDSA）")
     n: Optional[str] = Field(None, description="模数（RSA）")
-    e: Optional[Str] = Field(None, description="指数（RSA）")
+    e: Optional[str] = Field(None, description="指数（RSA）")
+    
+    @validator('kty')
+    def validate_kty(cls, v):
+        if v not in ['EC', 'RSA']:
+            raise ValueError('密钥类型仅支持EC或RSA')
+        return v
 ```
 
-### 4.5 JWKS模型
+### 4.4 JWKS模型
 
 ```python
 class JWKS(BaseModel):
@@ -435,37 +284,63 @@ class JWKS(BaseModel):
     keys: List[JWK] = Field(..., description="公钥列表")
 ```
 
+### 4.5 Agent公钥存储模型
+
+```python
+class AgentKeysStorage(BaseModel):
+    """Agent公钥存储模型"""
+    organization: str = Field(..., description="组织名称")
+    agent_name: str = Field(..., description="Agent名称")
+    keys: List[JWK] = Field(default_factory=list, description="公钥列表")
+    updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
+```
+
 ## 5. 核心组件设计
 
-### 5.1 签名验证器 (JWSValidator)
+### 5.1 签名验证器 (AgentCardValidator)
 
 **职责**：
-- 解析JWS格式的签名
-- 验证签名有效性
-- 支持多种签名算法
+- 协调整个验签流程
+- 集成配置公钥和临时公钥验签
+- 提供统一的验签接口
 
 **主要方法**：
 ```python
-class JWSValidator:
-    def validate_signature(
-        self, 
-        signature_obj: SignatureObject,
-        public_key: PublicKeyTypes,
-        payload: str
+class AgentCardValidator:
+    def validate_agent_card(
+        self,
+        agent_card_data: dict,
+        organization: str,
+        agent_name: str
+    ) -> ValidationResult:
+        """验证AgentCard的签名"""
+        
+    def _extract_signatures(self, agent_card_data: dict) -> List[SignatureObject]:
+        """提取signatures字段"""
+        
+    def _validate_single_signature(
+        self,
+        signature: SignatureObject,
+        agent_card_data: dict,
+        organization: str,
+        agent_name: str
     ) -> bool:
         """验证单个签名"""
         
-    def decode_protected(self, protected: str) -> ProtectedHeader:
-        """解码protected头"""
-        
-    def verify_with_public_key(
+    def _try_backend_key(
         self,
-        signature: str,
-        protected: str,
-        payload: str,
-        public_key: PublicKeyTypes
-    ) -> bool:
-        """使用公钥验证签名"""
+        kid: str,
+        organization: str,
+        agent_name: str
+    ) -> Optional[JWK]:
+        """尝试从后台获取公钥"""
+        
+    def _try_temporary_key(
+        self,
+        jku: str,
+        kid: str
+    ) -> Optional[JWK]:
+        """尝试从jku获取临时公钥"""
 ```
 
 ### 5.2 公钥管理器 (PublicKeyManager)
@@ -474,21 +349,48 @@ class JWSValidator:
 - 管理后台配置的公钥
 - 提供公钥的CRUD操作
 - 支持多本公钥
+- 基于文件存储
 
 **主要方法**：
 ```python
 class PublicKeyManager:
-    def add_public_key(self, key_config: PublicKeyConfig) -> bool:
-        """添加公钥配置"""
+    def add_public_keys(
+        self,
+        organization: str,
+        agent_name: str,
+        jwks: JWKS
+    ) -> List[str]:
+        """批量添加公钥配置"""
         
-    def remove_public_key(self, key_id: str) -> bool:
+    def remove_public_key(
+        self,
+        organization: str,
+        agent_name: str,
+        kid: str
+    ) -> bool:
         """删除公钥配置"""
         
-    def get_all_public_keys(self) -> List[PublicKeyConfig]:
+    def get_all_public_keys(
+        self,
+        organization: str,
+        agent_name: str
+    ) -> JWKS:
         """获取所有配置的公钥"""
         
-    def get_public_key(self, key_id: str) -> Optional[PublicKeyConfig]:
-        """根据key_id获取公钥"""
+    def get_public_key(
+        self,
+        organization: str,
+        agent_name: str,
+        kid: str
+    ) -> Optional[JWK]:
+        """根据kid获取公钥"""
+        
+    def _get_storage_path(
+        self,
+        organization: str,
+        agent_name: str
+    ) -> str:
+        """获取存储路径"""
 ```
 
 ### 5.3 JWK获取器 (JWKFetcher)
@@ -506,88 +408,87 @@ class JWKFetcher:
         
     def find_key_by_kid(self, jwks: JWKS, kid: str) -> Optional[JWK]:
         """根据kid从JWKS中查找公钥"""
-        
-    def jwk_to_public_key(self, jwk: JWK) -> PublicKeyTypes:
-        """将JWK转换为公钥对象"""
-```
-
-### 5.4 AgentCard验证器 (AgentCardValidator)
-
-**职责**：
-- 协调整个验签流程
-- 集成配置公钥和临时公钥验签
-- 提供统一的验签接口
-
-**主要方法**：
-```python
-class AgentCardValidator:
-    def validate_agent_card(
-        self,
-        agent_card_data: dict,
-        enforce_validation: bool = True
-    ) -> ValidationResult:
-        """验证AgentCard的签名"""
-        
-    def _extract_signatures(self, agent_card_data: dict) -> List[SignatureObject]:
-        """提取signatures字段"""
-        
-    def _try_configured_keys(self, signatures: List[SignatureObject], payload: str) -> bool:
-        """尝试使用配置的公钥验签"""
-        
-    def _try_temporary_key(self, signature: SignatureObject, payload: str) -> bool:
-        """尝试使用临时公钥验签"""
 ```
 
 ## 6. API接口设计
 
 ### 6.1 公钥管理API
 
-#### 添加公钥配置
+#### 批量添加公钥配置
 ```
 POST /rest/a2a-t/v1/keys/config
+Headers:
+  - organization: TestOrg
+  - agent-name: TestAgent
 
 Request Body:
 {
-    "key_id": "agent-001",
-    "public_key": "-----BEGIN PUBLIC KEY-----\n...",
-    "algorithm": "ES256",
-    "metadata": {
-        "owner": "agent-provider",
-        "description": "Agent 001 public key"
-    }
+    "keys": [
+        {
+            "kty": "EC",
+            "kid": "key-1",
+            "use": "sig",
+            "alg": "ES256",
+            "crv": "P-256",
+            "x": "MKBCTNIcKUSDii11ySs3526iDz8ETo7ct6KogEvTkH0",
+            "y": "4Etl6SRW2YiLUrN5vfvAfHh7nStpGMT9y3JQtmD1LYA"
+        },
+        {
+            "kty": "RSA",
+            "kid": "rsa-key-1",
+            "use": "sig",
+            "alg": "RS256",
+            "n": "0vx7agoebGcQSuuCxLzdtZ...)",
+            "e": "AQAB"
+        }
+    ]
 }
 
 Response:
 {
     "success": true,
-    "key_id": "agent-001",
-    "message": "Public key configuration added successfully"
+    "added_keys": ["key-1", "rsa-key-1"],
+    "message": "Public keys added successfully"
 }
 ```
+
+**校验规则**：
+- 一次最多添加5个公钥
+- 每个JWK的密钥类型约束只支持EC或RSA公钥
+- 若kid相同则视为重复添加，直接覆盖
 
 #### 删除公钥配置
 ```
-DELETE /rest/a2a-t/v1/keys/config/{key_id}
+DELETE /rest/a2a-t/v1/keys/config/{kid}
+Headers:
+  - organization: TestOrg
+  - agent-name: TestAgent
 
 Response:
 {
     "success": true,
-    "message": "Public key configuration removed successfully"
+    "message": "Public key removed successfully"
 }
 ```
 
 #### 查询所有公钥配置
 ```
 GET /rest/a2a-t/v1/keys/config
+Headers:
+  - organization: TestOrg
+  - agent-name: TestAgent
 
 Response:
 {
     "keys": [
         {
-            "key_id": "agent-001",
-            "algorithm": "ES256",
-            "status": "active",
-            "created_at": "2024-01-01T00:00:00Z"
+            "kty": "EC",
+            "kid": "key-1",
+            "use": "sig",
+            "alg": "ES256",
+            "crv": "P-256",
+            "x": "MKBCTNIcKUSDii11ySs3526iDz8ETo7ct6KogEvTkH0",
+            "y": "4Etl6SRW2YiLUrN5vfvAfHh7nStpGMT9y3JQtmD1LYA"
         }
     ],
     "total": 1
@@ -596,72 +497,212 @@ Response:
 
 #### 查询单个公钥配置
 ```
-GET /rest/a2a-t/v1/keys/agent/{key_id}
+GET /rest/a2a-t/v1/keys/config/{kid}
+Headers:
+  - organization: TestOrg
+  - agent-name: TestAgent
 
 Response:
 {
-    "key_id": "agent-001",
-    "public_key": "-----BEGIN PUBLIC KEY-----\n...",
-    "algorithm": "ES256",
-    "status": "active",
-    "created_at": "2024-01-01T00:00:00Z"
+    "kty": "EC",
+    "kid": "key-1",
+    "use": "sig",
+    "alg": "ES256",
+    "crv": "P-256",
+    "x": "MKBCTNIcKUSDii11ySs3526iDz8ETo7ct6KogEvTkH0",
+    "y": "4Etl6SRW2YiLUrN5vfvAfHh7nStpGMTGMT9y3JQtmD1LYA"
 }
 ```
 
-### 6.2 验签开关API
+### 6.2 验签开关配置
 
-#### 查询验签状态
-```
-GET /rest/a2a-t/v1/config/signature
-
-Response:
-{
-    "enabled": true,
-    "enforce": true
-}
-```
-
-#### 更新验签配置
-```
-PUT /rest/a2a-t/v1/config/signature
-
-Request Body:
-{
-    "enabled": true,
-    "enforce": false
-}
-
-Response:
-{
-    "success": true,
-    "message": "Signature validation configuration updated"
-}
-```
-
-## 7. 配置设计
-
-### 7.1 验签配置
+验签能力开关配置在`/etc/conf/server.conf`中：
 
 ```ini
-# etc/conf/server.properties
-
 # 验签开关
-signature.validation.enabled=true
-signature.validation.enforce=true
-
-# 公钥存储路径
-signature.public_key.storage=data/public_keys.json
-
-# JWK获取超时时间（秒）
-signature.jwk.fetch_timeout=10
-
-# JWK获取最大重试次数
-signature.jwk.max_retries=3
+signature_validation_enabled=true
 ```
 
-## 8. 错误处理
+## 7. 文件存储设计
 
-### 8.1 错误码定义
+### 7.1 存储目录结构
+
+```
+/etc/sign_verify/jwks/
+├── TestOrg/
+│   ├── TestAgent.json
+│   ├── AnotherAgent.json
+│   └── ...
+├── AnotherOrg/
+│   ├── Agent1.json
+│   └── Agent2.json
+└── ...
+```
+
+### 7.2 存储文件格式
+
+每个Agent的公钥存储在独立的JSON文件中：
+
+```json
+{
+    "organization": "TestOrg",
+    "agent_name": "TestAgent",
+    "keys": [
+        {
+            "kty": "EC",
+            "kid": "key-1",
+            "use": "sig",
+            "alg": "ES256",
+            "crv": "P-256",
+            "x": "MKBCTNIcKUSDii11ySs3526iDz8ETo7ct6KogEvTkH0",
+            "y": "4Etl6SRW2YiLUrN5vfvAfHh7nStpGMT9y3JQtmD1LYA"
+        }
+    ],
+    "updated_at": "2024-01-01T00:00:00Z"
+}
+```
+
+### 7.3 存储路径构造
+
+```python
+def get_storage_path(organization: str, agent_name: str) -> str:
+    """
+    构造存储路径
+    
+    Args:
+        organization: 组织名称
+        agent_name: Agent名称
+    
+    Returns:
+        str: 存储文件路径
+    """
+    base_dir = "/etc/sign_verify/jwks"
+    org_dir = os.path.join(base_dir, organization)
+    return os.path.join(org_dir, f"{agent_name}.json")
+```
+
+## 8. 签名验证集成设计
+
+### 8.1 使用a2a-sdk进行签名验证
+
+```python
+from a2a_sdk import signature as a2a_signature
+
+def verify_signature_with_sdk(
+    protected: str,
+    payload: str,
+    signature: str,
+    public_key: JWK
+) -> bool:
+    """
+    使用a2a-sdk进行签名验证
+    
+    Args:
+        protected: base64url编码的protected头
+        payload: AgentCard的JSON字符串（不包含signatures）
+        signature: base64url编码的签名值
+        public_key: JWK格式的公钥
+    
+    Returns:
+        bool: 验证结果
+    """
+    try:
+        # 构造JWS对象
+        jws = {
+            "protected": protected,
+            "payload": payload,
+            "signature": signature
+        }
+        
+        # 使用a2a-sdk验证签名
+        result = a2a_signature.verify_jws(jws, public_key)
+        
+        return result.is_valid
+    except Exception as e:
+        logger.error(f"签名验证失败: {e}")
+        return False
+```
+
+### 8.2 完整验签流程实现
+
+```python
+class AgentCardValidator:
+    def validate_agent_card(
+        self,
+        agent_card_data: dict,
+        organization: str,
+        agent_name: str
+    ) -> ValidationResult:
+        """
+        验证AgentCard的签名
+        
+        Args:
+            agent_card_data: AgentCard数据
+            organization: 组织名称
+            agent_name: Agent名称
+        
+        Returns:
+            ValidationResult: 验证结果
+        """
+        # 步骤1：提取signatures字段
+        signatures = self._extract_signatures(agent_card_data)
+        if not signatures:
+            return ValidationResult(
+                is_valid=False,
+                error_code="SIG001",
+                error_message="Signatures field is required"
+            )
+        
+        # 步骤2：构造payload（不包含signatures）
+        agent_card_copy = agent_card_data.copy()
+        del agent_card_copy["signatures"]
+        payload = json.dumps(agent_card_copy, sort_keys=True)
+        
+        # 步骤3：遍历signatures数组
+        for sig_obj in signatures:
+            # 解码protected头
+            protected_header = self._decode_protected(sig_obj.protected)
+            kid = protected_header.kid
+            
+            # 步骤4：优先从后台获取公钥
+            backend_key = self._try_backend_key(kid, organization, agent_name)
+            if backend_key:
+                # 使用后台公钥验签
+                if self._verify_with_sdk(
+                    sig_obj.protected,
+                    payload,
+                    sig_obj.signature,
+                    backend_key
+                ):
+                    return ValidationResult(is_valid=True)
+            
+            # 步骤5：从jku获取临时公钥
+            if hasattr(protected_header, 'jku'):
+                temporary_key = self._try_temporary_key(
+                    protected_header.jku,
+                    kid
+                )
+                if temporary_key:
+                    # 使用临时公钥验签
+                    if self._verify_with_sdk(
+                        sig_obj.protected,
+                        payload,
+                        sig_obj.signature,
+                        temporary_key
+                    ):
+                        return ValidationResult(is_valid=True)
+        
+        # 所有签名都验证失败
+        return ValidationResult(
+            is_valid=False,
+            error_code="SIG005",
+            error_message="All signature validations failed"
+        )
+```
+
+## 9. 错误处理
+
+### 9.1 错误码定义
 
 | 错误码 | 说明 | HTTP状态码 |
 |--------|------|-----------|
@@ -673,8 +714,10 @@ signature.jwk.max_retries=3
 | SIG006 | 不支持的签名算法 | 400 |
 | SIG007 | JWKS格式错误 | 400 |
 | SIG008 | 公钥配置不存在 | 404 |
+| SIG009 | 公钥数量超过限制（最多5个） | 400 |
+| SIG010 | 不支持的密钥类型（仅支持EC或RSA） | 400 |
 
-### 8.2 错误响应格式
+### 9.2 错误响应格式
 
 ```json
 {
@@ -687,102 +730,103 @@ signature.jwk.max_retries=3
 }
 ```
 
-## 9. 安全考虑
+## 10. 安全考虑
 
-### 9.1 公钥安全
-- **配置公钥**：存储在后台，权限控制
+### 10.1 公钥安全
+- **配置公钥**：存储在后台文件系统，权限控制
 - **临时公钥**：不缓存，每次重新获取
 - **公钥验证**：验证公钥格式和算法
 
-### 9.2 网络安全
+### 10.2 网络安全
 - **HTTPS传输**：jku URL必须使用HTTPS
 - **超时控制**：防止长时间等待
 - **重试限制**：限制重试次数
 
-### 9.3 算法安全
+### 10.3 算法安全
 - **算法白名单**：只允许安全的签名算法
+- **密钥类型约束**：仅支持EC或RSA公钥
 - **密钥长度验证**：验证密钥长度符合要求
 
-## 10. 性能优化
+## 11. 性能优化
 
-### 10.1 缓存策略
+### 11.1 缓存策略
 - **配置公钥**：可以缓存（因为配置不常变化）
 - **临时公钥**：不缓存（每次重新获取）
 
-### 10.2 并发处理
-- **多公钥并行验签**：提高验签速度
+### 11.2 并发处理
+- **多签名并行验签**：提高验签速度
 - **超时控制**：防止单个公钥验签时间过长
 
-## 11. 测试计划
+## 12. 测试计划
 
-### 11.1 单元测试
-- JWS签名验证测试
+### 12.1 单元测试
 - 公钥管理器测试
 - JWK获取器测试
 - AgentCard验证器测试
 
-### 11.2 集成测试
+### 12.2 集成测试
 - 完整验签流程测试
 - 配置公钥验签测试
 - 临时公钥验签测试
 - 混合验签测试
 
-### 11.3 安全测试
+### 12.3 安全测试
 - 签名伪造测试
 - 公钥替换测试
 - jku篡改测试
 - 算法降级测试
 
-## 12. 实现优先级
+## 13. 实现优先级
 
 ### Phase 1: 核心功能
-1. 实现JWS签名验证器
-2. 实现公钥管理器
-3. 实现JWK获取器
-4. 实现AgentCard验证器
+1. 实现公钥管理器（文件存储）
+2. 实现JWK获取器
+3. 实现AgentCard验证器
+4. 集成a2a-sdk签名验证
 
 ### Phase 2: API接口
 1. 实现公钥管理API
-2. 实现验签配置API
-3. 集成到现有Agent注册接口
+2. 集成到现有Agent注册接口
 
 ### Phase 3: 优化和测试
 1. 性能优化
 2. 完整测试覆盖
 3. 文档完善
 
-## 13. 兼容性考虑
+## 14. 兼容性考虑
 
-### 13.1 向后兼容
+### 14.1 向后兼容
 - **验签关闭时**：兼容无signatures字段的请求
 - **渐进式启用**：支持先启用验签，再配置公钥
 
-### 13.2 前向兼容
+### 14.2 前向兼容
 - **多签名支持**：支持密钥轮转场景
 - **算法扩展**：易于添加新的签名算法
 
-## 14. 监控和日志
+## 15. 监控和日志
 
-### 14.1 监控指标
+### 15.1 监控指标
 - 验签成功率
 - 验签失败原因分布
 - jku获取成功率
 - 配置公钥使用率
 
-### 14.2 日志记录
+### 15.2 日志记录
 - 验签请求日志
 - 公钥使用日志
 - jku获取日志
 - 错误日志
 
-## 15. 总结
+## 16. 总结
 
 本设计方案基于JWS (JSON Web Signature)标准，实现了AgentCard的验签功能，主要特点：
 
 1. **灵活的验签策略**：支持配置公钥和临时公钥双重验签
 2. **密钥轮转支持**：支持多签名字段，平滑密钥轮转
 3. **安全优先**：默认强制验签，支持动态公钥获取
-4. **易于集成**：最小化对现有代码的侵入
+4. **易于集成**：使用a2a-sdk进行签名验证
 5. **可扩展性**：支持多种签名算法和公钥来源
+6. **文件存储**：基于文件系统的公钥管理
+7. **Agent隔离**：通过organization和agent-name实现Agent级别的公钥隔离
 
 该设计满足所有需求，并考虑了安全性、性能和可维护性。
