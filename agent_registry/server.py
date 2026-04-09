@@ -9,12 +9,11 @@ and persistence using a JSON file.
 
 import asyncio
 from functools import partial
-from http import HTTPStatus
 from typing import List, Optional, Tuple, Any
 
 import anyio
 from a2a.types import AgentCard
-from fastapi import FastAPI, HTTPException, Query, Request, Depends, status
+from fastapi import FastAPI, HTTPException, Query, Request, Depends, status, Path, Body
 from fastapi.responses import JSONResponse
 from loguru import logger
 from limits import strategies, storage, parse_many
@@ -346,6 +345,82 @@ async def list_agents_exact(
     finally:
         if acquired:
             query_semaphore.release()
+
+
+@app.put("/rest/a2a-t/v1/update_agent/{name}", response_model=bool, summary="Full update(replace) an agent")
+async def update_agent(
+        name: str = Path(..., description="Agent name"),
+        organization: str = Query(..., description="Agent organization"),
+        agent_data: AgentCard = Body(..., description="Full agent data"),
+        registry: RegistryCore = Depends(get_registry),
+):
+    """
+    Fully replace an existing agent. The name and organization in the body must match the path/query.
+    Returns True if updated, False if not found.
+    """
+    try:
+        # Convert to dict for update
+        data = agent_data.model_dump()
+        success = registry.update(name, organization, data, partial=False)
+        if not success:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+        return success
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Unexpected error in full update:{e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.delete("/rest/a2a-t/v1/deregister_agent/{name}", response_model=bool, summary="Deregister an agent")
+async def deregister_agent(
+        name: str = Path(..., description="Agent name"),
+        organization: str = Query(..., description="Agent organization"),
+        registry: RegistryCore = Depends(get_registry),
+):
+    """
+    Remove an agent from the registry.
+    Returns True if deleted, False if not found.
+    """
+    try:
+        success = registry.deregister(name, organization)
+        if not success:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+        return success
+    except Exception as e:
+        logger.error(f"Unexpected error in deregister agent:{e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.get("/rest/a2a-t/v1/agents/retrieve", response_model=List[AgentCard], summary="Fuzzy retrieve by task")
+async def retrieve_agents_by_task(
+        task: str = Query(..., description="Natural language task description"),
+        registry: RegistryCore = Depends(get_registry),
+):
+    """
+    Find agents that are semantically relevant to the given task using LLM.
+    """
+    try:
+        agents = registry.retrieve_by_task(task)
+        return agents
+    except Exception as e:
+        logger.error(f"Error in fuzzy search:{e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.get("/rest/a2a-t/v1/agents/{name}", response_model=AgentCard, summary="Get agent by exact name and organization")
+async def get_agent(
+        name: str = Path(..., description="Agent name"),
+        organization: str = Query(..., description="Agent organization"),
+        registry: RegistryCore = Depends(get_registry)
+):
+    """
+    Search a single agent by its unique key(name and organization).
+    """
+    agent = registry.get_by_key(name, organization)
+    if not agent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+    return agent
 
 
 def _make_agent_key(name: str, organization: str) -> Tuple[str, str]:
