@@ -30,7 +30,7 @@ class RegistryCore:
         # Internal storage of Agents: key is (name, organization) Tuple, value is AgentCard
         self._agents: Dict[Tuple[str, str], AgentCard] = {}
         self._load()  # load from file on startup
-        self.llm = get_llm_instance()
+        # self.llm = get_llm_instance()
 
     @staticmethod
     def _make_key(name: str, organization: str) -> Tuple[str, str]:
