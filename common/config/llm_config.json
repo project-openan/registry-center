@@ -1,0 +1,10 @@
+{
+  "deepseek-chat": {
+    "description": "this is openai rest api, deepseek-chat",
+    "model": "deepseek-chat",
+    "api": "httsp://api.deepseek.com",
+    "timeout": 120,
+    "version": "1.0.0",
+    "api_key": ""
+  }
+}

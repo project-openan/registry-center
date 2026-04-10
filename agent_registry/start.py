@@ -93,16 +93,16 @@ class CustomUvicornServer:
             app=app,
             host=self.server_config.get("ip", "127.0.0.1"),
             port=int(self.server_config.get("port", 5000)),
-            ssl_certfile=self.conf_obj.ssl_certfile,
-            # 私钥路径
-            ssl_keyfile=self.conf_obj.ssl_keyfile,
-            # 私钥密码
-            ssl_keyfile_password=load_cert_password(self.conf_obj.ssl_keyfile_password).decode(DEFAULT_ENCODING),
-            # 信任证书
-            ssl_ca_certs=self.conf_obj.ssl_ca_certs,
-            # 是否校验客户端证书，填了如果浏览器没证书就没法访问了
-            ssl_cert_reqs=self.conf_obj.verify_client,
-            ssl_ciphers=CipherConverter.convert(self.server_config.get(TLS_CIPHER)),
+            # ssl_certfile=self.conf_obj.ssl_certfile,
+            # # 私钥路径
+            # ssl_keyfile=self.conf_obj.ssl_keyfile,
+            # # 私钥密码
+            # ssl_keyfile_password=load_cert_password(self.conf_obj.ssl_keyfile_password).decode(DEFAULT_ENCODING),
+            # # 信任证书
+            # ssl_ca_certs=self.conf_obj.ssl_ca_certs,
+            # # 是否校验客户端证书，填了如果浏览器没证书就没法访问了
+            # ssl_cert_reqs=self.conf_obj.verify_client,
+            # ssl_ciphers=CipherConverter.convert(self.server_config.get(TLS_CIPHER)),
             timeout_keep_alive=0,
             timeout_graceful_shutdown=int(self.server_config.get(CONN_TIMEOUT, 30)),
             log_level="info",
@@ -117,9 +117,9 @@ def main():
     try:
         # 校验配置
         conf_obj = conf_singleton_obj
-        result = CertValidator(conf_obj).validate()
-        if not result.is_valid:
-            sys.exit(result.message)
+        # result = CertValidator(conf_obj).validate()
+        # if not result.is_valid:
+        #     sys.exit(result.message)
         # 通过校验后修改etc/ssl文件夹权限为700，里面文件权限为600
         set_ssl_folder_permissions()
         # 创建并启动服务器

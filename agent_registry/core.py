@@ -11,6 +11,7 @@ from loguru import logger
 from agent_registry.config import PERSISTENCE_FILE
 from agent_registry.persistence import save_to_file, load_from_file
 from agent_registry.prompts import build_agent_selection_prompt
+from common.llm import get_llm_instance
 from common.util.config_util import get_root_path
 
 
@@ -29,6 +30,7 @@ class RegistryCore:
         # Internal storage of Agents: key is (name, organization) Tuple, value is AgentCard
         self._agents: Dict[Tuple[str, str], AgentCard] = {}
         self._load()  # load from file on startup
+        self.llm = get_llm_instance()
 
     @staticmethod
     def _make_key(name: str, organization: str) -> Tuple[str, str]:

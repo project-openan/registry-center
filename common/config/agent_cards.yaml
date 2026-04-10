@@ -1,0 +1,145 @@
+# AgentCard配置
+# 如果设置了source_url，则优先从URL获取AgentCard
+# 否则使用下面的agents字段
+# source_url: "http://example.com/agents"
+
+agents:
+  - name: "RAN Energy Saving Agent"
+    description: "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。"
+    provider:
+      organization: "Huawei"
+      url: ""
+    protocolVersion: "0.3.0"
+    version: "0.1.0"
+    url: "http://127.0.0.1:8899"
+    iconUrl: ""
+    skills:
+      - id: "ran-es-intent-exploration"
+        name: "RAN ES Intent Exploration"
+        description: "评估并确定指定RAN ES意图目标的最佳可能性，考虑当前资源状况和系统能力。"
+        tags: [ "wireless","energy-saving","intent" ]
+      - id: "ran-es-intent-lifecycle-management"
+        name: "RAN ES Intent Lifecycle Management"
+        description: "管理RAN节能意图的生命周期，包括创建、修改、删除、激活、去激活意图，并执行数据采集、分析、解决方案制定与配置。"
+        tags: [ "wireless","energy-saving","intent" ]
+      - id: "ran-es-intent-reporting"
+        name: "RAN ES Intent Reporting"
+        description: "提供意图报告查询、订阅、通知功能，报告意图实现状态、达成值、推荐值及配置修改信息。"
+        tags: [ "wireless","energy-saving","reporting" ]
+    capabilities:
+      pushNotifications: false
+      streaming: false
+      stateTransitionHistory: true
+    defaultInputModes: [ "text" ]
+    defaultOutputModes: [ "text" ]
+
+  - name: "Energy Saving Intent Agent"
+    description: "负责设置节能意图，与RAN能效优化智能体交互，进行意图预评估、意图生成与交付，并对节能效果进行评估与调整。"
+    provider:
+      organization: "Huawei"
+      url: ""
+    protocolVersion: "0.3.0"
+    version: "0.1.0"
+    url: "http://127.0.0.1:8900"
+    iconUrl: ""
+    skills:
+      - id: "intent-exploration-request"
+        name: "Intent Exploration Request"
+        description: "发起RAN ES意图探索请求，并获取指定意图目标的最佳可能值。"
+        tags: [ "wireless","energy-saving","intent" ]
+      - id: "intent-generation"
+        name: "Intent Generation"
+        description: "根据探索报告和业务需求生成RAN节能意图内容，包括不同时段、不同RAT的吞吐量和节能目标。"
+        tags: [ "wireless","energy-saving","intent" ]
+      - id: "intent-delivery"
+        name: "Intent Delivery"
+        description: "将生成的节能意图交付给RAN能效优化智能体，并管理意图生命周期（调用意图生命周期管理接口）。"
+        tags: [ "wireless","energy-saving","intent" ]
+      - id: "effect-evaluation"
+        name: "Effect Evaluation"
+        description: "评估不同RAN域的节能效果，根据效果调整意图。"
+        tags: [ "wireless","energy-saving","evaluation" ]
+    capabilities:
+      pushNotifications: false
+      streaming: false
+      stateTransitionHistory: true
+    defaultInputModes: [ "text" ]
+    defaultOutputModes: [ "text" ]
+  - name: "live-streaming-agent"
+    description: "负责赛事需求的解析与监控。"
+    provider:
+      organization: "Huawei"
+      url: ""
+    protocolVersion: "0.3.0"
+    version: "0.1.0"
+    url: "http://127.0.0.1:8901"
+    iconUrl: ""
+    skills:
+      - id: "info-parsing"
+        name: "赛事信息解析"
+        description: "提取赛事的路线与业务需求"
+        tags: [ "live", "info" ]
+      - id: "kqi-monitoring"
+        name: "KQI指标监控"
+        description: "实时反馈保障任务关键质量指标及任务状态"
+        tags: [ "live", "monitoring" ]
+    capabilities:
+      pushNotifications: false
+      streaming: false
+      stateTransitionHistory: true
+    defaultInputModes: [ "text" ]
+    defaultOutputModes: [ "text" ]
+
+  - name: "assurance-agent"
+    description: "负责保障策略及其恢复策略的生成。"
+    provider:
+      organization: "Huawei"
+      url: ""
+    protocolVersion: "0.3.0"
+    version: "0.1.0"
+    url: "http://127.0.0.1:8902"
+    iconUrl: ""
+    skills:
+      - id: "strategy-generation"
+        name: "策略生成"
+        description: "将赛事保障需求转换为网络需求，包含带宽上下行要求等"
+        tags: [ "assurance", "strategy" ]
+      - id: "recovery-delivery"
+        name: "恢复策略下发"
+        description: "恢复保障前网络配置"
+        tags: [ "assurance", "recovery" ]
+    capabilities:
+      pushNotifications: false
+      streaming: false
+      stateTransitionHistory: true
+    defaultInputModes: [ "text" ]
+    defaultOutputModes: [ "text" ]
+
+  - name: "ran-agent"
+    description: "负责无线网络的分析、规划与策略执行。"
+    provider:
+      organization: "Huawei"
+      url: ""
+    protocolVersion: "0.3.0"
+    version: "0.1.0"
+    url: "http://127.0.0.1:8903"
+    iconUrl: ""
+    skills:
+      - id: "analysis-eval"
+        name: "分析评估"
+        description: "分析网络负载现状"
+        tags: [ "ran", "analysis" ]
+      - id: "plan-design"
+        name: "方案规划"
+        description: "根据网络负载现状及网络保障需求规划网络策略方案"
+        tags: [ "ran", "plan" ]
+      - id: "net-exec"
+        name: "网络策略执行"
+        description: "执行或恢复网络策略"
+        tags: [ "ran", "exec" ]
+    capabilities:
+      pushNotifications: false
+      streaming: false
+      stateTransitionHistory: true
+    defaultInputModes: [ "text" ]
+    defaultOutputModes: [ "text" ]

@@ -361,7 +361,7 @@ async def update_agent(
     try:
         # Convert to dict for update
         data = agent_data.model_dump()
-        success = registry.update(name, organization, data, partial=False)
+        success = registry.update(name, organization, data)
         if not success:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
         return success
