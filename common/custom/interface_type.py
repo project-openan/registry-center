@@ -10,3 +10,4 @@ class InterfaceType(Enum):
     QUERY = "query"
     UPDATE = "update"
     GET = "get"
+    RETRIEVE = "retrieve"

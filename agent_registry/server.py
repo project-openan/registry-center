@@ -23,7 +23,7 @@ from starlette.responses import Response
 from agent_registry.config import (
     MAX_REQUEST_BODY_SIZE,
     MAX_URL_LENGTH, CONN_TIMEOUT, CONN_MAX, FLOW_CTL_PARALLEL_REGISTER, FLOW_CTL_PARALLEL_QUERY, FLOW_CTL_REGISTER,
-    FLOW_CTL_QUERY, AGENT_NUM_MAX, FLOW_CTL_PARALLEL_UPDATE, FLOW_CTL_PARALLEL_GET,
+    FLOW_CTL_QUERY, AGENT_NUM_MAX, FLOW_CTL_PARALLEL_UPDATE, FLOW_CTL_PARALLEL_GET, FLOW_CTL_PARALLEL_RETRIEVE,
 )
 from agent_registry.core import RegistryCore
 from agent_registry.registry_instance import get_registry
@@ -136,6 +136,7 @@ register_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_REGISTER, 
 query_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_QUERY, 10)))
 update_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_UPDATE, 10)))
 get_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_GET, 10)))
+retrieve_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_RETRIEVE, 10)))
 
 
 # ---------- Middleware ----------
@@ -460,18 +461,37 @@ async def deregister_agent(
 
 @app.get("/rest/a2a-t/v1/agents/retrieve", response_model=List[AgentCard], summary="Fuzzy retrieve by task")
 async def retrieve_agents_by_task(
-        task: str = Query(..., description="Natural language task description"),
-        registry: RegistryCore = Depends(get_registry),
+        request: Request,
+        task: str = Query(..., description="Natural language task description")
 ):
     """
     Find agents that are semantically relevant to the given task using LLM.
     """
+    """
+    Search a single agent by its unique key(name and organization).
+    """
+    client_ip = request.client.host
+    authenticate_handle = HandlerRegistry.get_handler(InterfaceType.AUTHENTICATE)
+    await authenticate_handle.handle(client_ip, request)
+    acquired = False
     try:
-        agents = registry.retrieve_by_task(task)
-        return agents
-    except Exception as e:
-        logger.error(f"Error in fuzzy search:{e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+        retrieve_semaphore.acquire_nowait()
+        acquired = True
+        try:
+            retrieve_handle = HandlerRegistry.get_handler(InterfaceType.RETRIEVE)
+            agents = await retrieve_handle.handle(task)
+            return agents
+        except Exception as e:
+            logger.error(f"Error in exact search: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal server error",
+            ) from e
+    except anyio.WouldBlock as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Server is busy") from e
+    finally:
+        if acquired:
+            retrieve_semaphore.release()
 
 
 @app.get("/rest/a2a-t/v1/agents/{name}", response_model=AgentCard, summary="Get agent by exact name and organization")
