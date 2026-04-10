@@ -9,3 +9,4 @@ class InterfaceType(Enum):
     INSERT = "insert"
     QUERY = "query"
     UPDATE = "update"
+    GET = "get"

@@ -47,6 +47,10 @@ class UpdateHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
         return get_registry().update(*args)
 
+class GetHandler(BaseHandler):
+    async def handle(self, *args, **kwargs):
+        return get_registry().get_by_key(*args)
+
 # ==================== 注册表 ====================
 class HandlerRegistry:
     _registry: Dict[str, Type[BaseHandler]] = {}
@@ -81,6 +85,7 @@ class HandlerRegistry:
             "insert": InsertHandler,
             "query": QueryHandler,
             "update": UpdateHandler,
+            "get": GetHandler,
         }
         handler_class = default_map.get(interface_type.value)
         if handler_class is None:

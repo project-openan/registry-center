@@ -23,7 +23,7 @@ from starlette.responses import Response
 from agent_registry.config import (
     MAX_REQUEST_BODY_SIZE,
     MAX_URL_LENGTH, CONN_TIMEOUT, CONN_MAX, FLOW_CTL_PARALLEL_REGISTER, FLOW_CTL_PARALLEL_QUERY, FLOW_CTL_REGISTER,
-    FLOW_CTL_QUERY, AGENT_NUM_MAX,
+    FLOW_CTL_QUERY, AGENT_NUM_MAX, FLOW_CTL_PARALLEL_UPDATE, FLOW_CTL_PARALLEL_GET,
 )
 from agent_registry.core import RegistryCore
 from agent_registry.registry_instance import get_registry
@@ -134,7 +134,8 @@ app.add_middleware(
 
 register_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_REGISTER, 1)))
 query_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_QUERY, 10)))
-update_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_QUERY, 10)))
+update_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_UPDATE, 10)))
+get_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_GET, 10)))
 
 
 # ---------- Middleware ----------
@@ -475,18 +476,35 @@ async def retrieve_agents_by_task(
 
 @app.get("/rest/a2a-t/v1/agents/{name}", response_model=AgentCard, summary="Get agent by exact name and organization")
 async def get_agent(
-        name: str = Path(..., description="Agent name"),
-        organization: str = Query(..., description="Agent organization"),
-        registry: RegistryCore = Depends(get_registry)
+        request: Request,
+        name: str,
+        organization: str,
 ):
     """
     Search a single agent by its unique key(name and organization).
     """
-    agent = registry.get_by_key(name, organization)
-    if not agent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
-    return agent
-
+    client_ip = request.client.host
+    authenticate_handle = HandlerRegistry.get_handler(InterfaceType.AUTHENTICATE)
+    await authenticate_handle.handle(client_ip, request)
+    acquired = False
+    try:
+        get_semaphore.acquire_nowait()
+        acquired = True
+        try:
+            get_handle = HandlerRegistry.get_handler(InterfaceType.GET)
+            agents = await get_handle.handle(name, organization)
+            return agents
+        except Exception as e:
+            logger.error(f"Error in exact search: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal server error",
+            ) from e
+    except anyio.WouldBlock as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Server is busy") from e
+    finally:
+        if acquired:
+            get_semaphore.release()
 
 def _make_agent_key(name: str, organization: str) -> Tuple[str, str]:
     """Create a normalized key for indexing."""
