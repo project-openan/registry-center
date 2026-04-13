@@ -24,7 +24,7 @@ from agent_registry.config import (
     MAX_REQUEST_BODY_SIZE,
     MAX_URL_LENGTH, CONN_TIMEOUT, CONN_MAX, FLOW_CTL_PARALLEL_REGISTER, FLOW_CTL_PARALLEL_QUERY, FLOW_CTL_REGISTER,
     FLOW_CTL_QUERY, AGENT_NUM_MAX, FLOW_CTL_PARALLEL_UPDATE, FLOW_CTL_PARALLEL_GET, FLOW_CTL_PARALLEL_RETRIEVE,
-    FLOW_CTL_PARALLEL_DEREGISTER,
+    FLOW_CTL_PARALLEL_DEREGISTER, FLOW_CTL_UPDATE, FLOW_CTL_GET, FLOW_CTL_RETRIEVE, FLOW_CTL_DEREGISTER,
 )
 from agent_registry.core import RegistryCore
 from agent_registry.registry_instance import get_registry
@@ -52,8 +52,12 @@ def parse_rate_limit(interface_name: str):
     """
     # Mapping from interface name to config key and default value
     config_map = {
-        "register": (FLOW_CTL_REGISTER, 10),
-        "query": (FLOW_CTL_QUERY, 10),
+        "register": (FLOW_CTL_REGISTER, 50),
+        "query": (FLOW_CTL_QUERY, 100),
+        "update": (FLOW_CTL_UPDATE, 100),
+        "get": (FLOW_CTL_GET, 100),
+        "retrieve": (FLOW_CTL_RETRIEVE, 100),
+        "deregister": (FLOW_CTL_DEREGISTER, 50),
     }
 
     # Get the corresponding config entry
@@ -133,12 +137,12 @@ app.add_middleware(
     timeout_seconds=int(config.get(CONN_TIMEOUT, 30))
 )
 
-register_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_REGISTER, 1)))
-query_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_QUERY, 10)))
-update_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_UPDATE, 10)))
-get_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_GET, 10)))
-retrieve_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_RETRIEVE, 10)))
-deregister_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_DEREGISTER, 1)))
+register_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_REGISTER, 50)))
+query_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_QUERY, 100)))
+update_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_UPDATE, 100)))
+get_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_GET, 100)))
+retrieve_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_RETRIEVE, 100)))
+deregister_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_DEREGISTER, 50)))
 
 
 # ---------- Middleware ----------
@@ -369,7 +373,7 @@ async def list_agents_exact(
         request: Request,
         name: Optional[str] = Query(None, description="Exact agent name"),
         organization: Optional[str] = Query(None, description="Exact organization"),
-        registry: RegistryCore = Depends(get_registry), _: Any = Depends(RateLimiter('query')),
+        _: Any = Depends(RateLimiter('query')),
 ):
     """
     Search agents by exact fields (AND combination).
@@ -405,7 +409,7 @@ async def update_agent(
         name: str,
         organization: str,
         agent_data: ValidatedAgentCard,
-        registry: RegistryCore = Depends(get_registry),
+        registry: RegistryCore = Depends(get_registry),  _: Any = Depends(RateLimiter('update'))
 ):
     """
     Fully replace an existing agent. The name and organization in the body must match the path/query.
@@ -446,7 +450,7 @@ async def deregister_agent(
         request: Request,
         name: str = Path(..., description="Agent name"),
         organization: str = Query(..., description="Agent organization"),
-        registry: RegistryCore = Depends(get_registry),
+        _: Any = Depends(RateLimiter('deregister'))
 ):
     """
     Remove an agent from the registry.
@@ -483,7 +487,8 @@ async def deregister_agent(
 @app.get("/rest/a2a-t/v1/agents/retrieve", response_model=List[AgentCard], summary="Fuzzy retrieve by task")
 async def retrieve_agents_by_task(
         request: Request,
-        task: str = Query(..., description="Natural language task description")
+        task: str = Query(..., description="Natural language task description"),
+        _: Any = Depends(RateLimiter('retrieve'))
 ):
     """
     Find agents that are semantically relevant to the given task using LLM.
@@ -519,7 +524,7 @@ async def retrieve_agents_by_task(
 async def get_agent(
         request: Request,
         name: str,
-        organization: str,
+        organization: str, _: Any = Depends(RateLimiter('get'))
 ):
     """
     Search a single agent by its unique key(name and organization).
