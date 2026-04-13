@@ -120,11 +120,6 @@ repeat
   if (口令复杂度不足?) then (是)
     :显示风险提示;
     :用户确认(y/n);
-    if (用户拒绝?) then (是)
-      :重新输入口令;
-    else (否)
-      break
-    endif
   else (否)
     break
   endif
