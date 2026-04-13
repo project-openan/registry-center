@@ -97,28 +97,76 @@ python agent-registry init
 ## 4 处理过程
 
 ### 4.1 配置流程图
-```
-开始
-  │
-  ├─> 配置服务端TLS证书
-  │     ├─> 输入证书路径（使用默认值）
-  │     ├─> 校验证书路径和有效性
-  │     ├─> 输入私钥口令（隐藏输入）
-  │     ├─> 校验口令复杂度
-  │     ├─> 加密私钥口令
-  │     └─> 保存加密口令到文件
-  │
-  ├─> 配置签名证书
-  │     ├─> 输入证书路径（使用默认值）
-  │     ├─> 校验证书路径和有效性
-  │     ├─> 输入私钥口令（隐藏输入）
-  │     ├─> 校验口令复杂度
-  │     ├─> 加密私钥口令
-  │     └─> 保存加密口令到文件
-  │
-  ├─> 保存配置到 etc/conf/server.conf
-  │
-  └─> 显示配置完成信息
+
+```plantuml
+@startuml
+start
+
+:配置服务端TLS证书;
+repeat
+  :输入证书路径;
+  :校验证书路径和有效性;
+  if (证书校验失败?) then (是)
+    :显示错误信息;
+  else (否)
+    break
+  endif
+repeat while (证书校验失败?)
+
+repeat
+  :输入私钥口令(隐藏显示);
+  :校验口令复杂度;
+  if (口令复杂度不足?) then (是)
+    :显示风险提示;
+    :用户二次确认;
+    if (用户拒绝?) then (是)
+      :重新输入口令;
+    else (否)
+      break
+    endif
+  else (否)
+    break
+  endif
+repeat while (口令复杂度不足?)
+
+:加密私钥口令;
+:保存加密口令到文件;
+
+:配置签名证书;
+repeat
+  :输入证书路径;
+  :校验证书路径和有效性;
+  if (证书校验失败?) then (是)
+    :显示错误信息;
+  else (否)
+    break
+  endif
+repeat while (证书校验失败?)
+
+repeat
+  :输入私钥口令(隐藏显示);
+  :校验口令复杂度;
+  if (口令复杂度不足?) then (是)
+    :显示风险提示;
+    :用户二次确认;
+    if (用户拒绝?) then (是)
+      :重新输入口令;
+    else (否)
+      break
+    endif
+  else (否)
+    break
+  endif
+repeat while (口令复杂度不足?)
+
+:加密私钥口令;
+:保存加密口令到文件;
+
+:保存配置到 etc/conf/server.conf;
+:显示配置完成信息;
+
+stop
+@enduml
 ```
 
 ### 4.2 口令加密和存储
@@ -161,11 +209,70 @@ sign_keyfile=etc/sign_cert/server_key_rsa.pem
 sign_keyfile_password=etc/sign_cert/server_key_rsa_pwd
 ```
 
-## 5 接口设计
+## 5. 接口设计
 
-### 5.1 主要函数
+### 5.1 类图
 
-#### 5.1.1 init_command()
+```plantuml
+@startuml
+class InitCommand {
+    +init_command()
+    +config_tls_cert() -> dict
+    +config_sign_cert() -> dict
+    +validate_password_complexity(password: str) -> tuple[bool, str]
+    +validate_certificate(cert_path: str, key_path: str, password: str) -> tuple[bool, str]
+    +save_password_file(password: str, key_path: str) -> str
+    +save_config_to_file(config: dict, config_path: str)
+}
+
+class CertValidator {
+    +validate_cert_with_password_file(cert_path: str, key_path: str, password_file: str) -> bool
+    +validate_cert_with_password(cert_path: str, key_path: str, password: str) -> tuple[bool, str]
+    +validate_cert_path(cert_path: str) -> tuple[bool, str]
+    +validate_cert_algorithm(cert_path: str, algorithm: str) -> tuple[bool, str]
+    +validate_key_cert_match(cert_path: str, key_path: str, password: str) -> tuple[bool, str]
+}
+
+class Crypto {
+    +encrypt_password(password: str) -> str
+    +decrypt_password(encrypted: str) -> str
+}
+
+class Config {
+    +read_config(config_path: str) -> dict
+    +write_config(config: dict, config_path: str)
+    +update_config(key: str, value: str, config_path: str)
+}
+
+InitCommand --> CertValidator : uses
+InitCommand --> Crypto : uses
+InitCommand --> Config : uses
+
+note right of InitCommand
+  初始化配置命令主类
+  负责协调整个配置流程
+end note
+
+note right of CertValidator
+  证书验证模块
+  扩展：增加从参数读取口令的方法
+end note
+
+note right of Crypto
+  加密模块
+  使用AES-256加密算法
+end note
+
+note right of Config
+  配置管理模块
+  读写server.conf配置文件
+end note
+@enduml
+```
+
+### 5.2 主要函数
+
+##### 5.2.1 init_command()
 ```python
 def init_command():
     """
@@ -174,7 +281,7 @@ def init_command():
     pass
 ```
 
-#### 5.1.2 config_tls_cert()
+#### 5.2.2 config_tls_cert()
 ```python
 def config_tls_cert() -> dict:
     """
@@ -184,7 +291,7 @@ def config_tls_cert() -> dict:
     pass
 ```
 
-#### 5.1.3 config_sign_cert()
+#### 5.2.3 config_sign_cert()
 ```python
 def config_sign_cert() -> dict:
     """
@@ -194,7 +301,7 @@ def config_sign_cert() -> dict:
     pass
 ```
 
-#### 5.1.4 validate_password_complexity(password: str) -> tuple[bool, str]
+#### 5.2.4 validate_password_complexity(password: str) -> tuple[bool, str]
 ```python
 def validate_password_complexity(password: str) -> tuple[bool, str]:
     """
@@ -204,7 +311,7 @@ def validate_password_complexity(password: str) -> tuple[bool, str]:
     pass
 ```
 
-#### 5.1.5 validate_certificate(cert_path: str, key_path: str, password: str) -> tuple[bool, str]
+#### 5.2.5 validate_certificate(cert_path: str, key_path: str, password: str) -> tuple[bool, str]
 ```python
 def validate_certificate(cert_path: str, key_path: str, password: str) -> tuple[bool, str]:
     """
@@ -214,7 +321,7 @@ def validate_certificate(cert_path: str, key_path: str, password: str) -> tuple[
     pass
 ```
 
-#### 5.1.6 save_password_file(password: str, key_path: str) -> str
+#### 5.2.6 save_password_file(password: str, key_path: str) -> str
 ```python
 def save_password_file(password: str, key_path: str) -> str:
     """
@@ -224,7 +331,7 @@ def save_password_file(password: str, key_path: str) -> str:
     pass
 ```
 
-#### 5.1.7 save_config_to_file(config: dict, config_path: str)
+#### 5.2.7 save_config_to_file(config: dict, config_path: str)
 ```python
 def save_config_to_file(config: dict, config_path: str):
     """
@@ -233,9 +340,9 @@ def save_config_to_file(config: dict, config_path: str):
     pass
 ```
 
-### 5.2 证书验证模块扩展
+### 5.3 证书验证模块扩展
 
-#### 5.2.1 现有函数（从文件读取口令）
+#### 5.3.1 现有函数（从文件读取口令）
 ```python
 def validate_cert_with_password_file(cert_path: str, key_path: str, password_file: str) -> bool:
     """
@@ -244,7 +351,7 @@ def validate_cert_with_password_file(cert_path: str, key_path: str, password_fil
     pass
 ```
 
-#### 5.2.2 新增函数（从参数读取口令）
+#### 5.3.2 新增函数（从参数读取口令）
 ```python
 def validate_cert_with_password(cert_path: str, key_path: str, password: str) -> tuple[bool, str]:
     """
@@ -256,7 +363,120 @@ def validate_cert_with_password(cert_path: str, key_path: str, password: str) ->
 
 ## 6 交互示例
 
-### 6.1 正常流程
+### 6.1 时序图
+
+```plantuml
+@startuml
+actor User as "用户"
+participant InitCommand as "InitCommand"
+participant CertValidator as "CertValidator"
+participant Crypto as "Crypto"
+participant Config as "Config"
+
+== 配置服务端TLS证书 ==
+
+User -> InitCommand: 输入服务端证书路径
+InitCommand -> CertValidator: validate_cert_path(cert_path)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+alt 证书校验失败
+    InitCommand --> User: 显示错误信息
+    User -> InitCommand: 重新输入证书路径
+end
+
+User -> InitCommand: 输入服务端私钥路径
+InitCommand -> CertValidator: validate_cert_path(key_path)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+User -> InitCommand: 输入服务端信任证书路径
+InitCommand -> CertValidator: validate_cert_path(ca_certs)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+User -> InitCommand: 输入服务端吊销列表路径
+InitCommand -> CertValidator: validate_cert_path(crl_path)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+User -> InitCommand: 输入服务端私钥口令(隐藏显示)
+InitCommand -> InitCommand: validate_password_complexity(password)
+
+alt 口令复杂度不足
+    InitCommand --> User: 显示风险提示
+    User -> InitCommand: 二次确认(y/n)
+    
+    alt 用户拒绝
+        User -> InitCommand: 重新输入口令
+    end
+end
+
+InitCommand -> CertValidator: validate_cert_with_password(cert_path, key_path, password)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+alt 证书校验失败
+    InitCommand --> User: 显示错误信息
+    User -> InitCommand: 重新输入证书或口令
+end
+
+InitCommand -> Crypto: encrypt_password(password)
+Crypto --> InitCommand: encrypted_password
+
+InitCommand -> InitCommand: save_password_file(encrypted_password, key_path)
+InitCommand --> User: 口令已加密保存
+
+User -> InitCommand: 输入是否开启客户端证书校验(y/n)
+
+== 配置签名证书 ==
+
+User -> InitCommand: 输入签名证书路径
+InitCommand -> CertValidator: validate_cert_path(cert_path)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+alt 证书校验失败
+    InitCommand --> User: 显示错误信息
+    User -> InitCommand: 重新输入证书路径
+end
+
+User -> InitCommand: 输入签名私钥路径
+InitCommand -> CertValidator: validate_cert_path(key_path)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+User -> InitCommand: 输入签名私钥口令(隐藏显示)
+InitCommand -> InitCommand: validate_password_complexity(password)
+
+alt 口令复杂度不足
+    InitCommand --> User: 显示风险提示
+    User -> InitCommand: 二次确认(y/n)
+    
+    alt 用户拒绝
+        User -> InitCommand: 重新输入口令
+    end
+end
+
+InitCommand -> CertValidator: validate_cert_with_password(cert_path, key_path, password)
+CertValidator --> InitCommand: (true, "") or (false, error)
+
+alt 证书校验失败
+    InitCommand --> User: 显示错误信息
+    User -> InitCommand: 重新输入证书或口令
+end
+
+InitCommand -> Crypto: encrypt_password(password)
+Crypto --> InitCommand: encrypted_password
+
+InitCommand -> InitCommand: save_password_file(encrypted_password, key_path)
+InitCommand --> User: 口令已加密保存
+
+== 保存配置 ==
+
+InitCommand -> Config: write_config(config_dict, "etc/conf/server.conf")
+Config --> InitCommand: success or error
+
+InitCommand --> User: 显示配置完成信息
+InitCommand --> User: 提示可以使用 './start.sh' 启动服务
+
+@enduml
+```
+
+### 6.2 正常流程
 ```
 $ python agent-registry init
 
@@ -287,11 +507,18 @@ sign_keyfile_password=etc/sign_cert/server_key_rsa_pwd
 您可以使用 './start.sh' 启动服务
 ```
 
-### 6.2 口令复杂度警告
+### 6.3 口令复杂度警告
 ```
 请输入服务端私钥口令: ********
 警告：私钥口令不满足复杂度要求（至少8个字符，包含至少两种字符类型）
 是否继续使用该口令？ (y/n): y
+```
+
+### 6.4 证书校验失败
+```
+请输入服务端证书路径 ssl_certfile: /invalid/path/cert.cer
+错误：证书文件不存在或无法读取：/invalid/path/cert.cer
+请重新输入服务端证书路径 ssl_certfile: (default: etc/ssl/service/server_rsa.cer)
 ```
 
 ### 6.3 证书校验失败
