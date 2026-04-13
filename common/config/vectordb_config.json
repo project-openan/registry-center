@@ -1,0 +1,7 @@
+{
+  "milvus": {
+    "description": "Milvus DB Service",
+    "uri": "",
+    "version": "2.x.x"
+  }
+}
