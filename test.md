@@ -77,10 +77,24 @@ python agent-registry init
 - 绝对路径：/path/to/cert.cer 或 C:\path\to\cert.cer
 - 相对路径：etc/ssl/service/server_rsa.cer
 
+路径主要由客户指定，支持使用绝对路径和相对路径，不指定则使用默认路径。
+
 **校验规则**：
 - 路径格式正确
 - 文件存在
 - 文件可读
+- 文件权限校验（权限过大时提示用户进行二次风险确认）
+
+### 3.3 文件权限校验
+**校验规则**：
+- 检查文件权限是否过大（如文件权限为 666 或 777）
+- 如果权限过大，提示用户进行二次风险确认
+
+**风险提示示例**：
+```
+警告：文件 /path/to/cert.cer 权限过大（当前权限：666），可能存在安全风险
+是否继续使用该文件？ (y/n):
+```
 
 ### 3.3 证书校验
 **校验内容**：
@@ -98,6 +112,8 @@ python agent-registry init
 
 ### 4.1 配置流程图
 
+#### 4.1.1 服务端TLS证书配置流程
+
 ```plantuml
 @startuml
 start
@@ -105,7 +121,7 @@ start
 :配置服务端TLS证书;
 
 repeat
-  :输入证书路径;
+  :输入服务端证书路径;
   :校验证书路径和有效性;
   if (证书校验失败?) then (是)
     :显示错误信息;
@@ -115,27 +131,126 @@ repeat
 repeat while (证书校验失败?)
 
 repeat
-  :输入私钥口令(隐藏显示);
+  :输入服务端私钥路径;
+  :校验私钥路径和有效性;
+  if (私钥校验失败?) then (是)
+    :显示错误信息;
+  else (否)
+    break
+  endif
+repeat while (私钥校验失败?)
+
+repeat
+  :输入服务端信任证书路径;
+  :校验信任证书路径和有效性;
+  if (信任证书校验失败?) then (是)
+    :显示错误信息;
+  else (否)
+    break
+  endif
+repeat while (信任证书校验失败?)
+
+repeat
+  :输入服务端吊销列表路径;
+  :校验吊销列表路径和有效性;
+  if (吊销列表校验失败?) then (是)
+    :显示错误信息;
+  else (否)
+    break
+  endif
+repeat while (吊销列表校验失败?)
+
+repeat
+  :输入服务端私钥口令(隐藏显示);
   :校验口令复杂度;
   if (口令复杂度不足?) then (是)
     :显示风险提示;
     :用户确认(y/n);
+    if (用户拒绝?) then (是)
+      :重新输入口令;
+    else (否)
+      break
+    endif
   else (否)
     break
   endif
 repeat while (口令复杂度不足且用户拒绝?)
 
+repeat
+  :验证证书与私钥匹配;
+  if (证书校验失败?) then (是)
+    :显示错误信息;
+    :重新输入证书或口令;
+  else (否)
+    break
+  endif
+repeat while (证书校验失败?)
+
 :加密私钥口令;
 :保存加密口令到文件;
 
-note right
-  以上流程同样适用于配置签名证书
-  重复执行证书路径输入、校验、
-  口令输入、复杂度校验、加密保存
-end note
+:输入是否开启客户端证书校验(y/n);
 
-:保存配置到 etc/conf/server.conf;
-:显示配置完成信息;
+stop
+@enduml
+```
+
+#### 4.1.2 签名证书配置流程
+
+```plantuml
+@startuml
+start
+
+:配置签名证书;
+
+repeat
+  :输入签名证书路径;
+  :校验证书路径和有效性;
+  if (证书校验失败?) then (是)
+    :显示错误信息;
+  else (否)
+    break
+  endif
+repeat while (证书校验失败?)
+
+repeat
+  :输入签名私钥路径;
+  :校验私钥路径和有效性;
+  if (私钥校验失败?) then (是)
+    :显示错误信息;
+  else (否)
+    break
+  endif
+repeat while (私钥校验失败?)
+
+repeat
+  :输入签名私钥口令((隐藏显示);
+  :校验口令复杂度;
+  if (口令复杂度不足?) then (是)
+    :显示风险提示;
+    :用户确认(y/n);
+    if (用户拒绝?) then (是)
+      :重新输入口令;
+    else (否)
+      break
+    endif
+  else (否)
+    break
+  endif
+repeat while (口令复杂度不足且用户拒绝?)
+
+repeat
+  :验证证书与私钥匹配;
+  if (证书校验失败?) then (是)
+    :显示错误信息;
+    :重新输入证书或口令;
+  else (否)
+    break
+  endif
+repeat while (证书校验失败?)
+
+:加密私钥口令;
+:保存加密口令到文件;
 
 stop
 @enduml
@@ -145,8 +260,6 @@ stop
 
 #### 4.2.1 口令加密
 - 使用现有加密函数（common/crypto.py）
-- 加密算法：AES-256
-- 加密密钥：从系统环境或配置获取
 
 #### 4.2.2 口令文件存储路径
 | 原私钥文件 | 口令文件路径 |
@@ -170,7 +283,7 @@ stop
 [ssl]
 ssl_certfile=etc/ssl/service/server_rsa.cer
 ssl_keyfile=etc/ssl/service/server_key_rsa.pem
-ssl_keyfile_password=etc/ssl/service/server_key_rsa_pwd
+ssl_keyfile_password=<加密口令文件路径>
 ssl_ca_certs=etc/ssl/service/trust.cer
 ssl_cert_certs=etc/ssl/service/revovationlist.crl
 ssl_verify_client=true
@@ -178,7 +291,7 @@ ssl_verify_client=true
 [sign]
 sign_certfile=etc/sign_cert/server_rsa.cer
 sign_keyfile=etc/sign_cert/server_key_rsa.pem
-sign_keyfile_password=etc/sign_cert/server_key_rsa_pwd
+sign_keyfile_password=<加密口令文件路径>
 ```
 
 ## 5. 接口设计
@@ -468,13 +581,11 @@ $ python agent-registry init
 配置已完成，已保存在 etc/conf/server.conf
 ssl_certfile=etc/ssl/service/server_rsa.cer
 ssl_keyfile=etc/ssl/service/server_key_rsa.pem
-ssl_keyfile_password=etc/ssl/service/server_key_rsa_pwd
 ssl_ca_certs=etc/ssl/service/trust.cer
 ssl_cert_certs=etc/ssl/service/revovationlist.crl
 ssl_verify_client=true
 sign_certfile=etc/sign_cert/server_rsa.cer
 sign_keyfile=etc/sign_cert/server_key_rsa.pem
-sign_keyfile_password=etc/sign_cert/server_key_rsa_pwd
 
 您可以使用 './start.sh' 启动服务
 ```
@@ -482,8 +593,7 @@ sign_keyfile_password=etc/sign_cert/server_key_rsa_pwd
 ### 6.3 口令复杂度警告
 ```
 请输入服务端私钥口令: ********
-警告：私钥口令不满足复杂度要求（至少8个字符，包含至少两种字符类型）
-是否继续使用该口令？ (y/n): y
+私钥口令复杂度过低，请确认是否需要继续使用该口令 (y/n): y
 ```
 
 ### 6.4 证书校验失败
@@ -493,11 +603,11 @@ sign_keyfile_password=etc/sign_cert/server_key_rsa_pwd
 请重新输入服务端证书路径 ssl_certfile: (default: etc/ssl/service/server_rsa.cer)
 ```
 
-### 6.3 证书校验失败
+### 6.5 文件权限警告
 ```
-请输入服务端证书路径 ssl_certfile: /invalid/path/cert.cer
-错误：证书文件不存在或无法读取：/invalid/path/cert.cer
-请重新输入服务端证书路径 ssl_certfile: (default: etc/ssl/service/server_rsa.cer)
+请输入服务端证书路径 ssl_certfile: /path/to/cert.cer
+警告：文件 /path/to/cert.cer 权限过大（当前权限：666），可能存在安全风险
+是否继续使用该文件？ (y/n): y
 ```
 
 ## 7 错误处理
@@ -523,15 +633,15 @@ sign_keyfile_password=etc/sign_cert/server_key_rsa_pwd
 
 ### 8.1 口令安全
 - 输入时隐藏显示
-- 使用 AES-256 加密存储
+- 加密存储
 - 口令文件权限设置为 600
 - 避免在日志中记录口令
 
 ### 8.2 文件权限
-- 口令文件：600
-- 配置文件：644
-- 证书文件：644
-- 私钥文件：600
+- 口令文件：600（由系统设置）
+- 配置文件：600（由系统设置）
+- 证书文件：由客户自定义存储位置，系统不修改客户权限（使用默认位置时为600）
+- 私钥文件：由客户自定义存储位置，系统不修改客户权限（使用默认位置时为600）
 
 ### 8.3 其他安全措施
 - 证书路径验证，防止路径遍历攻击
