@@ -15,6 +15,9 @@
 
 from pymilvus import MilvusClient, DataType, MilvusException
 from loguru import logger
+
+from agent_registry.config import AGENT_NUM_MAX
+from common.util.config_util import get_conf
 from common.vector_db.util import restore_string_values, flatten_to_strings
 from common.vector_db.vector_db_client.config.vector_db_client import VectorDBClient
 from common.vector_db.vector_db_client.config.vector_db_client_registry import vectordb_tool_register
@@ -23,14 +26,18 @@ from common.vector_db.vector_db_client.config.vector_db_config import VectorDBTy
 VARCHAR_MAX_LENGTH = 65535
 SEARCH_NUM = 5
 BGE_EMBEDDING_VECTOR_DIVISION_LENGTH = 1024
-
+output_fields=["id", "name", "description", "provider", "protocolVersion", "version", "url", "iconUrl",
+                               "skills", "capabilities", "defaultInputModes", "defaultOutputModes"]
 
 @vectordb_tool_register(VectorDBType.Milvus)
 class MilvusDBClient(VectorDBClient):
     def __init__(self, config: dict):
         super().__init__(config)
         client_uri = config["uri"]
-        self.client = MilvusClient(uri=client_uri)
+        try:
+            self.client = MilvusClient(uri=client_uri)
+        except Exception as e:
+            logger.error(f"Milvus initiation failed: {e}")
 
     def create_collection(self, data):
         try:
@@ -116,20 +123,52 @@ class MilvusDBClient(VectorDBClient):
             insert_id = result.get("ids", [None])[0] if isinstance(result.get("ids"), list) else result.get("ids")
 
             logger.info(f"Insert success! insert_id:{insert_id}")
-            return insert_id
+            return True
 
         except Exception as e:
             logger.error(f"Error: There is Exception in insert method: {e}")
-            return None
+            return False
 
     def delete_entity(self, data):
-        collection_name = data.get("collection_name")
-        entity = data.get("entity")
-        primary_key = entity["id"]
-        self.client.delete(
-            collection_name=collection_name,
-            ids=[primary_key]
-        )
+        """
+        删除实体数据（带异常处理）
+
+        参数:
+            data: dict, 包含 collection_name 和 id
+
+        返回:
+            bool: 删除成功返回 True，失败返回 False
+        """
+        try:
+            # 1. 参数校验
+            collection_name = data.get("collection_name")
+            primary_key = data.get("id")
+
+            if not collection_name:
+                logger.error("✗ 删除失败：collection_name 不能为空")
+                return False
+
+            if primary_key is None:
+                logger.error("✗ 删除失败：id 不能为空")
+                return False
+
+            # 2. 执行删除
+            result = self.client.delete(
+                collection_name=collection_name,
+                ids=[primary_key]
+            )
+
+            # 3. 验证删除结果（可选）
+            delete_count = result.get("delete_count", 0) if isinstance(result, dict) else 0
+            if delete_count == 0:
+                logger.error(f"⚠ 警告：未找到 ID 为 {primary_key} 的记录，可能已删除")
+
+            logger.info(f"✓ 删除成功：collection={collection_name}, id={primary_key}")
+            return True
+
+        except Exception as e:
+            print(f"✗ 删除失败：{e}")
+            return False
 
     def update_entity(self, data):
         collection_name = data.get("collection_name")
@@ -142,10 +181,13 @@ class MilvusDBClient(VectorDBClient):
                 collection_name=collection_name,
                 data=entity
             )
+            return True
         except MilvusException as e1:
             logger.error(f"Error: There is MilvusException in update method: {e1}")
+            return False
         except Exception as e2:
             logger.error(f"Error: There is Exception in update method: {e2}")
+            return False
 
     def retrieve_entity(self, data):
         collection_name = data.get("collection_name")
@@ -156,8 +198,7 @@ class MilvusDBClient(VectorDBClient):
                 data=[query_embedding],
                 anns_field="embedding",
                 limit=SEARCH_NUM,
-                output_fields=["id", "name", "description", "provider", "protocolVersion", "version", "url", "iconUrl",
-                               "skills", "capabilities", "defaultInputModes", "defaultOutputModes"],
+                output_fields=output_fields,
                 search_params={"metric_type": "COSINE", "param": {"nprobe": 10}}
             )
             formatted_results = []
@@ -174,28 +215,45 @@ class MilvusDBClient(VectorDBClient):
             return []
 
     def query_by_key(self, data):
-        # 构建过滤表达式
-        collection_name = data.get("collection_name")
-        key = data.get("key")
-        value = data.get("value")
-        if isinstance(value, str):
-            filter_expr = f'{key} == "{value}"'
-        else:
-            filter_expr = f'{key} == {value}'
+        try:
+            # 构建过滤表达式
+            collection_name = data.get("collection_name")
+            key = data.get("key")
+            value = data.get("value")
+            if isinstance(value, str):
+                filter_expr = f'{key} == "{value}"'
+            else:
+                filter_expr = f'{key} == {value}'
 
-        # 执行查询
-        results = self.client.query(
-            collection_name=collection_name,
-            filter=filter_expr,
-            output_fields=["id", "name", "description", "provider", "protocolVersion", "version", "url", "iconUrl",
-                               "skills", "capabilities", "defaultInputModes", "defaultOutputModes"]
-        )
-        formatted_results = []
-        if results and len(results) > 0:
-            for hit in results[0]:
-                formatted_results.append({
-                    "id": hit.get("id"),
-                    "distance": hit.get("distance"),
-                    "entity": restore_string_values(hit.get("entity"))
-                })
-        return formatted_results
+            # 执行查询
+            results = self.client.query(
+                collection_name=collection_name,
+                filter=filter_expr,
+                output_fields=output_fields
+            )
+            formatted_results = []
+            if results and len(results) > 0:
+                for hit in results[0]:
+                    formatted_results.append({
+                        "id": hit.get("id"),
+                        "distance": hit.get("distance"),
+                        "entity": restore_string_values(hit.get("entity"))
+                    })
+            return formatted_results
+        except Exception as e:
+            logger.error(f"查询失败： {e}")
+            return []
+
+    def get_all_entities(self,data):
+        try:
+            collection_name = data.get("collection_name")
+            results = self.client.query(
+                collection_name=collection_name,
+                filter="",
+                output_fields=output_fields,
+                limit=int(get_conf().get(AGENT_NUM_MAX, 40))  # 单次最大查询量
+            )
+            return results
+        except Exception as e:
+            logger.error(f"获取全部信息失败：{e}")
+            return []

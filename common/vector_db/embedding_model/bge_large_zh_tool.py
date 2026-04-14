@@ -28,5 +28,5 @@ class BgeLargeEmbeddingTool(EmbeddingTool):
 
     def get_embedding_vector(self,context:str):
         sentences = [context]
-        embeddings = self.client.encode(sentences,normalize_encoding=True)
-        return embeddings.tolist()
+        embeddings = self.client.encode(sentences,normalize_embeddings=True)
+        return embeddings.tolist()[0]

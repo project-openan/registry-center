@@ -38,3 +38,11 @@ class VectorDBClient(ABC):
     @abstractmethod
     def retrieve_entity(self,data):
         pass
+
+    @abstractmethod
+    def query_by_key(self,data):
+        pass
+
+    @abstractmethod
+    def get_all_entities(self,data):
+        pass
