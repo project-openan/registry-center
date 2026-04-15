@@ -330,7 +330,7 @@ async def _perform_update(
             "details": details,
             "client_ip": client_ip
         })
-        logger.error(f"Unexpected error in register: {e}")
+        logger.error(f"Unexpected error in update: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -503,6 +503,7 @@ async def deregister_agent(
 async def retrieve_agents_by_task(
         request: Request,
         task: str = Query(..., description="Natural language task description"),
+        top_n: int = 10,
         _: Any = Depends(RateLimiter('retrieve'))
 ):
     """
@@ -520,7 +521,7 @@ async def retrieve_agents_by_task(
         acquired = True
         try:
             retrieve_handle = HandlerRegistry.get_handler(InterfaceType.RETRIEVE)
-            agents = await retrieve_handle.handle(task)
+            agents = await retrieve_handle.handle(task,top_n)
             return agents
         except Exception as e:
             logger.error(f"Error in exact search: {e}")

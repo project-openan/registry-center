@@ -15,6 +15,8 @@
 
 # agent_registry/config.py
 PERSISTENCE_FILE = "agentcard.json"
+USE_VECTORDB = False
+COLLECTION_NAME = "agent_card_collection"
 MAX_REGISTER_NUM = 40
 MAX_REQUEST_BODY_SIZE = 1024 * 1024  # 1MB default limit
 MAX_URL_LENGTH = 1024  # 1KB default limit

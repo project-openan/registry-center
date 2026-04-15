@@ -28,3 +28,5 @@ def get_registry() -> RegistryCore:
     avoiding repeated loading of the persistence file.
     """
     return RegistryCore(persistence_file=PERSISTENCE_FILE)
+
+get_registry()

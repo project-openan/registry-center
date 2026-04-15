@@ -13,7 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-def build_agent_selection_prompt(task:str,agents_text:str)->str:
+def build_agent_selection_prompt(task:str,agents_text:str,top_n:int)->str:
     """
     Build a prompt for the LLM to select the most suitable agents.
 
@@ -32,7 +32,7 @@ def build_agent_selection_prompt(task:str,agents_text:str)->str:
 请分析用户任务，选择最能胜任此任务的智能体。考虑因素：
 1. 智能体的描述是否匹配任务领域
 2. 智能体的能力和技能是否满足任务需求
-3. 如果多个智能体可以协同工作，最多可以选择3个智能体
+3. 如果多个智能体可以协同工作，最多可以选择{top_n}个智能体
 4. 如果没有合适的智能体，返回空列表
     
 请仅以JSON数组格式返回智能体名称。例如：

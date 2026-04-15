@@ -43,4 +43,7 @@ class OpenAIStyleLLM(BaseLLM):
             model=self.llm_config.config_item.model,
             messages=[user_message]
         )
-        return "", completion.choices[0].message.content
+        message = completion.choices[0].message
+        reasoning = getattr(message, 'reasoning_content', '') or ''
+        answer = message.content or ''
+        return reasoning, answer
