@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Any
 
 from a2a.types import AgentCard
+from google.protobuf.json_format import MessageToDict
 from loguru import logger
 
 from agent_registry.config import PERSISTENCE_FILE, USE_VECTORDB, COLLECTION_NAME
@@ -246,7 +247,7 @@ class RegistryCore:
     # ---------- Private helpers ----------
     def _save(self) -> None:
         """Persist current agents to file."""
-        data = [agent.model_dump() for agent in self._agents.values()]
+        data = [MessageToDict(agent, preserving_proto_field_name=True) for agent in self._agents.values()]
         save_to_file(self.persistence_file, data)
 
     def _load(self) -> None:
