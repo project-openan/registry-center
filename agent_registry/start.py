@@ -129,28 +129,33 @@ class CustomUvicornServer:
 
 def main():
     server_config = get_conf()
-    try:
-        # 校验配置
-        conf_obj = conf_singleton_obj
-        result = CertValidator(conf_obj).validate()
-        if not result.is_valid:
-            sys.exit(result.message)
-        # 通过校验后修改etc/ssl文件夹权限为700，里面文件权限为600
-        set_ssl_folder_permissions()
-        # 创建并启动服务器
-        server = CustomUvicornServer(server_config, conf_obj)
-        server.run()
-    except Exception as e:
-        logger.error(f"agent_registry server start failed {e}")
-        asyncio.run(audit_handle.handle({
-            "object_name": OperatorObject.SERVICE,
-            "operation_name": OperationName.START_SERVICE,
-            "level": LogLevel.DANGER,
-            "result": OperationResult.FAILURE,
-            "details": {"ip": server_config.get("ip", ""), "port": server_config.get("port", "")},
-            "user_name": get_user_info_from_env().get('username')
-        }))
-        sys.exit(f"agent_registry server start failed: {e}")
+    is_https = server_config.get("enable_https", True)
+    is_enable_https = str(is_https).lower() == 'true'
+    if not is_enable_https:
+        uvicorn.run(app, host=server_config.get('ip', "127.0.0.1"), port=int(server_config.get('port', 5000)))
+    else:
+        try:
+            # 校验配置
+            conf_obj = conf_singleton_obj
+            result = CertValidator(conf_obj).validate()
+            if not result.is_valid:
+                sys.exit(result.message)
+            # 通过校验后修改etc/ssl文件夹权限为700，里面文件权限为600
+            set_ssl_folder_permissions()
+            # 创建并启动服务器
+            server = CustomUvicornServer(server_config, conf_obj)
+            server.run()
+        except Exception as e:
+            logger.error(f"agent_registry server start failed {e}")
+            asyncio.run(audit_handle.handle({
+                "object_name": OperatorObject.SERVICE,
+                "operation_name": OperationName.START_SERVICE,
+                "level": LogLevel.DANGER,
+                "result": OperationResult.FAILURE,
+                "details": {"ip": server_config.get("ip", ""), "port": server_config.get("port", "")},
+                "user_name": get_user_info_from_env().get('username')
+            }))
+            sys.exit(f"agent_registry server start failed: {e}")
 
 
 if __name__ == "__main__":

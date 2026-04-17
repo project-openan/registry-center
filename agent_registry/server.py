@@ -24,27 +24,31 @@ and persistence using a JSON file.
 
 import asyncio
 from functools import partial
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional, Tuple, Any, Dict
 
 import anyio
 from a2a.types import AgentCard
 from fastapi import FastAPI, HTTPException, Query, Request, Depends, status, Path, Body
 from fastapi.responses import JSONResponse
+from jwt import PyJWK
 from loguru import logger
 from limits import strategies, storage, parse_many
 from openai import organization
 from starlette.responses import Response
 
+from agent_registry.agent_registry.jwk_provider import JWKProvider, CertLoadError
 from agent_registry.config import (
     MAX_REQUEST_BODY_SIZE,
     MAX_URL_LENGTH, CONN_TIMEOUT, CONN_MAX, FLOW_CTL_PARALLEL_REGISTER, FLOW_CTL_PARALLEL_QUERY, FLOW_CTL_REGISTER,
     FLOW_CTL_QUERY, AGENT_NUM_MAX, FLOW_CTL_PARALLEL_UPDATE, FLOW_CTL_PARALLEL_GET, FLOW_CTL_PARALLEL_RETRIEVE,
     FLOW_CTL_PARALLEL_DEREGISTER, FLOW_CTL_UPDATE, FLOW_CTL_GET, FLOW_CTL_RETRIEVE, FLOW_CTL_DEREGISTER,
+    FLOW_CTL_JWK, FLOW_CTL_PARALLEL_JWK,
 )
 from agent_registry.core import RegistryCore
 from agent_registry.registry_instance import get_registry
 from agent_registry.middleware import ConnectionLimitMiddleware, TimeoutMiddleware
 from agent_registry.model.validated_agentcard import ValidatedAgentCard
+from agent_registry.signature.validator_instance import get_agent_card_validator
 from common.custom.custom_handle import HandlerRegistry
 from common.custom.interface_type import InterfaceType
 from common.log.audit_logger import OperationResult, LogLevel, OperatorObject, OperationName
@@ -73,6 +77,7 @@ def parse_rate_limit(interface_name: str):
         "get": (FLOW_CTL_GET, 100),
         "retrieve": (FLOW_CTL_RETRIEVE, 100),
         "deregister": (FLOW_CTL_DEREGISTER, 50),
+        "jwk": (FLOW_CTL_JWK, 10),
     }
 
     # Get the corresponding config entry
@@ -158,6 +163,7 @@ update_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_UPDATE, 100)
 get_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_GET, 100)))
 retrieve_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_RETRIEVE, 100)))
 deregister_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_DEREGISTER, 50)))
+jwk_semaphore = anyio.Semaphore(int(config.get(FLOW_CTL_PARALLEL_JWK, 1)))
 
 
 # ---------- Middleware ----------
@@ -363,6 +369,16 @@ async def register_agent(
     await authenticate_handle.handle(client_ip, request)
     acquired = False
     try:
+        # 验证AgentCard签名
+        signature_validator = get_agent_card_validator()
+        validation_result = signature_validator.validate_agent_card(agent)
+        if not validation_result.is_valid:
+            logger.error(f"AgentCard signature validation failed: {validation_result.error_message}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Signature validation failed: {validation_result.error_message}"
+            )
+
         register_semaphore.acquire_nowait()
         acquired = True
         await _check_agent_limit(registry, client_ip, details)
@@ -440,6 +456,16 @@ async def update_agent(
     await authenticate_handle.handle(client_ip, request)
     acquired = False
     try:
+        # 验证AgentCard签名
+        signature_validator = get_agent_card_validator()
+        validation_result = signature_validator.validate_agent_card(agent_data)
+        if not validation_result.is_valid:
+            logger.error(f"AgentCard signature validation failed: {validation_result.error_message}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Signature validation failed: {validation_result.error_message}"
+            )
+
         # Convert to dict for update
         update_semaphore.acquire_nowait()
         acquired = True
@@ -571,3 +597,59 @@ async def get_agent(
 def _make_agent_key(name: str, organization: str) -> Tuple[str, str]:
     """Create a normalized key for indexing."""
     return name.strip(), organization.strip()
+
+
+# ---------- JWK Endpoint ----------
+jwk_provider = JWKProvider(cert_path=config.get("JWK_CERT_PATH", "cert.pem"))
+jwk_kid = config.get("JWK_KID", None)
+
+jwk_rate_item = parse_rate_limit('jwk')
+
+
+@app.get("/.well-known/jwks.json")
+async def get_jwks(request: Request):
+    """
+    Get JSON Web Key Set (JWKS) for JWT signature verification.
+    This endpoint does not require authentication.
+    """
+    # Rate limit check
+    if jwk_rate_item and not await async_hit(jwk_rate_item, request.client.host):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too Many Requests"
+        )
+
+    acquired = False
+    try:
+        jwk_semaphore.acquire_nowait()
+        acquired = True
+        jwk_set = jwk_provider.get_jwk_set()
+        keys = []
+        for jwk in jwk_set:
+            enhanced_jwk = _enhance_jwk(jwk)
+            keys.append(enhanced_jwk)
+        return {"keys": keys}
+    except CertLoadError as e:
+        logger.error(f"Failed to load JWK: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in JWK endpoint: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    finally:
+        if acquired:
+            jwk_semaphore.release()
+
+
+def _enhance_jwk(jwk: PyJWK) -> Dict[str, Any]:
+    """Enhance JWK with kid and key_ops fields."""
+    jwk_dict = jwk._jwk_data.copy()
+    if jwk_kid:
+        jwk_dict["kid"] = jwk_kid
+    jwk_dict["key_ops"] = ["verify"]
+    return jwk_dict

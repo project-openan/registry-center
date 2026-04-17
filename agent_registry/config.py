@@ -12,10 +12,11 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from common.util.config_util import get_conf
 
 # agent_registry/config.py
 PERSISTENCE_FILE = "agentcard.json"
-USE_VECTORDB = False
+USE_VECTORDB = str(get_conf().get("use_vectordb", False)).lower() == 'true'
 COLLECTION_NAME = "agent_card_collection"
 MAX_REGISTER_NUM = 40
 MAX_REQUEST_BODY_SIZE = 1024 * 1024  # 1MB default limit
@@ -43,5 +44,9 @@ FLOW_CTL_PARALLEL_RETRIEVE = "flowcontrol.parallelism.retrieve"
 
 FLOW_CTL_DEREGISTER = "flowcontrol.ratelimit.deregister"
 FLOW_CTL_PARALLEL_DEREGISTER = "flowcontrol.parallelism.deregister"
+
+FLOW_CTL_JWK = "flowcontrol.ratelimit.jwk"
+FLOW_CTL_PARALLEL_JWK = "flowcontrol.parallelism.jwk"
+
 AGENT_NUM_MAX = "agent.num.max"
 FORWARDED_ALLOW_IPS = "forwarded_allow_ips"
