@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""
+Agent Registry Init Command
+用于初始化 Agent Registry 配置的命令行工具
+"""
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from agent_registry.init import main
+
+if __name__ == "__main__":
+    main()

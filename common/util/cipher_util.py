@@ -16,6 +16,11 @@
 DEFAULT_ENCODING = 'utf-8'
 
 
+def encrypt(plaintext: str) -> str:
+    # need to impl by user
+    return plaintext
+
+
 def decrypt(ciphertext: str) -> bytes:
     # need to impl by user
     return ciphertext.encode(DEFAULT_ENCODING)
