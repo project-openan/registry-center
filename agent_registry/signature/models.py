@@ -44,7 +44,7 @@ class JWKS(BaseModel):
 
 class AgentKeysStorage(BaseModel):
     """Agent公钥存储模型"""
-    organization: str = Field(..., description="组织名称")
+    organization: Optional[str] = Field(None, description="组织名称")
     agent_name: str = Field(..., description="Agent名称")
     keys: List[JWK] = Field(default_factory=list, description="公钥列表")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")

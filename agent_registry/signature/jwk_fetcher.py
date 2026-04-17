@@ -77,26 +77,28 @@ class JWKFetcher:
     def fetch_from_backend(
         self,
         kid: str,
-        organization: str,
-        agent_name: str
+        organization: Optional[str],
+        agent_name: str,
+        provider_url: Optional[str] = None
     ) -> Optional[PyJWK]:
         """
         从后台获取公钥
         
         Args:
             kid: 密钥ID
-            organization: 组织名称
+            organization: 组织名称（可选）
             agent_name: Agent名称
+            provider_url: Provider URL（可选，仅当organization为None时使用）
         
         Returns:
-            Optional[JWK]: JWK对象，不存在返回None
+            Optional[PyJWK]: PyJWK对象，不存在返回None
         """
         try:
             if not self.public_key_manager:
                 logger.warning("PublicKeyManager not configured")
                 return None
             
-            jwk = self.public_key_manager.get_public_key(organization, agent_name, kid)
+            jwk = self.public_key_manager.get_public_key(organization, agent_name, kid, provider_url)
             if jwk:
                 logger.info(f"Found backend key for kid: {kid}")
                 return self._convert_to_pyjwk(jwk)
@@ -109,21 +111,23 @@ class JWKFetcher:
     
     def create_backend_key_fetcher(
         self,
-        organization: str,
-        agent_name: str
+        organization: Optional[str],
+        agent_name: str,
+        provider_url: Optional[str] = None
     ) -> Callable[[str, str], Optional[PyJWK]]:
         """
         创建后台公钥获取函数（闭包）
         
         Args:
-            organization: 组织名称
+            organization: 组织名称（可选）
             agent_name: Agent名称
+            provider_url: Provider URL（可选，仅当organization为None时使用）
         
         Returns:
-            Callable: 接收(jku, kid)参数，返回JWK对象
+            Callable: 接收(jku, kid)参数，返回PyJWK对象
         """
         def fetch_backend_key(kid: str, jku: str) -> Optional[PyJWK]:
-            return self.fetch_from_backend(kid, organization, agent_name)
+            return self.fetch_from_backend(kid, organization, agent_name, provider_url)
         
         return fetch_backend_key
     

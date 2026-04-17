@@ -1,6 +1,7 @@
 import os
 import json
 import datetime
+import hashlib
 from typing import Optional, List
 from loguru import logger
 
@@ -18,17 +19,19 @@ class PublicKeyManager:
     
     def add_public_keys(
         self,
-        organization: str,
+        organization: Optional[str],
         agent_name: str,
-        jwks: JWKS
+        jwks: JWKS,
+        provider_url: Optional[str] = None
     ) -> List[str]:
         """
         批量添加公钥配置
         
         Args:
-            organization: 组织名称
+            organization: 组织名称（可选）
             agent_name: Agent名称
             jwks: JWKS对象
+            provider_url: Provider URL（可选，仅当organization为None时使用）
         
         Returns:
             List[str]: 添加的公钥ID列表
@@ -44,7 +47,7 @@ class PublicKeyManager:
                     raise ValueError(f"密钥类型仅支持EC或RSA，当前: {jwk.kty}")
             
             # 获取存储路径
-            storage_path = StoragePath.get_storage_path(organization, agent_name)
+            storage_path = StoragePath.get_storage_path(organization, agent_name, provider_url)
             
             # 确保目录存在
             StoragePath.ensure_directory_exists(storage_path)
@@ -79,23 +82,25 @@ class PublicKeyManager:
     
     def remove_public_key(
         self,
-        organization:   str,
+        organization: Optional[str],
         agent_name: str,
-        kid: str
+        kid: str,
+        provider_url: Optional[str] = None
     ) -> bool:
         """
         删除公钥配置
         
         Args:
-            organization: 组织名称
+            organization: 组织名称（可选）
             agent_name: Agent名称
             kid: 密钥ID
+            provider_url: Provider URL（可选，仅当organization为None时使用）
         
         Returns:
             bool: 是否成功删除
         """
         try:
-            storage_path = StoragePath.get_storage_path(organization, agent_name)
+            storage_path = StoragePath.get_storage_path(organization, agent_name, provider_url)
             
             if not StoragePath.is_valid_path(storage_path):
                 logger.warning(f"公钥配置文件不存在: {storage_path}")
@@ -133,21 +138,23 @@ class PublicKeyManager:
     
     def get_all_public_keys(
         self,
-        organization: str,
-        agent_name: str
+        organization: Optional[str],
+        agent_name: str,
+        provider_url: Optional[str] = None
     ) -> JWKS:
         """
         获取所有配置的公钥
         
         Args:
-            organization: 组织名称
+            organization: 组织名称（可选）
             agent_name: Agent名称
+            provider_url: Provider URL（可选，仅当organization为None时使用）
         
         Returns:
             JWKS: JWKS对象
         """
         try:
-            storage_path = StoragePath.get_storage_path(organization, agent_name)
+            storage_path = StoragePath.get_storage_path(organization, agent_name, provider_url)
             if not StoragePath.is_valid_path(storage_path):
                 logger.warning(f"公钥配置文件不存在: {storage_path}")
                 return JWKS(keys=[])
@@ -161,23 +168,25 @@ class PublicKeyManager:
     
     def get_public_key(
         self,
-        organization: str,
+        organization: Optional[str],
         agent_name: str,
-        kid: str
+        kid: str,
+        provider_url: Optional[str] = None
     ) -> Optional[JWK]:
         """
         根据kid获取公钥
         
         Args:
-            organization: 组织名称
+            organization: 组织名称（可选）
             agent_name: Agent名称
             kid: 密钥ID
+            provider_url: Provider URL（可选，仅当organization为None时使用）
         
         Returns:
             Optional[JWK]: JWK对象，不存在返回None
         """
         try:
-            jwks = self.get_all_public_keys(organization, agent_name)
+            jwks = self.get_all_public_keys(organization, agent_name, provider_url)
             
             for key in jwks.keys:
                 if key.kid == kid:

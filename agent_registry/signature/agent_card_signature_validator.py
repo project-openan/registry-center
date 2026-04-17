@@ -3,6 +3,7 @@ import base64
 from typing import Optional, List, Dict, Any
 from loguru import logger
 
+from common.util.config_util import get_conf
 from a2a.utils.signing import create_signature_verifier, InvalidSignaturesError, NoSignatureError
 
 from agent_registry.signature.models import SignatureObject, ProtectedHeader
@@ -30,6 +31,22 @@ class AgentCardSignatureValidator:
     
     def __init__(self, jwk_fetcher: JWKFetcher):
         self.jwk_fetcher = jwk_fetcher
+        self._signature_validation_enabled = self._load_signature_config()
+    
+    def _load_signature_config(self) -> bool:
+        """
+        从配置文件加载验签开关配置
+        
+        Returns:
+            bool: 是否启用验签
+        """
+        try:
+            config = get_conf()
+            enabled = config.get('signature_validation_enabled', 'true')
+            return enabled.lower() == 'true'
+        except Exception as e:
+            logger.error(f"Failed to load signature validation config: {e}")
+            return True  # 默认启用验签
     
     def validate_agent_card(
         self,
@@ -45,8 +62,14 @@ class AgentCardSignatureValidator:
             ValidationResult: 验证结果
         """
         try:
+            # 检查验签开关
+            if not self._signature_validation_enabled:
+                logger.info("Signature validation is disabled, skipping validation")
+                return ValidationResult(is_valid=True)
+            
             organization = agent_card.provider.organization
             agent_name = agent_card.name
+            provider_url = agent_card.provider.url
             
             agent_card_data = agent_card.model_dump()
             signatures = self._extract_signatures(agent_card_data)
@@ -70,7 +93,7 @@ class AgentCardSignatureValidator:
                 
                 kid = protected_header.kid
                 
-                backend_key_fetcher = self.jwk_fetcher.create_backend_key_fetcher(organization, agent_name)
+                backend_key_fetcher = self.jwk_fetcher.create_backend_key_fetcher(organization, agent_name, provider_url)
                 backend_key = backend_key_fetcher(kid, "")  # 这里第二个参数代表jku，由于后台公钥无需jku，这里给空字符串
 
                 # 步骤2：尝试从后台获取公钥并验签

@@ -1,4 +1,5 @@
 import os
+import hashlib
 from pathlib import Path
 from typing import Optional
 from loguru import logger
@@ -12,19 +13,30 @@ class StoragePath:
     BASE_DIR = os.path.join(Path(__file__).parent.parent.parent, "etc", "sign_verify", "jwks")
     
     @staticmethod
-    def get_storage_path(organization: str, agent_name: str) -> str:
+    def get_storage_path(organization: Optional[str], agent_name: str, provider_url: Optional[str] = None) -> str:
         """
         构造存储路径
         
         Args:
-            organization: 组织名称
+            organization: 组织名称（可选）
             agent_name: Agent名称
+            provider_url: Provider URL（可选，仅当organization为None时使用）
         
         Returns:
             str: 存储文件路径
         """
-        org_dir = os.path.join(StoragePath.BASE_DIR, organization)
-        return os.path.join(org_dir, f"{agent_name}.json")
+        if organization:
+            # 有organization：etc/sign_verify/jwks/{organization}/{agent_name}.json
+            org_dir = os.path.join(StoragePath.BASE_DIR, organization)
+            return os.path.join(org_dir, f"{agent_name}.json")
+        else:
+            # 无organization：etc/sign_verify/jwks/{name+url的hash}.json
+            if not provider_url:
+                raise ValueError("provider_url is required when organization is None")
+            
+            hash_key = f"{agent_name}{provider_url}"
+            hash_value = hashlib.sha256(hash_key.encode('utf-8')).hexdigest()
+            return os.path.join(StoragePath.BASE_DIR, f"{hash_value}.json")
     
     @staticmethod
     def get_organization_dir(organization: str) -> str:
