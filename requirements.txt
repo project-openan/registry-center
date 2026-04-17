@@ -21,6 +21,6 @@ cryptography~=46.0.5
 limits~=4.0.0
 starlette~=0.50.0
 openai>=2.26.0
-pymilvus~=2.4.9
+pymilvus~=2.6.12
 sentence_transformers~=3.0.1
 environs~=15.0.1
