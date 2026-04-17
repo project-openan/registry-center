@@ -19,6 +19,23 @@ class JWKProvider:
             self._jwk_set = self._load_jwk_set()
         return self._jwk_set
 
+    def get_public_key_pem(self) -> bytes:
+        try:
+            with open(self.cert_path, 'rb') as f:
+                cert_data = f.read()
+            
+            cert = x509.load_pem_x509_certificate(cert_data, default_backend())
+            public_key = cert.public_key()
+            
+            public_key_pem = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            
+            return public_key_pem
+        except Exception as e:
+            raise CertLoadError(f"Failed to load public key: {e}")
+
     def _load_jwk_set(self) -> List[PyJWK]:
         try:
             with open(self.cert_path, 'rb') as f:

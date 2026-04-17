@@ -61,7 +61,7 @@ class AuditLogger:
         self.backup_count = int(self.config.get("audit_log_backup_count", 5)) - 1
         parent_path = os.path.join(get_root_path(), "log", "audit")
         audit_log_dir = Path(parent_path)
-        audit_log_dir.mkdir(exist_ok=True)
+        audit_log_dir.mkdir(parents=True, exist_ok=True)
         os.chmod(audit_log_dir, 0o700)
         self.log_file = os.path.join(parent_path, "audit.log")
         self.lock = threading.Lock()

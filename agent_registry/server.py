@@ -609,10 +609,9 @@ jwk_rate_item = parse_rate_limit('jwk')
 @app.get("/.well-known/jwks.json")
 async def get_jwks(request: Request):
     """
-    Get JSON Web Key Set (JWKS) for JWT signature verification.
+    Download public key in PEM format for JWT signature verification.
     This endpoint does not require authentication.
     """
-    # Rate limit check
     if jwk_rate_item and not await async_hit(jwk_rate_item, request.client.host):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -623,12 +622,14 @@ async def get_jwks(request: Request):
     try:
         jwk_semaphore.acquire_nowait()
         acquired = True
-        jwk_set = jwk_provider.get_jwk_set()
-        keys = []
-        for jwk in jwk_set:
-            enhanced_jwk = _enhance_jwk(jwk)
-            keys.append(enhanced_jwk)
-        return {"keys": keys}
+        public_key_pem = jwk_provider.get_public_key_pem()
+        return Response(
+            content=public_key_pem,
+            media_type="application/x-pem-file",
+            headers={
+                "Content-Disposition": "attachment; filename=public_key.pem"
+            }
+        )
     except CertLoadError as e:
         logger.error(f"Failed to load JWK: {e}")
         raise HTTPException(
