@@ -1,0 +1,25 @@
+[Unit]
+Description=Registry Center - A2A-T AgentCard Registry
+Documentation=https://github.com/your-org/registry-center
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/registry-center
+Environment="APP_USER=root"
+Environment="APP_UID=0"
+Environment="APP_GID=0"
+Environment="OPENSSL_CONF=/opt/registry-center/etc/conf/custom_openssl.cnf"
+ExecStart=/usr/bin/python -m agent_registry.start
+ExecStop=/bin/kill -15 $MAINPID
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

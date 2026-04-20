@@ -14,15 +14,61 @@ class InitCommand:
     def __init__(self):
         self.root_path = get_root_path()
         self.config_file = os.path.join(self.root_path, "etc", "conf", "server.conf")
+        self.existing_config = self._load_existing_config()
+
+    def _load_existing_config(self) -> dict:
+        config = {}
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and '=' in line:
+                        key, _, value = line.partition('=')
+                        config[key.strip()] = value.strip()
+        return config
 
     def init_command(self):
-        print("配置服务端TLS证书：（仅支持RSA算法）")
-        tls_config = self.config_tls_cert()
+        config = {}
 
-        print("\n配置签名证书：（仅支持RSA算法）")
-        sign_config = self.config_sign_cert()
+        default_enable_https = self.existing_config.get('enable_https', 'true')
+        enable_https_input = input(f"是否开启HTTPS enable_https (y/n, 默认: {default_enable_https}): ").strip()
+        if enable_https_input.lower() == 'n':
+            config['enable_https'] = 'false'
+        elif enable_https_input.lower() == 'y':
+            config['enable_https'] = 'true'
+        else:
+            config['enable_https'] = default_enable_https
 
-        config = {**tls_config, **sign_config}
+        if config['enable_https'] == 'true':
+            print("\n配置服务端TLS证书：（仅支持RSA算法）")
+            tls_config = self.config_tls_cert()
+            config.update(tls_config)
+
+        default_sign_enabled = self.existing_config.get('registry.sign.enabled', 'true')
+        sign_enabled_input = input(
+            f"是否需要提供注册中心签名配置 registry.sign.enabled (y/n, 默认: {default_sign_enabled}): ").strip()
+        if sign_enabled_input.lower() == 'n':
+            config['registry.sign.enabled'] = 'false'
+        elif sign_enabled_input.lower() == 'y':
+            config['registry.sign.enabled'] = 'true'
+        else:
+            config['registry.sign.enabled'] = default_sign_enabled
+
+        if config['registry.sign.enabled'] == 'true':
+            print("\n配置签名证书：（仅支持RSA算法）")
+            sign_config = self.config_sign_cert()
+            config.update(sign_config)
+
+        default_signature = self.existing_config.get('signature_validation_enabled', 'true')
+        signature_validation_input = input(
+            f"是否开启验签能力 signature_validation_enabled (y/n, 默认: {default_signature}): ").strip()
+        if signature_validation_input.lower() == 'n':
+            config['signature_validation_enabled'] = 'false'
+        elif signature_validation_input.lower() == 'y':
+            config['signature_validation_enabled'] = 'true'
+        else:
+            config['signature_validation_enabled'] = default_signature
+
         self.save_config_to_file(config)
 
         print(f"\n配置已完成，已保存在 {self.config_file}")
@@ -31,68 +77,101 @@ class InitCommand:
     def config_tls_cert(self) -> dict:
         config = {}
 
+        default_ssl_certfile = self.existing_config.get('ssl_certfile', '')
         config['ssl_certfile'] = self.input_path(
             "请输入服务端证书路径 ssl_certfile",
-            "etc/ssl/service/server_rsa.cer",
+            default_ssl_certfile,
             ".cer"
         )
 
-        config['ssl_keyfile'] = self.input_path(
+        default_ssl_keyfile = self.existing_config.get('ssl_keyfile', '')
+        ssl_keyfile, keyfile_changed = self.input_path(
             "请输入服务端私钥路径 ssl_keyfile",
-            "etc/ssl/service/server_key_rsa.pem",
-            ".pem"
+            default_ssl_keyfile,
+            ".pem",
+            track_change=True
         )
+        config['ssl_keyfile'] = ssl_keyfile
 
+        default_ssl_ca_certs = self.existing_config.get('ssl_ca_certs', '')
         config['ssl_ca_certs'] = self.input_path(
             "请输入服务端信任证书路径 ssl_ca_certs",
-            "etc/ssl/service/trust.cer",
+            default_ssl_ca_certs,
             ".cer"
         )
 
+        default_ssl_cert_certs = self.existing_config.get('ssl_cert_certs', '')
         config['ssl_cert_certs'] = self.input_path(
             "请输入服务端吊销列表文件路径 ssl_cert_certs",
-            "etc/ssl/service/revovationlist.crl",
+            default_ssl_cert_certs,
             ".crl",
             required=False
         )
 
-        password = self.input_password("请输入服务端私钥口令")
-        config['ssl_keyfile_password'] = self.save_password_file(password, config['ssl_keyfile'])
+        if keyfile_changed:
+            password = self.input_password("请输入服务端私钥口令")
+            config['ssl_keyfile_password'] = self.save_password_file(password, ssl_keyfile)
+        else:
+            config['ssl_keyfile_password'] = self.existing_config.get('ssl_keyfile_password', '')
 
-        verify_client = input("是否开启客户端证书校验 verify_client (y/n, 默认: y): ").strip()
-        config['ssl_verify_client'] = 'true' if verify_client.lower() != 'n' else 'false'
+        default_verify_client = self.existing_config.get('ssl_verify_client', 'true')
+        verify_client = input(f"是否开启客户端证书校验 verify_client (y/n, 默认: {default_verify_client}): ").strip()
+        if verify_client.lower() == 'n':
+            config['ssl_verify_client'] = 'false'
+        elif verify_client.lower() == 'y':
+            config['ssl_verify_client'] = 'true'
+        else:
+            config['ssl_verify_client'] = default_verify_client
 
         return config
 
     def config_sign_cert(self) -> dict:
         config = {}
 
+        default_sign_certfile = self.existing_config.get('sign_certfile', '')
         config['sign_certfile'] = self.input_path(
-            "请输入签名证书路径",
-            "etc/sign_cert/server_rsa.cer",
+            "请输入签名证书路径 sign_certfile",
+            default_sign_certfile,
             ".cer"
         )
 
-        config['sign_keyfile'] = self.input_path(
-            "请输入签名私钥路径",
-            "etc/sign_cert/server_key_rsa.pem",
-            ".pem"
+        default_sign_keyfile = self.existing_config.get('sign_keyfile', '')
+        sign_keyfile, keyfile_changed = self.input_path(
+            "请输入签名私钥路径 sign_keyfile",
+            default_sign_keyfile,
+            ".pem",
+            track_change=True
         )
+        config['sign_keyfile'] = sign_keyfile
 
-        password = self.input_password("请输入签名私钥口令")
-        config['sign_keyfile_password'] = self.save_password_file(password, config['sign_keyfile'])
+        if keyfile_changed:
+            password = self.input_password("请输入签名私钥口令")
+            config['sign_keyfile_password'] = self.save_password_file(password, sign_keyfile)
+        else:
+            config['sign_keyfile_password'] = self.existing_config.get('sign_keyfile_password', '')
 
         return config
 
-    def input_path(self, prompt: str, default: str, suffix: str, required: bool = True) -> str:
+    def input_path(self, prompt: str, default: str, suffix: str, required: bool = True, track_change: bool = False):
         while True:
-            path = input(f"{prompt}: (当前配置: {default}): ").strip()
-            if not path:
-                if not required:
-                    return ""
-                path = default
+            prompt_text = f"{prompt}: (当前配置: {default}): " if default else f"{prompt}: "
+            path = input(prompt_text).strip()
 
-            result, error = self.validate_cert_path(path, suffix, required)
+            changed = False
+            if not path:
+                if default:
+                    path = default
+                elif not required:
+                    if track_change:
+                        return "", False
+                    return ""
+                else:
+                    print("错误：路径不能为空")
+                    continue
+            else:
+                changed = (path != default)
+
+            result, error = self.validate_cert_path(path, suffix, required if not default else False)
             if not result:
                 print(f"错误：{error}")
                 continue
@@ -104,6 +183,8 @@ class InitCommand:
                 if confirm != 'y':
                     continue
 
+            if track_change:
+                return path, changed
             return path
 
     def input_password(self, prompt: str) -> str:
@@ -157,8 +238,8 @@ class InitCommand:
             private_key = parse_pem_files(key_path, password.encode(DEFAULT_ENCODING))
 
             if private_key.public_key().public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
             ) != cert.public_key().public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
@@ -174,7 +255,7 @@ class InitCommand:
         key_path_obj = Path(key_path)
         password_file_path = key_path_obj.parent / f"{key_path_obj.stem}_pwd"
 
-        with open(password_file_path, 'w') as f:
+        with open(password_file_path, 'w', encoding='utf-8') as f:
             f.write(encrypted_password)
 
         os.chmod(password_file_path, 0o600)
@@ -185,18 +266,20 @@ class InitCommand:
         config_dir = os.path.dirname(self.config_file)
         os.makedirs(config_dir, exist_ok=True)
 
-        with open(self.config_file, 'w') as f:
-            f.write("[ssl]\n")
-            f.write(f"ssl_certfile={config.get('ssl_certfile', '')}\n")
-            f.write(f"ssl_keyfile={config.get('ssl_keyfile', '')}\n")
-            f.write(f"ssl_keyfile_password={config.get('ssl_keyfile_password', '')}\n")
-            f.write(f"ssl_ca_certs={config.get('ssl_ca_certs', '')}\n")
-            f.write(f"ssl_cert_certs={config.get('ssl_cert_certs', '')}\n")
-            f.write(f"ssl_verify_client={config.get('ssl_verify_client', 'true')}\n")
-            f.write("\n[sign]\n")
-            f.write(f"sign_certfile={config.get('sign_certfile', '')}\n")
-            f.write(f"sign_keyfile={config.get('sign_keyfile', '')}\n")
-            f.write(f"sign_keyfile_password={config.get('sign_keyfile_password', '')}\n")
+        existing_config = {}
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and '=' in line:
+                        key, _, value = line.partition('=')
+                        existing_config[key.strip()] = value.strip()
+
+        existing_config.update(config)
+
+        with open(self.config_file, 'w', encoding='utf-8') as f:
+            for key, value in existing_config.items():
+                f.write(f"{key}={value}\n")
 
         os.chmod(self.config_file, 0o600)
 
