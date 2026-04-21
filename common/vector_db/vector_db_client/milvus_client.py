@@ -25,7 +25,7 @@ from common.vector_db.vector_db_client.config.vector_db_client_registry import v
 from common.vector_db.vector_db_client.config.vector_db_config import VectorDBType
 
 VARCHAR_MAX_LENGTH = 65535
-BGE_EMBEDDING_VECTOR_DIVISION_LENGTH = 1024
+EMBEDDING_VECTOR_DIVISION_LENGTH = 1024
 output_fields = ["id", "name", "description", "organization", "agent_card"]
 
 
@@ -60,7 +60,7 @@ class MilvusDBClient(VectorDBClient):
                              auto_id=False, description="name of organization")
 
             schema.add_field(field_name="embedding", datatype=DataType.FLOAT_VECTOR,
-                             dim=BGE_EMBEDDING_VECTOR_DIVISION_LENGTH,
+                             dim=EMBEDDING_VECTOR_DIVISION_LENGTH,
                              description="vector embedding")
 
             for key in output_fields:
@@ -108,8 +108,8 @@ class MilvusDBClient(VectorDBClient):
 
             # 1. 校验 embedding 维度
             embedding = insert_entity.get("embedding", [])
-            if not isinstance(embedding, list) or len(embedding) != BGE_EMBEDDING_VECTOR_DIVISION_LENGTH:
-                raise ValueError(F"向量维度必须为 {BGE_EMBEDDING_VECTOR_DIVISION_LENGTH}")
+            if not isinstance(embedding, list) or len(embedding) != EMBEDDING_VECTOR_DIVISION_LENGTH:
+                raise ValueError(F"向量维度必须为 {EMBEDDING_VECTOR_DIVISION_LENGTH}")
 
             # 2. 执行插入操作
             result = self.client.insert(

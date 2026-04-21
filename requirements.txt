@@ -13,7 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-a2a-sdk>=0.3.26
+a2a-sdk>=1.0.0a1
 a2a-sdk[signing]
 loguru>=0.7.3
 uvicorn>=0.34.0
@@ -22,6 +22,5 @@ cryptography~=46.0.5
 limits~=4.0.0
 starlette~=0.50.0
 openai>=2.26.0
-pymilvus~=2.4.9
-sentence_transformers~=3.0.1
+pymilvus~=2.6.12
 environs~=15.0.1

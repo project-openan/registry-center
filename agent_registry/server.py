@@ -24,19 +24,18 @@ and persistence using a JSON file.
 
 import asyncio
 from functools import partial
-from typing import List, Optional, Tuple, Any, Dict
+from typing import Optional, Tuple, Any
 
 import anyio
 from a2a.types import AgentCard
-from fastapi import FastAPI, HTTPException, Query, Request, Depends, status, Path, Body
+from fastapi import FastAPI, HTTPException, Query, Request, Depends, status, Path
 from fastapi.responses import JSONResponse
-from jwt import PyJWK
+from google.protobuf.json_format import Parse, MessageToDict
 from loguru import logger
 from limits import strategies, storage, parse_many
-from openai import organization
+
 from starlette.responses import Response
 
-from agent_registry.agent_registry.jwk_provider import JWKProvider, CertLoadError
 from agent_registry.config import (
     MAX_REQUEST_BODY_SIZE,
     MAX_URL_LENGTH, CONN_TIMEOUT, CONN_MAX, FLOW_CTL_PARALLEL_REGISTER, FLOW_CTL_PARALLEL_QUERY, FLOW_CTL_REGISTER,
@@ -45,10 +44,10 @@ from agent_registry.config import (
     FLOW_CTL_JWK, FLOW_CTL_PARALLEL_JWK,
 )
 from agent_registry.core import RegistryCore
+from agent_registry.model.validated_agentcard import validate_agent_card
 from agent_registry.registry_instance import get_registry
 from agent_registry.middleware import ConnectionLimitMiddleware, TimeoutMiddleware
-from agent_registry.model.validated_agentcard import ValidatedAgentCard
-from agent_registry.signature.validator_instance import get_agent_card_validator
+
 from common.custom.custom_handle import HandlerRegistry
 from common.custom.interface_type import InterfaceType
 from common.log.audit_logger import OperationResult, LogLevel, OperatorObject, OperationName
@@ -228,7 +227,7 @@ async def _check_agent_limit(registry: RegistryCore, client_ip: str, details: di
         )
 
 
-async def _check_duplicate_agent(agent: ValidatedAgentCard, registry: RegistryCore, client_ip: str,
+async def _check_duplicate_agent(agent: AgentCard, registry: RegistryCore, client_ip: str,
                                  details: dict) -> None:
     """检查是否已存在相同 (name, organization) 的 agent，若存在则记录并抛出异常。"""
     key = _make_agent_key(agent.name, agent.provider.organization)
@@ -249,7 +248,7 @@ async def _check_duplicate_agent(agent: ValidatedAgentCard, registry: RegistryCo
 
 
 async def _perform_registration(
-        agent: ValidatedAgentCard,
+        agent: AgentCard,
         client_ip: str,
         details: dict,
 ) -> bool:
@@ -294,17 +293,18 @@ async def _perform_registration(
             detail="Internal server error",
         ) from e
 
+
 async def _perform_update(
         client_ip: str,
-        name:str,
-        organization:str,
+        name: str,
+        organization: str,
         data: dict,
-        details:dict
+        details: dict
 ) -> bool:
     """执行实际的更新操作，处理可能的 ValueError 和其他异常，并记录对应日志。"""
     try:
         update_handle = HandlerRegistry.get_handler(InterfaceType.UPDATE)
-        success = await update_handle.handle(name,organization,data)
+        success = await update_handle.handle(name, organization, data)
         await audit_handle.handle({
             "operation_name": OperationName.REGISTER_AGENT,
             "level": LogLevel.MINOR,
@@ -342,6 +342,7 @@ async def _perform_update(
             detail="Internal server error",
         ) from e
 
+
 @app.post(
     "/rest/a2a-t/v1/agents/register",
     response_model=bool,
@@ -349,7 +350,7 @@ async def _perform_update(
     status_code=status.HTTP_201_CREATED,
 )
 async def register_agent(
-        agent: ValidatedAgentCard,
+
         request: Request,
         _: Any = Depends(RateLimiter('register')),
         registry: RegistryCore = Depends(get_registry),
@@ -359,6 +360,8 @@ async def register_agent(
     The combination (name, provider.organization) must be unique.
     Returns True if registered, False if duplicate.
     """
+    body = await request.body()
+    agent = Parse(body, AgentCard())
     client_ip = request.client.host
     details = {
         "agentName": agent.name,
@@ -369,20 +372,11 @@ async def register_agent(
     await authenticate_handle.handle(client_ip, request)
     acquired = False
     try:
-        # 验证AgentCard签名
-        signature_validator = get_agent_card_validator()
-        validation_result = signature_validator.validate_agent_card(agent)
-        if not validation_result.is_valid:
-            logger.error(f"AgentCard signature validation failed: {validation_result.error_message}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Signature validation failed: {validation_result.error_message}"
-            )
-
         register_semaphore.acquire_nowait()
         acquired = True
         await _check_agent_limit(registry, client_ip, details)
         await _check_duplicate_agent(agent, registry, client_ip, details)
+        validate_agent_card(agent)
         result = await _perform_registration(agent, client_ip, details)
         return JSONResponse(
             content=result,
@@ -397,7 +391,7 @@ async def register_agent(
 
 @app.get(
     "/rest/a2a-t/v1/agents/query",
-    response_model=List[AgentCard],
+    response_model=None,
     summary="Exact search",
 )
 async def list_agents_exact(
@@ -420,7 +414,7 @@ async def list_agents_exact(
         try:
             query_handle = HandlerRegistry.get_handler(InterfaceType.QUERY)
             agents = await query_handle.handle(name, organization)
-            return agents
+            return [MessageToDict(card, preserving_proto_field_name=True) for card in agents]
         except Exception as e:
             logger.error(f"Error in exact search: {e}")
             raise HTTPException(
@@ -439,13 +433,15 @@ async def update_agent(
         request: Request,
         name: str,
         organization: str,
-        agent_data: ValidatedAgentCard,
-        registry: RegistryCore = Depends(get_registry),  _: Any = Depends(RateLimiter('update'))
+
+        registry: RegistryCore = Depends(get_registry), _: Any = Depends(RateLimiter('update'))
 ):
     """
     Fully replace an existing agent. The name and organization in the body must match the path/query.
     Returns True if updated, False if not found.
     """
+    body = await request.body()
+    agent_data = Parse(body, AgentCard())
     client_ip = request.client.host
     details = {
         "agentName": agent_data.name,
@@ -456,24 +452,14 @@ async def update_agent(
     await authenticate_handle.handle(client_ip, request)
     acquired = False
     try:
-        # 验证AgentCard签名
-        signature_validator = get_agent_card_validator()
-        validation_result = signature_validator.validate_agent_card(agent_data)
-        if not validation_result.is_valid:
-            logger.error(f"AgentCard signature validation failed: {validation_result.error_message}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Signature validation failed: {validation_result.error_message}"
-            )
-
         # Convert to dict for update
         update_semaphore.acquire_nowait()
         acquired = True
-
+        validate_agent_card(agent_data)
         await _check_agent_limit(registry, client_ip, details)
 
-        data = agent_data.model_dump()
-        success = await _perform_update(client_ip,name, organization, data,details)
+        data = MessageToDict(agent_data, preserving_proto_field_name=True)
+        success = await _perform_update(client_ip, name, organization, data, details)
         if not success:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
         return success
@@ -485,6 +471,7 @@ async def update_agent(
     finally:
         if acquired:
             update_semaphore.release()
+
 
 @app.delete("/rest/a2a-t/v1/deregister_agent/{name}", response_model=bool, summary="Deregister an agent")
 async def deregister_agent(
@@ -525,7 +512,8 @@ async def deregister_agent(
         if acquired:
             deregister_semaphore.release()
 
-@app.get("/rest/a2a-t/v1/agents/retrieve", response_model=List[AgentCard], summary="Fuzzy retrieve by task")
+
+@app.get("/rest/a2a-t/v1/agents/retrieve", response_model=None, summary="Fuzzy retrieve by task")
 async def retrieve_agents_by_task(
         request: Request,
         task: str = Query(..., description="Natural language task description"),
@@ -547,8 +535,8 @@ async def retrieve_agents_by_task(
         acquired = True
         try:
             retrieve_handle = HandlerRegistry.get_handler(InterfaceType.RETRIEVE)
-            agents = await retrieve_handle.handle(task,top_n)
-            return agents
+            agents = await retrieve_handle.handle(task, top_n)
+            return [MessageToDict(agent) for agent in agents]
         except Exception as e:
             logger.error(f"Error in exact search: {e}")
             raise HTTPException(
@@ -562,7 +550,7 @@ async def retrieve_agents_by_task(
             retrieve_semaphore.release()
 
 
-@app.get("/rest/a2a-t/v1/agents/{name}", response_model=AgentCard | None, summary="Get agent by exact name and organization")
+@app.get("/rest/a2a-t/v1/agents/{name}", response_model=None, summary="Get agent by exact name and organization")
 async def get_agent(
         request: Request,
         name: str,
@@ -580,8 +568,8 @@ async def get_agent(
         acquired = True
         try:
             get_handle = HandlerRegistry.get_handler(InterfaceType.GET)
-            agents = await get_handle.handle(name, organization)
-            return agents
+            agent = await get_handle.handle(name, organization)
+            return MessageToDict(agent, preserving_proto_field_name=True) if agent is not None else None
         except Exception as e:
             logger.error(f"Error in exact search: {e}")
             raise HTTPException(
@@ -594,63 +582,7 @@ async def get_agent(
         if acquired:
             get_semaphore.release()
 
+
 def _make_agent_key(name: str, organization: str) -> Tuple[str, str]:
     """Create a normalized key for indexing."""
     return name.strip(), organization.strip()
-
-
-# ---------- JWK Endpoint ----------
-jwk_provider = JWKProvider(cert_path=config.get("JWK_CERT_PATH", "cert.pem"))
-jwk_kid = config.get("JWK_KID", None)
-
-jwk_rate_item = parse_rate_limit('jwk')
-
-
-@app.get("/.well-known/jwks.json")
-async def get_jwks(request: Request):
-    """
-    Download public key in PEM format for JWT signature verification.
-    This endpoint does not require authentication.
-    """
-    if jwk_rate_item and not await async_hit(jwk_rate_item, request.client.host):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too Many Requests"
-        )
-
-    acquired = False
-    try:
-        jwk_semaphore.acquire_nowait()
-        acquired = True
-        public_key_pem = jwk_provider.get_public_key_pem()
-        return Response(
-            content=public_key_pem,
-            media_type="application/x-pem-file",
-            headers={
-                "Content-Disposition": "attachment; filename=public_key.pem"
-            }
-        )
-    except CertLoadError as e:
-        logger.error(f"Failed to load JWK: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error in JWK endpoint: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-    finally:
-        if acquired:
-            jwk_semaphore.release()
-
-
-def _enhance_jwk(jwk: PyJWK) -> Dict[str, Any]:
-    """Enhance JWK with kid and key_ops fields."""
-    jwk_dict = jwk._jwk_data.copy()
-    if jwk_kid:
-        jwk_dict["kid"] = jwk_kid
-    jwk_dict["key_ops"] = ["verify"]
-    return jwk_dict

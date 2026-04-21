@@ -19,14 +19,14 @@ from common.llm.config.config_reader import read_config_as_json
 
 
 class EmbeddingType(Enum):
-    BGELargeZH = "bge-large-zh-v1.5"
+    BGEM3 = "bge-m3"
 
 
 def convert_embedding_type(embedding_type: str) -> EmbeddingType:
     for member in EmbeddingType:
         if member.value == embedding_type:
             return member
-    return EmbeddingType.BGELargeZH
+    return EmbeddingType.BGEM3
 
 
 class EmbeddingConfig:

@@ -1,7 +1,7 @@
 {
-  "bge-large-zh-v1.5": {
+  "bge-m3": {
     "description": "BGE Embedding Service",
-    "uri": "BAAI/bge-large-zh-v1.5",
-    "version": "1.5.0"
+    "uri": "http://{IP}:{Port}/{URI}",
+    "version": "M3"
   }
 }
