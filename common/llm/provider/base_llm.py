@@ -41,7 +41,7 @@ class BaseLLM(ABC):
             return result
         except Exception as e:
             logger.error(f"ask llm exception {e}")
-        return ""
+        return "", ""
 
     def to_dict(self):
         return {"name": self.llm_config.llm_type.value}
