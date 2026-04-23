@@ -29,7 +29,8 @@ class BaseLLM(ABC):
         self.llm_config = llm_config
         self.model = llm_config.config_item.model
         self.base_url = llm_config.config_item.api
-        self.api_key = llm_config.config_item.apikey
+        self.api_key = llm_config.config_item.apikey,
+        self.enable_thinking = llm_config.config_item.enable_thinking
 
     def ask_llm(self, prompt) -> Union[str, Tuple[str, str]]:
         start_time = time.time()
@@ -40,7 +41,7 @@ class BaseLLM(ABC):
             return result
         except Exception as e:
             logger.error(f"ask llm exception {e}")
-        return ""
+        return "", ""
 
     def to_dict(self):
         return {"name": self.llm_config.llm_type.value}

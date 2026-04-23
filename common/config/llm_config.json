@@ -2,6 +2,7 @@
   "openai_style_llm": {
     "description": "this is openai rest api, deepseek-chat",
     "model": "deepseek-chat",
+    "enable_thinking": false,
     "api": "https://api.deepseek.com",
     "api_key": "sk-f80c71a4058c4ea9a6df03e69804ecec"
   }

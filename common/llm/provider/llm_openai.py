@@ -41,7 +41,12 @@ class OpenAIStyleLLM(BaseLLM):
         )
         completion = self.client.chat.completions.create(
             model=self.llm_config.config_item.model,
-            messages=[user_message]
+            messages=[user_message],
+            extra_body={
+                "chat_template_kwargs": {
+                    "enable_thinking": self.enable_thinking
+                }
+            }
         )
         message = completion.choices[0].message
         reasoning = getattr(message, 'reasoning_content', '') or ''

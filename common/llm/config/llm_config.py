@@ -39,6 +39,7 @@ class LLMConfigItem:
         self.model = config.get("model", "")
         self.api = config.get("api", "")
         self.apikey = config.get("api_key", "")
+        self.enable_thinking = config.get("enable_thinking", True)
 
 
 class LLMConfig:
