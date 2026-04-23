@@ -493,8 +493,10 @@ async def deregister_agent(
         acquired = True
         try:
             deregister_handle = HandlerRegistry.get_handler(InterfaceType.DEREGISTER)
-            agents = await deregister_handle.handle(name, organization)
-            return agents
+            success = await deregister_handle.handle(name, organization)
+            if not success:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+            return success
         except Exception as e:
             logger.error(f"Error in exact search: {e}")
             raise HTTPException(
@@ -502,10 +504,6 @@ async def deregister_agent(
                 detail="Internal server error",
             ) from e
 
-        success = registry.deregister(name, organization)
-        if not success:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
-        return success
     except anyio.WouldBlock as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Server is busy") from e
     finally:
