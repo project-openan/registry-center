@@ -1,0 +1,68 @@
+# CLI Chinese Language Configuration
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+
+cli:
+  intro: "agent-registry v{version}\n输入 'cmds' 查看可用命令，'exit' 退出。\n"
+  prompt: "agent-registry> "
+  goodbye: "再见！"
+  no_command: "未指定命令。输入 'cmds' 查看可用命令。"
+  unknown_command: "未知命令。输入 'cmds' 查看可用命令。"
+  
+commands:
+  header: "可用命令："
+  internal:
+    cmds: "显示命令列表"
+    exit: "退出 CLI"
+  footer: "使用 TAB 自动补齐命令和参数"
+  
+errors:
+  syntax: "语法错误：{error}"
+  not_found: "命令未找到：{command}"
+  validation: "验证错误：{error}"
+  service: "服务错误：{error}"
+  config: "配置错误：{error}"
+  permission: "权限拒绝：{error}"
+  argument_missing: "缺少必需参数：{argument}"
+  subcommand_not_found: "子命令未找到：{subcommand}"
+  command_conflict: "命令冲突：{command} 已注册"
+  connection_failed: "无法连接到服务：{url}"
+  timeout: "请求超时（{seconds} 秒）"
+  
+messages:
+  success: "[成功] {message}"
+  error: "[错误] {message}"
+  warning: "[警告] {message}"
+  info: "[信息] {message}"
+  loading: "加载中..."
+  saving: "保存中..."
+  deleted: "已删除：{item}"
+  created: "已创建：{item}"
+  updated: "已更新：{item}"
+  
+agent:
+  list_header: "已注册的 Agent"
+  list_empty: "没有已注册的 Agent"
+  not_found: "Agent 未找到：{name}"
+  already_exists: "Agent 已存在：{name}"
+  register_success: "Agent 注册成功：{name}"
+  unregister_success: "Agent 取消注册成功：{name}"
+  
+status:
+  service_running: "服务运行中"
+  service_stopped: "服务未运行"
+  service_url: "服务地址：{url}"
+  uptime: "运行时间：{uptime}"
+  version: "版本：{version}"
+  
+help:
+  usage: "用法：{usage}"
+  options: "选项："
+  arguments: "参数："
+  examples: "示例："
+  see_also: "参见："
+  
+debug:
+  command_start: "执行命令：{command}"
+  command_end: "完成（耗时 {duration}s，退出码 {code}）"
+  request: "HTTP {method} {url}"
+  response: "响应：{status}（{size} 字节）"
