@@ -41,7 +41,7 @@ class PathValidator:
 
     def is_support_format(self, file_extension: str) -> bool:
         if self.suffix == "":
-            # 没后缀的不校验
+            # No suffix configured, skip validation
             return True
         return self.suffix == file_extension.lower()
 
@@ -50,7 +50,7 @@ class PathValidator:
             if not self.is_required:
                 return ValidationResult(True, "Not config! ")
             return ValidationResult(False, f"Cert file path is empty! {self.conf_tip}")
-        # 到这里就是填了，填了就校验
+        # Path is configured, proceed with validation
         cert_path_obj = Path(self.cert_path)
         if not cert_path_obj.exists():
             return ValidationResult(False, f"Cert file not exist：{self.cert_path}. {self.conf_tip}")
@@ -98,27 +98,27 @@ class CommonContentValidator:
 
     @staticmethod
     def validate_public_key_length(public_key) -> bool:
-        """验证密钥算法和长度"""
+        """Validate key algorithm and length"""
         if isinstance(public_key, rsa.RSAPublicKey):
             return public_key.key_size >= 3072
         if isinstance(public_key, ec.EllipticCurvePublicKey):
-            # 256位及以上
+            # 256 bits or higher
             return public_key.key_size >= 256
         return False
 
     @staticmethod
     def validate_private_key_length(private_key) -> bool:
-        """验证密钥算法和长度"""
+        """Validate key algorithm and length"""
         if isinstance(private_key, rsa.RSAPrivateKey):
             return private_key.key_size >= 3072
         if isinstance(private_key, ec.EllipticCurvePrivateKey):
-            # 256位及以上
+            # 256 bits or higher
             return private_key.key_size >= 256
         return False
 
     @staticmethod
     def validate_certificate_validity(x509_obj: X509Obj) -> bool:
-        """验证证书有效期"""
+        """Validate certificate validity period"""
         current_time = datetime.datetime.now(datetime.timezone.utc)
         for cert_obj in x509_obj.cert_list:
             try:
@@ -128,7 +128,7 @@ class CommonContentValidator:
                     return False
             except (ValueError, TypeError):
                 return False
-        # 每本证书的有效期都要校验对
+        # Every certificate's validity period must be verified
         return True
 
     def validate(self) -> ValidationResult:
@@ -138,23 +138,23 @@ class CommonContentValidator:
 class CerContentValidator(CommonContentValidator):
 
     def validate(self) -> ValidationResult:
-        # 读取cer证书
+        # Read cer certificate
         try:
             x509_obj = cert_parser.parse_cer_certificate(self.cert_path)
             if len(x509_obj.cert_list) == 0:
                 return ValidationResult(False, f"No certificate found! {self.conf_tip}")
-            # 校验X.509v3格式，校验公钥算法及长度，校验有效期
+            # Validate X.509v3 format, public key algorithm and length, and validity period
             for cert_obj in x509_obj.cert_list:
-                # 1. 证书格式校验：X.509v3
+                # 1. Certificate format validation: X.509v3
                 if cert_obj.version != x509.Version.v3:
                     return ValidationResult(False, f"Certificate format is not X.509v3. {self.conf_tip}")
-                # 2. 密钥算法、长度校验，cer只校验公钥，因为没有私钥
+                # 2. Key algorithm and length validation; only public key is checked for cer (no private key)
                 if not self.validate_public_key_length(cert_obj.public_key):
                     return ValidationResult(False,
                                             f"Certificate key algorithm or length does not meet requirements."
                                             f"{self.conf_tip}")
 
-            # 3. 有效期校验，单独跑一把，确保每本证书的有效期对比的currentTime是一个
+            # 3. Validity period check: run once separately to ensure all certificates compare against the same currentTime
             if not self.validate_certificate_validity(x509_obj):
                 return ValidationResult(False, f"Certificate is not valid at current time. {self.conf_tip}")
 
@@ -164,7 +164,7 @@ class CerContentValidator(CommonContentValidator):
 
 
 class PrivateKeyValidator(CommonContentValidator):
-    # 定义字符类型
+    # Character type definitions
     digit_pattern = re.compile(r'[0-9]')
     upper_pattern = re.compile(r'[A-Z]')
     lower_pattern = re.compile(r'[a-z]')
@@ -181,16 +181,18 @@ class PrivateKeyValidator(CommonContentValidator):
 
     def password_verify(self, plaintext: str) -> bool:
         """
-        至少8个字符，至少包含两种字符（数字、大写字母、小写字母、特殊字符`~!@# $%^& *()-_=+ |[{}];:'",<.>/? 和空格 ）
-        :param plaintext: 待校验的密码明文
-        :return: 如果密码符合复杂度要求，返回True；否则返回False
+        At least 8 characters, containing at least two character types
+        (digits, uppercase letters, lowercase letters, special characters
+        `~!@# $%^& *()-_=+ |[{}];:'\",<.>/? and spaces).
+        :param plaintext: The plaintext password to validate.
+        :return: True if password meets complexity requirements, False otherwise.
         """
-        # 至少8个字符
+        # At least 8 characters
         if len(plaintext) < self.min_length:
             return False
-        # 计算密码中包含的字符类型数量
+        # Count the character types present in the password
         char_types = sum(bool(re.search(pattern, plaintext)) for pattern in self.patterns)
-        # 至少包含两种字符类型
+        # At least two character types required
         if char_types < 2:
             return False
 
@@ -198,7 +200,7 @@ class PrivateKeyValidator(CommonContentValidator):
 
     def validate(self) -> ValidationResult:
         try:
-            # 1. 校验密码复杂度
+            # 1. Validate password complexity
             if not self.password_verify(self.password_bytes.decode(DEFAULT_ENCODING)):
                 return ValidationResult(False,
                                         f"PEM privatekey password is too week, please check the password complexity! "
@@ -207,14 +209,14 @@ class PrivateKeyValidator(CommonContentValidator):
                                         f"digits, uppercase letters, "
                                         f"lowercase letters, special characters (`~!@#$%^&*()-_=+|[{{}}];:'\",<.>/?), "
                                         f"and spaces.")
-            # 2. 读取cer证书，验证密码是否有效
+            # 2. Read cer certificate, verify whether the password is valid
             private_key = cert_parser.parse_pem_files(self.cert_path, self.password_bytes)
-            # 3. 校验私钥算法及长度
+            # 3. Validate private key algorithm and length
             if not self.validate_private_key_length(private_key):
                 return ValidationResult(False,
                                         f"Certificate key algorithm or length does not meet requirements."
                                         f" {self.conf_tip}")
-            # 4. 校验私钥文件里的公钥和cer里面的公钥是否一致
+            # 4. Verify that the public key in the private key file matches the one in the cer file
             server_obj = cert_parser.parse_cer_certificate(self.server_path)
             if len(server_obj.cert_list) == 0 or server_obj.cert_list[0].public_key != private_key.public_key():
                 return ValidationResult(False,
@@ -232,27 +234,27 @@ class CRLValidator(CommonContentValidator):
     crl_list_data = None
 
     def validate_crl_validity(self, crl_list: x509.CertificateRevocationList) -> bool:
-        """验证CRL有效期"""
+        """Validate CRL validity period"""
         current_time = datetime.datetime.now(datetime.timezone.utc)
         return crl_list.last_update_utc <= current_time <= crl_list.next_update_utc
 
     def validate(self) -> ValidationResult:
         try:
             if self.cert_path is None or self.cert_path == '':
-                # 非必填，没填就不校验
+                # Optional field; skip validation if not configured
                 return ValidationResult(True, "CRL not config! ")
-            # 到这里就是填了，填了就校验
+            # Path is configured, proceed with validation
             cert_path_obj = Path(self.cert_path)
             if not cert_path_obj.exists():
                 return ValidationResult(False, f"CRL file not exist：{self.cert_path}. {self.conf_tip}")
-            # 读取CRL
+            # Read CRL
             crl_list = cert_parser.parse_crl_list(self.cert_path)
             self.crl_list_data = crl_list
-            # 1. 校验CRL格式：X.509v2，有扩展的是v2，没有扩展的是v1
+            # 1. Validate CRL format: X.509v2 (has extensions = v2, no extensions = v1)
             is_v2 = len(crl_list.extensions) > 0
             if not is_v2:
                 return ValidationResult(False, f"CRL format is not X.509v2. {self.conf_tip}")
-            # 2. 校验有效期：当前时间有效
+            # 2. Validate validity period: must be valid at current time
             if not self.validate_crl_validity(crl_list):
                 return ValidationResult(False, f"CRL is not valid at current time. {self.conf_tip}")
             return ValidationResult(True, f"CRL validation passed! {self.cert_path}")
@@ -277,23 +279,23 @@ class CertValidator:
 
     def validate(self) -> ValidationResult:
         """
-        pem私钥校验以下内容：
-            - 证书私钥密钥算法、密钥长度：RSA(≥3072 bits)，ECDSA(≥256 bits)，不满足则退出进程启动
-            - 有效期：当前时间有效，不满足则退出进程启动
-            - 是否加密私钥：是否有口令、口令复杂度，不满足则给出日志打印
-            - 私钥口令与私钥匹配性：不满足则退出进程启动
-            - 私钥与公钥的匹配性：不满足则退出进程启动
-        cer校验以下内容:
-            - 校验证书格式：X.509v3
-            - 证书公钥算法、密钥长度：RSA(≥3072 bits)，ECDSA(≥256 bits)，不满足则退出进程启动
-            - 校验有效期：当前时间有效
-            - 密钥算法、长度
-        crl校验以下内容:
-            - 校验证书格式：X.509v2
-            - 校验有效期：当前时间有效
+        PEM private key validation checks:
+            - Certificate private key algorithm and key length: RSA (>= 3072 bits), ECDSA (>= 256 bits). Exit process if not met.
+            - Validity period: Must be valid at current time. Exit process if not met.
+            - Whether private key is encrypted: password existence and complexity. Log warning if not met.
+            - Private key password and private key matching: Exit process if not met.
+            - Private key and public key matching: Exit process if not met.
+        CER validation checks:
+            - Validate certificate format: X.509v3
+            - Certificate public key algorithm and key length: RSA (>= 3072 bits), ECDSA (>= 256 bits). Exit process if not met.
+            - Validate validity period: Must be valid at current time.
+            - Key algorithm and length.
+        CRL validation checks:
+            - Validate certificate format: X.509v2
+            - Validate validity period: Must be valid at current time.
         :return: ValidationResult
         """
-        # 1. 基础校验，校验路径是否存在，文件名格式是否符合要求
+        # 1. Basic validation: check path existence and file format compliance
         if not os.path.exists(CONFIG_FILE_PATH):
             return ValidationResult(False,
                                     "Config file not exists! Please config \"etc/conf/server.conf\" "
@@ -301,22 +303,22 @@ class CertValidator:
         result = PathValidatorLink(self.conf_obj).validate()
         if not result.is_valid:
             return result
-        # 2. 读取证书，校验X.509v3格式，校验公钥算法及长度，校验有效期
+        # 2. Read certificate, validate X.509v3 format, verify public key algorithm and length, validate validity period
         result = CerContentValidatorLink(self.conf_obj).validate()
         if not result.is_valid:
             return result
 
-        # 3. 读取私钥，验证密码是否有效，校验私钥算法及长度
+        # 3. Read private key, validate whether password is valid, verify private key algorithm and length
         key_path = self.conf_obj.ssl_keyfile
         password_bytes = load_cert_password(self.conf_obj.ssl_keyfile_password)
         result = PrivateKeyValidator(cert_path=key_path, password_bytes=password_bytes,
                                      server_path=self.conf_obj.ssl_certfile, conf_tip="ssl_keyfile").validate()
         if not result.is_valid:
             return result
-        # 4. 读取crl，验证crl格式和有效期
+        # 4. Read CRL, validate CRL format and validity period
         crl_validator = CRLValidator(cert_path=self.conf_obj.ssl_crl_file, conf_tip="ssl_crl_file")
         result = crl_validator.validate()
         if result.is_valid:
-            # 校验通过后把单例的吊销列表缓存起来
+            # Cache the CRL list in the singleton after successful validation
             self.conf_obj.crl_list_data = crl_validator.crl_list_data
         return result

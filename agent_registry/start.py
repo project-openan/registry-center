@@ -38,7 +38,7 @@ audit_handle = HandlerRegistry.get_handler(InterfaceType.AUDIT)
 
 
 def get_user_info_from_env():
-    """从环境变量获取用户信息"""
+    """Get user information from environment variables"""
     user_info = {
         'username': os.environ.get('APP_USER', 'unknown'),
         'uid': os.environ.get('APP_UID', 'unknown'),
@@ -79,9 +79,9 @@ def customized_create_ssl_context(
         if ca_certs:
             ctx.load_verify_locations(ca_certs)
             if len(conf_singleton_obj.get_crl_list()) > 0:
-                # 如果有CRL的场景，追加CRL
+                # If CRL is configured, append CRL
                 ctx.load_verify_locations(conf_singleton_obj.ssl_crl_file)
-                # 配置为校验CRL模式
+                # Enable CRL verification mode
                 ctx.verify_flags |= ssl.VERIFY_CRL_CHECK_LEAF
         if ciphers:
             ctx.set_ciphers(ciphers)
@@ -91,7 +91,7 @@ def customized_create_ssl_context(
         raise e
 
 
-# 由于原版config不支持加载crl，因此扩展crl支持
+# Extend CRL support since the original config does not support loading CRLs
 config.create_ssl_context = customized_create_ssl_context
 
 
@@ -109,13 +109,13 @@ class CustomUvicornServer:
             host=self.server_config.get("ip", "127.0.0.1"),
             port=int(self.server_config.get("port", 5000)),
             ssl_certfile=self.conf_obj.ssl_certfile,
-            # 私钥路径
+            # Private key path
             ssl_keyfile=self.conf_obj.ssl_keyfile,
-            # 私钥密码
+            # Private key password
             ssl_keyfile_password=load_cert_password(self.conf_obj.ssl_keyfile_password).decode(DEFAULT_ENCODING),
-            # 信任证书
+            # Trusted CA certificates
             ssl_ca_certs=self.conf_obj.ssl_ca_certs,
-            # 是否校验客户端证书，填了如果浏览器没证书就没法访问了
+            # Whether to verify client certificates (enabling this prevents browser access without client certs)
             ssl_cert_reqs=self.conf_obj.verify_client,
             ssl_ciphers=CipherConverter.convert(self.server_config.get(TLS_CIPHER)),
             timeout_keep_alive=0,
@@ -135,14 +135,14 @@ def main():
         uvicorn.run(app, host=server_config.get('ip', "127.0.0.1"), port=int(server_config.get('port', 5000)))
     else:
         try:
-            # 校验配置
+            # Validate configuration
             conf_obj = conf_singleton_obj
             result = CertValidator(conf_obj).validate()
             if not result.is_valid:
                 sys.exit(result.message)
-            # 通过校验后修改etc/ssl文件夹权限为700，里面文件权限为600
+            # After validation, set etc/ssl directory permissions to 700 and file permissions to 600
             set_ssl_folder_permissions()
-            # 创建并启动服务器
+            # Create and start server
             server = CustomUvicornServer(server_config, conf_obj)
             server.run()
         except Exception as e:

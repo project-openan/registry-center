@@ -52,21 +52,21 @@ class ConfObj:
         obj = cls()
 
         obj.ip = in_dict.get("ip", DEFAULT_IP)
-        # 字符串要转成int
+        # Convert string port to int
         port = in_dict.get("port", DEFAULT_PORT)
         if isinstance(port, str):
             port = int(port)
         obj.port = port
-        # 相对路径要变成绝对路径
+        # Convert relative paths to absolute paths
         obj.ssl_certfile = as_absolute_path(in_dict.get("ssl_certfile", DEFAULT_SSL_CERT_FILE))
         obj.ssl_keyfile = as_absolute_path(in_dict.get("ssl_keyfile", DEFAULT_SSL_KEYFILE))
         obj.ssl_keyfile_password = as_absolute_path(in_dict.get("ssl_keyfile_password", DEFAULT_KEY_PASSWORD))
         obj.ssl_ca_certs = as_absolute_path(in_dict.get("ssl_ca_certs", DEFAULT_SSL_CA_CERTS))
-        # crl是非必填
+        # CRL is optional
         crl_path = in_dict.get("ssl_crl_file", "")
         obj.ssl_crl_file = as_absolute_path(crl_path) if len(crl_path) > 0 else crl_path
 
-        # 大部分场景都是校验
+        # Most scenarios use verification
         not_verified = in_dict.get("verify_client", "").lower() == "false"
         obj.verify_client = ssl.CERT_NONE if not_verified else ssl.CERT_REQUIRED
         return obj

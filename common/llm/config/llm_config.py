@@ -20,16 +20,16 @@ from common.llm.config.config_reader import read_config_as_json
 
 class LLMType(Enum):
     OPENAI_STYLE_LLM = "openai_style_llm"
-    AOC_CHAT_LLM = "aoc_chat_llm"           # 对话模型
-    AOC_EMBEDDING_LLM = "aoc_embedding_llm" # 嵌入模型
-    AOC_RERANKER_LLM = "aoc_reranker_llm"   # 重排模型
+    AOC_CHAT_LLM = "aoc_chat_llm"           # Chat model
+    AOC_EMBEDDING_LLM = "aoc_embedding_llm" # Embedding model
+    AOC_RERANKER_LLM = "aoc_reranker_llm"   # Reranker model
 
 
 def convert_llm_type(llm_type: str) -> LLMType:
     for member in LLMType:
         if member.value == llm_type:
             return member
-    # 默认返回 OPENAI_STYLE_LLM，可根据需要调整
+    # Default to OPENAI_STYLE_LLM; can be adjusted as needed
     return LLMType.OPENAI_STYLE_LLM
 
 
@@ -39,7 +39,7 @@ class LLMConfigItem:
     api: str
     apikey: str
     enable_thinking: bool
-    extra: Dict[str, Any]                       # 新增字段
+    extra: Dict[str, Any]                       # Extra fields
 
     def __init__(self, config: dict):
         self.description = config.get("description", "")
@@ -47,7 +47,7 @@ class LLMConfigItem:
         self.api = config.get("api", "")
         self.apikey = config.get("api_key", "")
         self.enable_thinking = config.get("enable_thinking", True)
-        self.extra = config.get("extra", {})    # 新增
+        self.extra = config.get("extra", {})    # Extra fields
 
 
 class LLMConfig:

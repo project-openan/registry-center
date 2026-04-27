@@ -1,7 +1,6 @@
 import os
 import json
 import datetime
-import hashlib
 from typing import Optional, List
 from loguru import logger
 
@@ -10,13 +9,13 @@ from agent_registry.signature.storage import StoragePath
 
 
 class PublicKeyManager:
-    """公钥管理器"""
-    
+    """Public key manager"""
+
     MAX_KEYS_PER_AGENT = 5
-    
+
     def __init__(self):
         self._base_dir = StoragePath.BASE_DIR
-    
+
     def add_public_keys(
         self,
         organization: Optional[str],
@@ -25,61 +24,61 @@ class PublicKeyManager:
         provider_url: Optional[str] = None
     ) -> List[str]:
         """
-        批量添加公钥配置
-        
+        Batch add public keys.
+
         Args:
-            organization: 组织名称（可选）
-            agent_name: Agent名称
-            jwks: JWKS对象
-            provider_url: Provider URL（可选，仅当organization为None时使用）
-        
+            organization: Organization name (optional).
+            agent_name: Agent name.
+            jwks: JWKS object.
+            provider_url: Provider URL (optional, used when organization is None).
+
         Returns:
-            List[str]: 添加的公钥ID列表
+            List[str]: List of added public key IDs.
         """
         try:
-            # 验证公钥数量
+            # Validate key count
             if len(jwks.keys) > self.MAX_KEYS_PER_AGENT:
-                raise ValueError(f"一次最多添加{self.MAX_KEYS_PER_AGENT}个公钥")
-            
-            # 验证每个JWK的密钥类型
+                raise ValueError(f"At most {self.MAX_KEYS_PER_AGENT} public keys can be added at once")
+
+            # Validate each JWK key type
             for jwk in jwks.keys:
                 if jwk.kty not in ['EC', 'RSA']:
-                    raise ValueError(f"密钥类型仅支持EC或RSA，当前: {jwk.kty}")
-            
-            # 获取存储路径
+                    raise ValueError(f"Key type only supports EC or RSA, got: {jwk.kty}")
+
+            # Get storage path
             storage_path = StoragePath.get_storage_path(organization, agent_name, provider_url)
-            
-            # 确保目录存在
+
+            # Ensure directory exists
             StoragePath.ensure_directory_exists(storage_path)
-            
-            # 读取现有公钥（如果存在）
+
+            # Read existing keys (if any)
             existing_keys = self._load_keys(storage_path)
             existing_keys_dict = {key.kid: key for key in existing_keys}
-            
-            # 添加或更新公钥
+
+            # Add or update keys
             added_kids = []
             for jwk in jwks.keys:
                 existing_keys_dict[jwk.kid] = jwk
                 added_kids.append(jwk.kid)
-            
-            # 构造存储对象
+
+            # Build storage object
             storage_obj = AgentKeysStorage(
                 organization=organization,
                 agent_name=agent_name,
                 keys=list(existing_keys_dict.values()),
                 updated_at=datetime.utcnow()
             )
-            
-            # 保存到文件
+
+            # Save to file
             self._save_keys(storage_path, storage_obj)
-            
-            logger.info(f"成功添加 {len(added_kids)} 个公钥到 {storage_path}")
+
+            logger.info(f"Successfully added {len(added_kids)} public keys to {storage_path}")
             return added_kids
-            
+
         except Exception as e:
-            logger.error(f"添加公钥失败: {e}")
+            logger.error(f"Failed to add public keys: {e}")
             raise
-    
+
     def remove_public_key(
         self,
         organization: Optional[str],
@@ -88,28 +87,28 @@ class PublicKeyManager:
         provider_url: Optional[str] = None
     ) -> bool:
         """
-        删除公钥配置
-        
+        Remove a public key.
+
         Args:
-            organization: 组织名称（可选）
-            agent_name: Agent名称
-            kid: 密钥ID
-            provider_url: Provider URL（可选，仅当organization为None时使用）
-        
+            organization: Organization name (optional).
+            agent_name: Agent name.
+            kid: Key ID.
+            provider_url: Provider URL (optional, used when organization is None).
+
         Returns:
-            bool: 是否成功删除
+            bool: Whether the key was successfully removed.
         """
         try:
             storage_path = StoragePath.get_storage_path(organization, agent_name, provider_url)
-            
+
             if not StoragePath.is_valid_path(storage_path):
-                logger.warning(f"公钥配置文件不存在: {storage_path}")
+                logger.warning(f"Public key config file does not exist: {storage_path}")
                 return False
-            
-            # 读取现有公钥
+
+            # Read existing keys
             storage_obj = self._load_storage_obj(storage_path)
-            
-            # 查找并删除公钥
+
+            # Find and remove key
             key_found = False
             keys = storage_obj.keys
             for i, key in enumerate(keys):
@@ -117,25 +116,25 @@ class PublicKeyManager:
                     keys.pop(i)
                     key_found = True
                     break
-            
+
             if not key_found:
-                logger.warning(f"公钥不存在: {kid}")
+                logger.warning(f"Public key not found: {kid}")
                 return False
-            
-            # 更新存储对象
+
+            # Update storage object
             storage_obj.keys = keys
             storage_obj.updated_at = datetime.utcnow()
-            
-            # 保存到文件
+
+            # Save to file
             self._save_keys(storage_path, storage_obj)
-            
-            logger.info(f"成功删除公钥: {kid}")
+
+            logger.info(f"Successfully deleted public key: {kid}")
             return True
-            
+
         except Exception as e:
-            logger.error(f"删除公钥失败: {e}")
+            logger.error(f"Failed to delete public key: {e}")
             return False
-    
+
     def get_all_public_keys(
         self,
         organization: Optional[str],
@@ -143,29 +142,29 @@ class PublicKeyManager:
         provider_url: Optional[str] = None
     ) -> JWKS:
         """
-        获取所有配置的公钥
-        
+        Get all configured public keys.
+
         Args:
-            organization: 组织名称（可选）
-            agent_name: Agent名称
-            provider_url: Provider URL（可选，仅当organization为None时使用）
-        
+            organization: Organization name (optional).
+            agent_name: Agent name.
+            provider_url: Provider URL (optional, used when organization is None).
+
         Returns:
-            JWKS: JWKS对象
+            JWKS: JWKS object.
         """
         try:
             storage_path = StoragePath.get_storage_path(organization, agent_name, provider_url)
             if not StoragePath.is_valid_path(storage_path):
-                logger.warning(f"公钥配置文件不存在: {storage_path}")
+                logger.warning(f"Public key config file does not exist: {storage_path}")
                 return JWKS(keys=[])
-            
+
             storage_obj = self._load_storage_obj(storage_path)
             return JWKS(keys=storage_obj.keys)
-            
+
         except Exception as e:
-            logger.error(f"获取公钥失败: {e}")
+            logger.error(f"Failed to get public keys: {e}")
             return JWKS(keys=[])
-    
+
     def get_public_key(
         self,
         organization: Optional[str],
@@ -174,90 +173,90 @@ class PublicKeyManager:
         provider_url: Optional[str] = None
     ) -> Optional[JWK]:
         """
-        根据kid获取公钥
-        
+        Get a public key by kid.
+
         Args:
-            organization: 组织名称（可选）
-            agent_name: Agent名称
-            kid: 密钥ID
-            provider_url: Provider URL（可选，仅当organization为None时使用）
-        
+            organization: Organization name (optional).
+            agent_name: Agent name.
+            kid: Key ID.
+            provider_url: Provider URL (optional, used when organization is None).
+
         Returns:
-            Optional[JWK]: JWK对象，不存在返回None
+            Optional[JWK]: JWK object, None if not found.
         """
         try:
             jwks = self.get_all_public_keys(organization, agent_name, provider_url)
-            
+
             for key in jwks.keys:
                 if key.kid == kid:
                     return key
-            
+
             return None
-            
+
         except Exception as e:
-            logger.error(f"获取公钥失败: {e}")
+            logger.error(f"Failed to get public key: {e}")
             return None
-    
+
     def _load_keys(self, storage_path: str) -> List[JWK]:
         """
-        从文件加载公钥列表
-        
+        Load public keys from file.
+
         Args:
-            storage_path: 存储文件路径
-        
+            storage_path: Storage file path.
+
         Returns:
-            List[JWK]: 公钥列表
+            List[JWK]: List of public keys.
         """
         try:
             storage_obj = self._load_storage_obj(storage_path)
             return storage_obj.keys
         except Exception as e:
-            logger.error(f"加载公钥失败: {e}")
+            logger.error(f"Failed to load public keys: {e}")
             return []
-    
+
     def _load_storage_obj(self, storage_path: str) -> AgentKeysStorage:
         """
-        从文件加载存储对象
-        
+        Load storage object from file.
+
         Args:
-            storage_path: 存储文件路径
-        
+            storage_path: Storage file path.
+
         Returns:
-            AgentKeysStorage: 存储对象
+            AgentKeysStorage: Storage object.
         """
         try:
             base_dir = os.getcwd()
             file_path = os.path.join(base_dir, storage_path)
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             return AgentKeysStorage(**data)
-            
+
         except Exception as e:
-            logger.error(f"加载存储对象失败: {e}")
+            logger.error(f"Failed to load storage object: {e}")
             raise
-    
+
     def _save_keys(self, storage_path: str, storage_obj: AgentKeysStorage) -> None:
         """
-        保存公钥到文件
-        
+        Save public keys to file.
+
         Args:
-            storage_path: 存储文件路径
-            storage_obj: 存储对象
+            storage_path: Storage file path.
+            storage_obj: Storage object.
         """
         try:
-            # 确保目录存在
+            # Ensure directory exists
             StoragePath.ensure_directory_exists(storage_path)
-            
-            # 保存到文件
+
+            # Save to file
             with open(storage_path, 'w', encoding='utf-8') as f:
                 json.dump(storage_obj.model_dump(), f, ensure_ascii=False, indent=2)
-            
-            # 设置文件权限
+
+            # Set file permissions
             StoragePath.set_file_permissions(storage_path)
-            
-            logger.info(f"成功保存公钥到 {storage_path}")
-            
+
+            logger.info(f"Successfully saved public keys to {storage_path}")
+
         except Exception as e:
-            logger.error(f"保存公钥失败: {e}")
+            logger.error(f"Failed to save public keys: {e}")
             raise

@@ -12,13 +12,11 @@ from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 from common.cert.password_generator import PasswordGenerator
 from common.util.cipher_util import encrypt, DEFAULT_ENCODING
 from common.log.audit_logger import audit_logger, LogLevel, OperationResult, OperationName
-
-
-
+from loguru import logger
 
 
 class CertificateGenerator:
-    """证书生成工具类，提供生成证书、检验等核心功能"""
+    """Certificate generation utility, providing certificate creation, validation, and related functions."""
 
     CERT_FILE = "server.cer"
     KEY_FILE = "server_key.pem"
@@ -36,10 +34,10 @@ class CertificateGenerator:
 
     def generate_certificates(self, cert_dir: str, cert_usage: List[str]) -> bool:
         """
-        生成自签名证书
-        :param cert_dir: 证书目录路径
-        :param cert_usage: 证书用途列表，支持以下值：serverAuth TLS服务器认证， dataSigning 数据签名
-        :return: 生成成功返回true，生成失败返回false。目标目录下已存在证书，返回false
+        Generate self-signed certificate.
+        :param cert_dir: Certificate directory path.
+        :param cert_usage: List of certificate usage types. Supports: serverAuth for TLS server auth, dataSigning for data signing
+        :return: True on success, False on failure. False if certificates already exist in the target directory.
         """
         try:
             if self._check_certificates_exists(cert_dir):
@@ -58,15 +56,16 @@ class CertificateGenerator:
 
             return True
         except Exception as e:
+            logger.error(f"Certificate generation failed: {e}")
             return False
 
     def generate_self_signed_cert(self, cert_dir: str, cert_usage: str, password: str) -> bool:
         """
-        生成自签名证书（新接口）
-        :param cert_dir: 证书目录路径
-        :param cert_usage: 证书用途，支持以下值：serverAuth TLS服务器认证， dataSigning 数据签名
-        :param password: 私钥加密口令
-        :return: 生成成功返回true，生成失败返回false。目标目录下已存在证书，返回false
+        Generate self-signed certificate (new API).
+        :param cert_dir: Certificate directory path.
+        :param cert_usage: Certificate usage type. Supports: serverAuth for TLS server auth, dataSigning for data signing
+        :param password: Private key encryption password.
+        :return: True on success, False on failure. False if certificates already exist in the target directory.
         """
         try:
             if self._check_self_signed_certificates_exists(cert_dir):
@@ -85,13 +84,14 @@ class CertificateGenerator:
 
             return True
         except Exception as e:
+            logger.error(f"Self-signed certificate generation failed: {e}")
             return False
 
     def _check_certificates_exists(self, cert_dir: str) -> bool:
         """
-        检查目录下是否已存在证书文件
-        :param cert_dir: 证书目录路径
-        :return: 三个文件只要存在一个返回True，否则返回False
+        Check if certificate files already exist in the directory.
+        :param cert_dir: Certificate directory path.
+        :return: True if ANY of the three files exist, False otherwise.
         """
         cert_path = os.path.join(cert_dir, self.CERT_FILE)
         key_path = os.path.join(cert_dir, self.KEY_FILE)
@@ -101,9 +101,9 @@ class CertificateGenerator:
 
     def _check_self_signed_certificates_exists(self, cert_dir: str) -> bool:
         """
-        检查目录下是否已存在自签名证书文件
-        :param cert_dir: 证书目录路径
-        :return: 两个文件只要存在一个返回True，否则返回False
+        Check if self-signed certificate files already exist in the directory.
+        :param cert_dir: Certificate directory path.
+        :return: True if either of the two files exists, False otherwise.
         """
         cert_file = f"server_{self.alg}.cer"
         key_file = f"server_key_{self.alg}.cer"
@@ -115,8 +115,8 @@ class CertificateGenerator:
 
     def _generate_key(self) -> PrivateKeyTypes:
         """
-        生成指定算法的签名密钥
-        :return: 私钥对象
+        Generate a signing key with the specified algorithm.
+        :return: Private key object.
         """
         if self.key_algorithm.upper() == 'RSA':
             return rsa.generate_private_key(
@@ -128,10 +128,10 @@ class CertificateGenerator:
 
     def _save_server_cert(self, cert_dir: str, private_key: PrivateKeyTypes, cert_usage: List[str]) -> None:
         """
-        使用私钥为公钥生成自签名证书
-        :param cert_dir: 证书目录路径
-        :param private_key: 私钥对象
-        :param cert_usage: 证书用途列表
+        Use the private key to generate a self-signed certificate for the public key.
+        :param cert_dir: Certificate directory path.
+        :param private_key: Private key object.
+        :param cert_usage: List of certificate usage types.
         """
         subject = issuer = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, self.SUBJECT),
@@ -172,18 +172,18 @@ class CertificateGenerator:
 
     def _generate_password(self) -> bytes:
         """
-        生成符合复杂度要求的随机口令
-        :return: 口令字节
+        Generate a random password meeting complexity requirements.
+        :return: Password bytes.
         """
         password = self.password_generator.generate_password(16)
         return password.encode(DEFAULT_ENCODING)
 
     def _save_encrypted_key(self, cert_dir: str, private_key: PrivateKeyTypes, password: bytes) -> None:
         """
-        为明文私钥加密并保存
-        :param cert_dir: 证书目录路径
-        :param private_key: 私钥对象
-        :param password: 加密口令
+        Encrypt the plaintext private key and save it.
+        :param cert_dir: Certificate directory path.
+        :param private_key: Private key object.
+        :param password: Encryption password.
         """
         encryption_algorithm = serialization.NoEncryption()
 
@@ -197,9 +197,9 @@ class CertificateGenerator:
 
     def _save_encrypted_password(self, cert_dir: str, password: bytes) -> None:
         """
-        加密口令并保存到文件
-        :param cert_dir: 证书目录路径
-        :param password: 明文口令
+        Encrypt and save password to file.
+        :param cert_dir: Certificate directory path.
+        :param password: Plaintext password.
         """
         password_str = password.decode(DEFAULT_ENCODING)
         encrypted_password = encrypt(password_str)
@@ -210,10 +210,10 @@ class CertificateGenerator:
 
     def _save_self_signed_cert(self, cert_dir: str, private_key: PrivateKeyTypes, cert_usage: str) -> None:
         """
-        使用私钥为公钥生成自签名证书（新接口）
-        :param cert_dir: 证书目录路径
-        :param private_key: 私钥对象
-        :param cert_usage: 证书用途，serverAuth 或 dataSigning
+        Use the private key to generate a self-signed certificate (new API).
+        :param cert_dir: Certificate directory path.
+        :param private_key: Private key object.
+        :param cert_usage: Certificate usage, serverAuth or dataSigning.
         """
         subject = issuer = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, self.SUBJECT),
@@ -275,10 +275,10 @@ class CertificateGenerator:
 
     def _save_encrypted_key_with_password(self, cert_dir: str, private_key: PrivateKeyTypes, password: str) -> None:
         """
-        使用用户提供的口令加密私钥并保存
-        :param cert_dir: 证书目录路径
-        :param private_key: 私钥对象
-        :param password: 加密口令
+        Encrypt the private key using user-provided password and save it.
+        :param cert_dir: Certificate directory path.
+        :param private_key: Private key object.
+        :param password: Encryption password.
         """
         encryption_algorithm = serialization.BestAvailableEncryption(password.encode())
 
@@ -293,8 +293,8 @@ class CertificateGenerator:
 
     def _set_self_signed_file_permissions(self, cert_dir: str) -> None:
         """
-        设置自签名证书文件权限为600
-        :param cert_dir: 证书目录路径
+        Set self-signed certificate file permissions to 600.
+        :param cert_dir: Certificate directory path.
         """
         cert_file = f"server_{self.alg}.cer"
         key_file = f"server_key_{self.alg}.cer"
@@ -308,8 +308,8 @@ class CertificateGenerator:
 
     def _set_file_permissions(self, cert_dir: str) -> None:
         """
-        设置证书文件权限为600
-        :param cert_dir: 证书目录路径
+        Set certificate file permissions to 600.
+        :param cert_dir: Certificate directory path.
         """
         cert_path = os.path.join(cert_dir, self.CERT_FILE)
         key_path = os.path.join(cert_dir, self.KEY_FILE)
@@ -321,17 +321,17 @@ class CertificateGenerator:
 
     def _audit_log_generation(self, cert_dir: str) -> None:
         """
-        记录证书生成操作的审计日志
-        :param cert_dir: 证书目录路径
+        Record audit log for certificate generation.
+        :param cert_dir: Certificate directory path.
         """
         cert_path = os.path.join(cert_dir, self.CERT_FILE)
         audit_logger.audit({
             "operation_name": OperationName.GENERATE_CERTIFICATE,
             "level": LogLevel.INFO,
             "result": OperationResult.SUCCESS,
-            "object_name": "证书",
+            "object_name": "Certificate",
             "details": {
-                "证书路径": cert_path,
-                "证书用途": "TLS通信证书"
+                "certificate_path": cert_path,
+                "certificate_usage": "TLS communication certificate"
             }
         })

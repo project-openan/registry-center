@@ -12,14 +12,8 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-from common.util.config_util import get_conf
 
-conf = get_conf()
-use_vector_db = str(conf.get("use_vectordb", False)).lower() == 'true'
+from common.plugin_framework.registry import PluginRegistry
+from common.plugin_framework.base_plugin import BasePlugin
 
-if use_vector_db:
-    from common.vector_db.vector_db_client.milvus_client import MilvusDBClient
-    __all__ = ["MilvusDBClient"]
-else:
-    MilvusDBClient = None
-    __all__ = []
+__all__ = ['PluginRegistry', 'BasePlugin']

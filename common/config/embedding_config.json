@@ -1,7 +1,0 @@
-{
-  "bge-m3": {
-    "description": "BGE Embedding Service",
-    "uri": "http://{IP}:{Port}/{URI}",
-    "version": "M3"
-  }
-}

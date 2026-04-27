@@ -12,11 +12,14 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import json
 
 # tests/test_register.py
 import pytest
 from fastapi.testclient import TestClient
 from a2a.types import AgentCard
+from google.protobuf.json_format import Parse, MessageToJson
+
 from agent_registry.server import app
 
 
@@ -40,13 +43,11 @@ def valid_agent_data():
         },
         "description": "Test Description",
         "capabilities": {
-            "skills": ["text-generation", "code-generation"],
-            "input_modes": ["text/plain", "application/json"],
-            "output_modes": ["text/plain", "application/json"]
+            "streaming": False,
+            "push_notifications": False
         },
         "default_input_modes": ["text/plain"],
         "default_output_modes": ["text/plain"],
-        "url": "https://agent.test",
         "version": "1.0.0",
         "skills": [
             {
@@ -62,18 +63,16 @@ def valid_agent_data():
 
 
 def test_register_agent_success(client, mock_registry, valid_agent_data):
-    agent = AgentCard(**valid_agent_data)
     mock_registry.return_value.register.return_value = True
-    response = client.post("/rest/a2a-t/v1/agent-register", json=agent.model_dump())
-    assert response.status_code == 200
+    response = client.post("/rest/a2a-t/v1/agents/register", json=valid_agent_data)
+    assert response.status_code == 201
     assert response.json() is True
 
 
 def test_register_agent_duplicate(client, mock_registry, valid_agent_data):
-    agent = AgentCard(**valid_agent_data)
     mock_registry.return_value.register.return_value = False
-    response = client.post("/rest/a2a-t/v1/agent-register", json=agent.model_dump())
-    assert response.status_code == 200
+    response = client.post("/rest/a2a-t/v1/agents/register", json=valid_agent_data)
+    assert response.status_code == 201
     assert response.json() is False
 
 
@@ -96,7 +95,7 @@ def test_register_agent_missing_required_field(client, mock_registry, valid_agen
     del invalid_data[field_to_remove]
 
     # 尝试注册缺少字段的 Agent
-    response = client.post("/rest/a2a-t/v1/agent-register", json=invalid_data)
+    response = client.post("/rest/a2a-t/v1/agents/register", json=invalid_data)
 
     # 验证返回状态码为 422（请求无效）
     assert response.status_code == 422

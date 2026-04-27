@@ -46,27 +46,27 @@ def add_module_logger(module_prefix: str):
 
     def compress_and_set_permission(source_file):
         """
-        自定义压缩函数
-        source_file: 需要压缩的日志文件路径
-        返回值: 压缩后的文件路径（或 None）
+        Custom compression function.
+        source_file: Path to the log file to compress.
+        Returns: Path to the compressed file (or None on failure).
         """
-        # 构建压缩文件名
+        # Build compressed file path
         zip_file = Path(str(source_file) + ".zip")
 
         try:
-            # 执行压缩
+            # Compress
             with zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.write(source_file, arcname=Path(source_file).name)
 
-            # 压缩完成后立即修改权限
+            # Set permissions after compression
             os.chmod(zip_file, 0o440)
 
-            # 可选：删除原始日志文件
+            # Optionally remove original log file
             os.remove(source_file)
 
             return zip_file
         except Exception as e:
-            logger.error(f"压缩或设置权限失败: {e}")
+            logger.error(f"Failed to compress or set permissions: {e}")
             return None
 
     logger.configure(extra={"request_id": ''})

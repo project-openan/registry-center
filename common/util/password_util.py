@@ -10,15 +10,15 @@ def validate_password_complexity(password: str) -> tuple[bool, str]:
     special_pattern = re.compile(r'[`~!@#$%^&*()_=+|\[\{\}\];:\'",<.>/? -]')
 
     if len(password) == 0:
-        return False, f"口令为空"
+        return False, "Password is empty"
 
     if len(password) < min_length:
-        return False, f"至少{min_length}个字符"
+        return False, f"At least {min_length} characters"
 
     char_types = sum(bool(re.search(pattern, password)) for pattern in
                      [digit_pattern, upper_pattern, lower_pattern, special_pattern])
     if char_types < 2:
-        return False, "包含至少两种字符类型"
+        return False, "Include at least two character types"
 
     return True, ""
 
@@ -28,7 +28,7 @@ def input_password_with_validation(prompt: str) -> str:
         password = getpass.getpass(f"{prompt}: ")
         result, error = validate_password_complexity(password)
         if not result:
-            print(f"私钥口令复杂度过低（{error}），请确认是否需要继续使用该口令 (y/n): ", end='')
+            print(f"Private key password complexity is low ({error}), continue using this password? (y/n): ", end='')
             confirm = input().strip().lower()
             if confirm == 'y':
                 return password

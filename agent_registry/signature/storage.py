@@ -7,85 +7,86 @@ from loguru import logger
 
 class StoragePath:
     """
-    存储路径工具类，用于后台公钥文件路径创建，权限设置等管理
+    Storage path utility, used for backend public key file path management
+    and permission configuration.
     """
-    
+
     BASE_DIR = os.path.join(Path(__file__).parent.parent.parent, "etc", "sign_verify", "jwks")
-    
+
     @staticmethod
     def get_storage_path(organization: Optional[str], agent_name: str, provider_url: Optional[str] = None) -> str:
         """
-        构造存储路径
-        
+        Build storage path.
+
         Args:
-            organization: 组织名称（可选）
-            agent_name: Agent名称
-            provider_url: Provider URL（可选，仅当organization为None时使用）
-        
+            organization: Organization name (optional).
+            agent_name: Agent name.
+            provider_url: Provider URL (optional, used when organization is None).
+
         Returns:
-            str: 存储文件路径
+            str: Storage file path.
         """
         if organization:
-            # 有organization：etc/sign_verify/jwks/{organization}/{agent_name}.json
+            # With organization: etc/sign_verify/jwks/{organization}/{agent_name}.json
             org_dir = os.path.join(StoragePath.BASE_DIR, organization)
             return os.path.join(org_dir, f"{agent_name}.json")
         else:
-            # 无organization：etc/sign_verify/jwks/{name+url的hash}.json
+            # Without organization: etc/sign_verify/jwks/{hash of name + url}.json
             if not provider_url:
                 raise ValueError("provider_url is required when organization is None")
-            
+
             hash_key = f"{agent_name}{provider_url}"
             hash_value = hashlib.sha256(hash_key.encode('utf-8')).hexdigest()
             return os.path.join(StoragePath.BASE_DIR, f"{hash_value}.json")
-    
+
     @staticmethod
     def get_organization_dir(organization: str) -> str:
         """
-        获取组织目录路径
-        
+        Get organization directory path.
+
         Args:
-            organization: 组织名称
-        
+            organization: Organization name.
+
         Returns:
-            str: 组织目录路径
+            str: Organization directory path.
         """
         return os.path.join(StoragePath.BASE_DIR, organization)
-    
+
     @staticmethod
     def ensure_directory_exists(file_path: str) -> None:
         """
-        确保目录存在，如果不存在则创建
-        
+        Ensure the directory exists; create it if it doesn't.
+
         Args:
-            file_path: 文件路径
+            file_path: File path.
         """
         file_path_obj = Path(file_path)
         file_path_obj.parent.mkdir(parents=True, exist_ok=True)
-        
-        # 设置目录权限为700
+
+        # Set directory permissions to 700
         os.chmod(file_path_obj.parent, 0o700)
-    
+
     @staticmethod
     def set_file_permissions(file_path: str) -> None:
         """
-        设置文件权限为600
-        
+        Set file permissions to 600.
+
         Args:
-            file_path: 文件路径
+            file_path: File path.
         """
         if os.path.exists(file_path):
             os.chmod(file_path, 0o600)
-    
+
     @staticmethod
     def is_valid_path(file_path: str) -> bool:
         """
-        验证路径是否有效
-        
+        Validate whether the path is valid.
+
         Args:
-            file_path: 文件路径
-        
+            file_path: File path.
+
         Returns:
-            bool: 路径是否有效
+            bool: Whether the path is valid.
         """
         try:
             path_obj = Path(file_path)

@@ -97,9 +97,13 @@ class RegistryCore:
                 insert_entity = {"embedding": embedding, "id": id, "name": agent.name, "description": agent.description,
                                  "organization": agent.provider.organization, "agent_card": entity_str}
                 insert_data = {"collection_name": COLLECTION_NAME, "entity": insert_entity}
-                return self.vectordb.insert_entity(insert_data)
+                result = self.vectordb.insert_entity(insert_data)
+                logger.info(f"Registered agent in vectordb: {agent.name} (org={agent.provider.organization})")
+                return result
             elif self.persistence_mode == 'postgresql':
-                return self.storage.create(agent)
+                result = self.storage.create(agent)
+                logger.info(f"Registered agent in postgresql: {agent.name} (org={agent.provider.organization})")
+                return result
             else:
                 key = self._make_key(agent.name, agent.provider.organization)
                 self._agents[key] = agent
@@ -152,7 +156,7 @@ class RegistryCore:
     def update(self, name: str, organization: str, agent_data: Dict[str, Any],
                use_vectordb: bool = USE_VECTORDB) -> bool:
         """
-        Update an existing agent.The primary key(name,organization) cannot be changed.
+        Update an existing agent. The primary key (name, organization) cannot be changed.
         Return True if successful, False if not found.
         """
         if use_vectordb:
@@ -163,9 +167,13 @@ class RegistryCore:
                              "description": agent_data["description"],
                              "organization": agent_data["provider"]["organization"], "agent_card": entity_str}
             update_data = {"collection_name": COLLECTION_NAME, "entity": insert_entity}
-            return self.vectordb.update_entity(update_data)
+            result = self.vectordb.update_entity(update_data)
+            logger.info(f"Updated agent in vectordb: {name}({organization})")
+            return result
         elif self.persistence_mode == 'postgresql':
-            return self.storage.update(name, organization, agent_data)
+            result = self.storage.update(name, organization, agent_data)
+            logger.info(f"Updated agent in postgresql: {name}({organization})")
+            return result
         else:
             key = self._make_key(name, organization)
             existing_agent = self._agents.get(key)
@@ -194,9 +202,13 @@ class RegistryCore:
         """
         if use_vectordb:
             delete_data = {"collection_name": COLLECTION_NAME, "id": self._make_id(name, organization)}
-            return self.vectordb.delete_entity(delete_data)
+            result = self.vectordb.delete_entity(delete_data)
+            logger.info(f"Deregistered agent from vectordb: {name}({organization})")
+            return result
         elif self.persistence_mode == 'postgresql':
-            return self.storage.delete(name, organization)
+            result = self.storage.delete(name, organization)
+            logger.info(f"Deregistered agent from postgresql: {name}({organization})")
+            return result
         else:
             key = self._make_key(name, organization)
             if key not in self._agents:

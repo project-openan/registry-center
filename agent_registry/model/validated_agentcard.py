@@ -24,7 +24,7 @@ from pydantic import HttpUrl
 _NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_]+(?:\s+[a-zA-Z0-9_]+)*$')
 
 NAME_MAX_LENGTH = 100
-ORGNIZATION_MAX_LENGTH = 100
+ORGANIZATION_MAX_LENGTH = 100
 DESCRIPTION_MAX_LENGTH = 1000
 URL_MAX_LENGTH = 1024
 VERSION_MAX_LENGTH = 50
@@ -42,7 +42,6 @@ def validate_name(v: str):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f'The agent name can contain a maximum of {NAME_MAX_LENGTH} characters.')
-    """验证名称仅包含字母、数字、下划线和空格"""
     if not _NAME_PATTERN.fullmatch(v):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -121,32 +120,32 @@ def validate_capabilities(capabilities: AgentCapabilities):
 
 
 def validate_provider(provider: AgentProvider):
-    # 1. provider 必须存在
+    # 1. Provider must exist
     if not provider:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail='Agent provider is required.')
 
-    # 2. organization 必须存在且非空
+    # 2. Organization must exist and be non-empty
     org = getattr(provider, 'organization', None)
     if org is None or not org.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail='Agent provider organization is required and cannot be empty.')
 
-    # 3. 长度限制
-    if len(org) > ORGNIZATION_MAX_LENGTH:
+    # 3. Length limit
+    if len(org) > ORGANIZATION_MAX_LENGTH:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f'The agent organization can contain a maximum of {ORGNIZATION_MAX_LENGTH} characters.')
+            detail=f'The agent organization can contain a maximum of {ORGANIZATION_MAX_LENGTH} characters.')
 
-    # 4. 危险字符检查
+    # 4. Dangerous character check
     if _DANGEROUS_CHARS.search(org):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail='Agent provider organization contains invalid or dangerous characters.')
 
-    # 5. URL 校验
+    # 5. URL validation
     url = getattr(provider, 'url', None)
     if url:
         if len(url) > URL_MAX_LENGTH:

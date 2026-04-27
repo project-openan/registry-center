@@ -24,7 +24,7 @@ from loguru import logger
 
 from common.util.config_util import get_root_path, load_configs
 
-# 文件权限：600 -> 属主读写，其他无权限
+# File permissions: 600 -> owner read/write only, others no access
 FILE_PERMISSION_MODE = 0o600
 
 
@@ -37,6 +37,12 @@ class LogLevel:
 class OperationName:
     START_SERVICE = "Start Service"
     REGISTER_AGENT = "Register Agent"
+    UPDATE_AGENT = "Update Agent"
+    QUERY_AGENT = "Query Agent"
+    RETRIEVE_AGENT = "Retrieve Agent"
+    GET_AGENT = "Get Agent"
+    DEREGISTER_AGENT = "Deregister Agent"
+    GENERATE_CERTIFICATE = "Generate Certificate"
 
 
 class OperatorObject:
@@ -51,13 +57,13 @@ class OperationResult:
 
 class AuditLogger:
     """
-    安全审计日志 SDK
-    支持 UTC 时间、文件滚动、绕接删除、权限控制
+    Security audit logger.
+    Supports UTC timestamps, file rotation, log wrapping/deletion, and permission control.
     """
 
     def __init__(self):
         self.config = self._load_config()
-        self.max_size = int(self.config.get("audit_log_max_file_size_mb", 5)) * 1024 * 1024  # 转为字节
+        self.max_size = int(self.config.get("audit_log_max_file_size_mb", 5)) * 1024 * 1024  # Convert to bytes
         self.backup_count = int(self.config.get("audit_log_backup_count", 5)) - 1
         parent_path = os.path.join(get_root_path(), "log", "audit")
         audit_log_dir = Path(parent_path)
@@ -68,7 +74,7 @@ class AuditLogger:
 
     @staticmethod
     def _load_config() -> Dict[str, Any]:
-        """加载配置文件，若不存在则创建默认配置"""
+        """Load configuration file, create default config if it does not exist"""
         root_path = get_root_path()
         log_config = {}
         log_config_path = os.path.join(root_path, "etc", "conf", "log_config.conf")
@@ -78,14 +84,14 @@ class AuditLogger:
 
     def audit(self, log_entry: Dict[str, Any]):
         """
-        :param log_entry: 审计日志条目，包含以下字段：
-                          operation_name: 操作名称
-                          level: 级别
-                          result: 成功/失败
-                          object_name: 操作对象
-                          details: 补充信息
-                          client_ip: 客户端IP
-                          user_name: 用户名
+        :param log_entry: Audit log entry containing the following fields:
+                          operation_name: Operation name
+                          level: Severity level
+                          result: Success / Failure
+                          object_name: Target object
+                          details: Supplementary information
+                          client_ip: Client IP address
+                          user_name: User name
         """
         log_data = {
             "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -100,23 +106,23 @@ class AuditLogger:
         self._write_log(log_data)
 
     def _get_file_size(self) -> int:
-        """获取当前日志文件大小，若不存在返回0"""
+        """Get current log file size, returns 0 if file does not exist"""
         return os.path.getsize(self.log_file) if os.path.exists(self.log_file) else 0
 
     def _rotate_logs(self):
-        """安全的日志滚动，避免卡死"""
+        """Safe log rotation to avoid deadlocks"""
         if self._get_file_size() < self.max_size:
             return
 
-        # 1. 先删除最旧的文件（.backup_count + 1）
+        # 1. Delete the oldest file first (.backup_count + 1)
         oldest = f"{self.log_file}.{self.backup_count + 1}"
         if os.path.exists(oldest):
             try:
                 os.remove(oldest)
             except Exception as e:
-                logger.error(f"Warning: failed to remove {oldest}: {e}")  # 不要 raise，避免阻塞日志
+                logger.error(f"Warning: failed to remove {oldest}: {e}")  # Do not raise, avoid blocking logs
 
-        # 2. 从高到低重命名：.4 -> .5, .3 -> .4, ..., .1 -> .2
+        # 2. Rename from high to low: .4 -> .5, .3 -> .4, ..., .1 -> .2
         for i in range(self.backup_count, 0, -1):
             src = f"{self.log_file}.{i}"
             dst = f"{self.log_file}.{i + 1}"
@@ -126,15 +132,15 @@ class AuditLogger:
                 except Exception as e:
                     logger.error(f"Warning: failed to rename {src} to {dst}: {e}")
 
-        # 3. 将当前主日志重命名为 .1
+        # 3. Rename current main log to .1
         if os.path.exists(self.log_file):
             try:
                 os.rename(self.log_file, f"{self.log_file}.1")
             except Exception as e:
                 logger.error(f"Warning: failed to rename {self.log_file} to {self.log_file}.1: {e}")
-                return  # 如果主文件重命名失败，不要继续
+                return  # If renaming main file fails, do not continue
 
-        # 4. 创建新日志文件
+        # 4. Create new log file
         try:
             open(self.log_file, 'w').close()
             os.chmod(self.log_file, FILE_PERMISSION_MODE)
@@ -142,12 +148,12 @@ class AuditLogger:
             logger.error(f"Error: failed to create new log file: {e}")
 
     def _write_log(self, log_entry: Dict[str, Any]):
-        """写入单条日志，线程安全"""
+        """Write a single log entry, thread-safe"""
         with self.lock:
-            self._rotate_logs()  # 滚动判断
+            self._rotate_logs()  # Check for rotation
             with open(self.log_file, 'a', encoding='utf-8') as f:
                 f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
-            # 确保权限（尤其新创建时）
+            # Ensure permissions (especially on newly created files)
             os.chmod(self.log_file, FILE_PERMISSION_MODE)
 
 

@@ -32,8 +32,8 @@ from common.llm.provider.base_llm import BaseLLM
 
 class AOCBaseLLM(BaseLLM):
     """
-    AOC 平台签名请求基类，封装公共签名与 HTTP 逻辑。
-    子类需实现 _build_request_body 和 _parse_response。
+    AOC platform signed request base class, encapsulating common signing and HTTP logic.
+    Subclasses must implement _build_request_body and _parse_response.
     """
 
     def __init__(self, llm_config: LLMConfig):
@@ -56,11 +56,11 @@ class AOCBaseLLM(BaseLLM):
         if not self.authorization: missing.append('authorization')
         if not self.api_code: missing.append('api_code')
         if missing:
-            raise ValueError(f"{self.__class__.__name__} 缺少必要配置: {', '.join(missing)}")
+            raise ValueError(f"{self.__class__.__name__} missing required config: {', '.join(missing)}")
 
         self.client = httpx.Client(verify=False, timeout=60.0)
 
-    # ------------------- 签名生成方法 -------------------
+    # ------------------- Signature generation methods -------------------
     def _generate_message_id(self) -> str:
         return str(uuid.uuid4()).replace('-', '')
 
@@ -105,28 +105,28 @@ class AOCBaseLLM(BaseLLM):
             'x-sg-spanid': self._generate_span_id(),
         }
 
-    # ------------------- 抽象方法（子类必须实现） -------------------
+    # ------------------- Abstract methods (subclasses must implement) -------------------
     @abstractmethod
     def _build_request_body(self, prompt: str) -> Dict[str, Any]:
-        """构造请求体，子类实现具体模型格式"""
+        """Build request body; subclasses implement model-specific format."""
         pass
 
     @abstractmethod
     def _parse_response(self, data: Dict[str, Any]) -> Tuple[str, str]:
         """
-        解析响应，返回 (reasoning, answer) 元组。
-        对于非对话模型，reasoning 可以为空字符串。
+        Parse response, return (reasoning, answer) tuple.
+        For non-chat models, reasoning may be an empty string.
         """
         pass
 
-    # ------------------- 核心调用逻辑 -------------------
+    # ------------------- Core invocation logic -------------------
     def _ask_llm(self, prompt: str) -> Tuple[str, str]:
         headers = self._build_headers()
         body = self._build_request_body(prompt)
 
-        logger.debug(f"{self.__class__.__name__} Request URL: {self.base_url}")
-        logger.debug(f"Headers: {headers}")
-        logger.debug(f"Body: {body}")
+        logger.info(f"{self.__class__.__name__} Request URL: {self.base_url}")
+        logger.info(f"Headers: {headers}")
+        logger.info(f"Body: {body}")
 
         try:
             response = self.client.post(self.base_url, headers=headers, json=body)

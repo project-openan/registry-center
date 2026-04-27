@@ -30,21 +30,21 @@ def parse_cer_certificate(cert_path: str) -> X509Obj:
             cert_data = f.read()
 
         if b"-----BEGIN " not in cert_data:
-            # der二进制模式，不支持读取私钥
+            # DER binary mode, reading private keys not supported
             raise CertParseException(f'Parse certificate error! "-----BEGIN" not found! Unsupported der binary type! ')
-        # 尝试解析为证书
+        # Attempt to parse as certificate
         cert_org_list = x509.load_pem_x509_certificates(cert_data)
         cer_obj_list = _extract_certificate_infos(cert_org_list)
-        # cer对应的是信任证书，仅包含证书和公钥
+        # Trust certificates (cer) only contain certificates and public keys
         if len(cer_obj_list) == 0:
             raise CertParseException(f"Parse certificate error! No certificate found! ")
-        # 有多个公钥
+        # Multiple public keys
         x509_obj = X509Obj(cert_list=cer_obj_list)
         return x509_obj
     except Exception as e:
         exception = e
         if not isinstance(e, CertParseException):
-            # 过滤原始解析异常信息，防止敏感信息泄漏
+            # Filter original parse exception info to prevent sensitive data leakage
             exception = CertParseException("Parse certificate error! ")
         raise exception
 
@@ -54,21 +54,21 @@ def parse_pem_files(cert_path: str, password: bytes = None) -> PrivateKeyTypes:
         with open(cert_path, 'rb') as f:
             p12_data = f.read()
 
-        # 使用cryptography解析私钥文件
+        # Parse private key file using cryptography
         password_bytes = password
         private_key = serialization.load_pem_private_key(
             p12_data,
             password=password_bytes
         )
 
-        # 处理证书
+        # Process certificate
         if not private_key:
             raise CertParseException(f"Parse private key error! ")
         return private_key
     except Exception as e:
         exception = e
         if not isinstance(e, CertParseException):
-            # 过滤原始解析异常信息，防止敏感信息泄漏
+            # Filter original parse exception info to prevent sensitive data leakage
             exception = CertParseException("Parse private key error! ")
         raise exception
 
@@ -81,8 +81,8 @@ def _extract_certificate_infos(cert_list: list[x509.Certificate]) -> list[CertOb
 
 
 def _extract_certificate_info(cert: x509.Certificate) -> CertObj:
-    """从cryptography证书对象中提取信息"""
-    # 国密模式不支持
+    """Extract information from a cryptography certificate object"""
+    # SM2 national cipher mode not supported
     if SM2_SIGN in cert.signature_algorithm_oid.dotted_string:
         raise CertParseException(f"Unsupported sm2 public key type: {SM2_SIGN}")
     info = {
@@ -105,9 +105,9 @@ def parse_crl_list(cert_path: str) -> x509.CertificateRevocationList:
             cert_data = f.read()
 
         if b"-----BEGIN " not in cert_data:
-            # der二进制模式，不支持读取der格式的crl
+            # DER binary mode, reading DER format CRLs not supported
             raise CertParseException(f'Parse crl file error! "-----BEGIN" not found! Unsupported der binary type! ')
-        # 尝试解析PEM格式的CRL
+        # Attempt to parse PEM format CRL
         crl_list = x509.load_pem_x509_crl(cert_data)
         if len(crl_list) == 0:
             raise CertParseException(f"Parse crl file error! No crl found! ")
@@ -115,6 +115,6 @@ def parse_crl_list(cert_path: str) -> x509.CertificateRevocationList:
     except Exception as e:
         exception = e
         if not isinstance(e, CertParseException):
-            # 过滤原始解析异常信息，防止敏感信息泄漏
+            # Filter original parse exception info to prevent sensitive data leakage
             exception = CertParseException("Parse crl file error! ")
         raise exception

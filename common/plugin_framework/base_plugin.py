@@ -13,13 +13,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from abc import ABC, abstractmethod
+from abc import ABC
 
 
-class EmbeddingTool(ABC):
+class BasePlugin(ABC):
+    """Base class for all plugins. Stores configuration dict on self.config."""
+
     def __init__(self, config: dict):
         self.config = config
-
-    @abstractmethod
-    def get_embedding_vector(self,context:str):
-        pass
