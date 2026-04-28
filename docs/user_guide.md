@@ -1,15 +1,15 @@
 # 注册中心用户手册
 
 ## 1 注册中心功能简介
-![photo](images/photo.jpeg)
+![photo](images/photo.png)
 
 注册中心是一个专注于Agent统一管理的服务，支持用户将来自不同厂商的Agent进行集中注册与管理，实现多源Agent的可控接入与维护。主要功能包括：
 
 - **Agent注册**：支持将不同厂商的Agent注册到中心，统一纳管。
 - **批量查询**：根据指定条件查询符合条件的Agent列表。
 - **语义检索**：根据自然语言语义检索相匹配的Agent，提升查找灵活性。
-- **唯一查找**：按 Agent 名称精确查找唯一的Agent实例。
-- **Agent修改**：支持按名称修改已注册Agent的配置或元信息。
+- **唯一查找**：按Agent名称精确查找唯一的Agent实例。
+- **Agent更新**：支持按名称修改已注册Agent的配置或元信息。
 - **注销Agent**：按名称注销不再使用的Agent。
 
 通过这些功能，注册中心帮助用户高效整合、维护与发现各类 Agent，为上层编排与协同提供基础能力。
@@ -501,11 +501,11 @@ Content-Type： application/json
 
 #### 2.4.1 典型场景
 
-- 根据用户输入的name和organization参数，精准查询name和organization对应的Agent，查不到返回null。
+- 根据用户输入的name和organization参数，精准查询name和organization对应的Agent。
 
 #### 2.4.2 接口功能
 
-- 根据Agent的name和organization的唯一组合，精确查询并返回单个Agent的完整详细信息
+- 根据Agent的name和organization的唯一组合，精确查询并返回单个Agent的完整详细信息，查不到返回null。
 
 #### 2.4.3 接口约束
 - 单实例上该接口最大并发数为100
@@ -622,7 +622,7 @@ Content-Type： application/json
 }
 ```
 
-### 2.5 Agent修改
+### 2.5 Agent更新
 
 #### 2.5.1 典型场景
 
