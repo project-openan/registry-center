@@ -162,7 +162,7 @@ def validate_provider(provider: AgentProvider):
 
 
 def validate_agent_card(agent: AgentCard):
-    """验证AgentCard数据（不含status字段）"""
+    """Validate AgentCard data (excluding status field)"""
     validate_name(agent.name)
     validate_description(agent.description)
     validate_version(agent.version)

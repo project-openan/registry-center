@@ -1,7 +1,7 @@
 """
-CLI框架命令注册表测试
+CLI framework command registry tests
 
-测试CommandRegistry的命令注册和层级隔离功能。
+Tests CommandRegistry command registration and level isolation functionality.
 """
 
 import pytest
@@ -12,7 +12,7 @@ from argparse import Namespace
 
 
 class MockCommand1(BaseCommand):
-    """测试命令1"""
+    """Test command 1"""
     
     @property
     def name(self) -> str:
@@ -27,7 +27,7 @@ class MockCommand1(BaseCommand):
 
 
 class MockCommand2(BaseCommand):
-    """测试命令2"""
+    """Test command 2"""
     
     @property
     def name(self) -> str:
@@ -42,7 +42,7 @@ class MockCommand2(BaseCommand):
 
 
 class MockCommandWithSub(BaseCommand):
-    """带子命令的测试命令"""
+    """Test command with subcommands"""
     
     @property
     def name(self) -> str:
@@ -64,11 +64,11 @@ class MockCommandWithSub(BaseCommand):
 
 
 class DuplicateCommand(BaseCommand):
-    """重复命令（用于测试冲突）"""
+    """Duplicate command (for testing conflicts)"""
     
     @property
     def name(self) -> str:
-        return "start"  # 与MockCommand1同名
+        return "start"  # Same name as MockCommand1
     
     @property
     def help_text(self) -> str:
@@ -79,19 +79,19 @@ class DuplicateCommand(BaseCommand):
 
 
 class TestCommandRegistry:
-    """CommandRegistry测试"""
+    """CommandRegistry tests"""
     
     def setup_method(self):
-        """每个测试方法前清空注册表"""
+        """clear registry before each test method"""
         self.registry = CommandRegistry()
     
     def test_register_command(self):
-        """注册命令"""
+        """register command"""
         self.registry.register(MockCommand1)
         assert self.registry.has("start")
     
     def test_register_multiple_commands(self):
-        """注册多个命令"""
+        """register multiple commands"""
         self.registry.register(MockCommand1)
         self.registry.register(MockCommand2)
         assert self.registry.count() == 2
@@ -99,24 +99,24 @@ class TestCommandRegistry:
         assert self.registry.has("stop")
     
     def test_register_duplicate_raises_error(self):
-        """注册重复命令应抛异常"""
+        """registering duplicate command should raise exception"""
         self.registry.register(MockCommand1)
         with pytest.raises(CommandConflictError):
             self.registry.register(DuplicateCommand)
     
     def test_get_command(self):
-        """获取命令"""
+        """get command"""
         self.registry.register(MockCommand1)
         cmd_class = self.registry.get("start")
         assert cmd_class == MockCommand1
     
     def test_get_command_not_exists(self):
-        """获取不存在的命令"""
+        """get non-existing command"""
         cmd_class = self.registry.get("unknown")
         assert cmd_class is None
     
     def test_get_all(self):
-        """获取所有命令"""
+        """get all commands"""
         self.registry.register(MockCommand1)
         self.registry.register(MockCommand2)
         all_cmds = self.registry.get_all()
@@ -125,20 +125,20 @@ class TestCommandRegistry:
         assert "stop" in all_cmds
     
     def test_get_all_returns_copy(self):
-        """get_all返回副本"""
+        """get_all returns copy"""
         self.registry.register(MockCommand1)
         all_cmds = self.registry.get_all()
-        all_cmds["new"] = MockCommand2  # 修改副本
-        assert not self.registry.has("new")  # 原注册表不受影响
+        all_cmds["new"] = MockCommand2  # Modify copy
+        assert not self.registry.has("new")  # Original registry unaffected
     
     def test_has_command(self):
-        """检查命令是否存在"""
+        """check if command exists"""
         self.registry.register(MockCommand1)
         assert self.registry.has("start") == True
         assert self.registry.has("unknown") == False
     
     def test_count(self):
-        """统计命令数量"""
+        """count commands"""
         assert self.registry.count() == 0
         self.registry.register(MockCommand1)
         assert self.registry.count() == 1
@@ -146,14 +146,14 @@ class TestCommandRegistry:
         assert self.registry.count() == 2
     
     def test_clear(self):
-        """清空注册表"""
+        """clear registry"""
         self.registry.register(MockCommand1)
         self.registry.register(MockCommand2)
         self.registry.clear()
         assert self.registry.count() == 0
     
     def test_get_command_names(self):
-        """获取命令名称列表"""
+        """get command names list"""
         self.registry.register(MockCommand1)
         self.registry.register(MockCommand2)
         names = self.registry.get_command_names()
@@ -163,38 +163,38 @@ class TestCommandRegistry:
 
 
 class TestSubcommandResolver:
-    """SubcommandResolver测试"""
+    """SubcommandResolver tests"""
     
     def test_resolve_existing_subcommand(self):
-        """解析存在的子命令"""
+        """resolve existing subcommand"""
         parent = MockCommandWithSub()
         subcmd = SubcommandResolver.resolve(parent, "list")
         assert subcmd is not None
-        assert subcmd.name == "start"  # MockCommand1的name
+        assert subcmd.name == "start"  # MockCommand1's name
     
     def test_resolve_non_existing_subcommand(self):
-        """解析不存在的子命令"""
+        """resolve non-existing subcommand"""
         parent = MockCommandWithSub()
         subcmd = SubcommandResolver.resolve(parent, "unknown")
         assert subcmd is None
     
     def test_has_subcommand_true(self):
-        """检查存在的子命令"""
+        """check existing subcommand"""
         parent = MockCommandWithSub()
         assert SubcommandResolver.has_subcommand(parent, "list") == True
     
     def test_has_subcommand_false(self):
-        """检查不存在的子命令"""
+        """check non-existing subcommand"""
         parent = MockCommandWithSub()
         assert SubcommandResolver.has_subcommand(parent, "unknown") == False
     
     def test_has_subcommand_parent_without_subs(self):
-        """父命令无子命令时"""
+        """parent without subcommands"""
         parent = MockCommand1()
         assert SubcommandResolver.has_subcommand(parent, "list") == False
     
     def test_get_subcommand_names(self):
-        """获取子命令名称列表"""
+        """get subcommand names list"""
         parent = MockCommandWithSub()
         names = SubcommandResolver.get_subcommand_names(parent)
         assert "list" in names
@@ -202,35 +202,35 @@ class TestSubcommandResolver:
         assert len(names) == 2
     
     def test_get_subcommand_names_empty(self):
-        """无子命令时返回空列表"""
+        """return empty list when no subcommands"""
         parent = MockCommand1()
         names = SubcommandResolver.get_subcommand_names(parent)
         assert names == []
 
 
 class TestLevelIsolation:
-    """层级隔离测试"""
+    """Level isolation tests"""
     
     def setup_method(self):
         self.registry = CommandRegistry()
     
     def test_one_level_commands_unique(self):
-        """一级命令全局唯一"""
+        """top-level commands globally unique"""
         self.registry.register(MockCommand1)
         
-        # 再次注册同名命令应抛异常
+        # Registering same-name command again should raise exception
         with pytest.raises(CommandConflictError):
             self.registry.register(DuplicateCommand)
     
     def test_subcommands_in_parent_scope(self):
-        """子命令在父命令作用域内"""
+        """subcommands in parent command scope"""
         parent = MockCommandWithSub()
         
-        # agent命令有list子命令
+        # agent command has list subcommand
         assert SubcommandResolver.has_subcommand(parent, "list")
     
     def test_different_parents_can_have_same_subcommand_name(self):
-        """不同父命令可以有同名子命令"""
+        """different parent commands can have same-name subcommands"""
         class AgentCommand(BaseCommand):
             @property
             def name(self):
@@ -258,12 +258,12 @@ class TestLevelIsolation:
             
             @property
             def subcommands(self):
-                return {"list": MockCommand2()}  # 同名"list"，但不同命令
+                return {"list": MockCommand2()}  # Same "list" name, but different command
             
             def execute(self, args):
                 return 0
         
-        # agent和cert都有"list"子命令，但它们是不同的
+        # Both agent and cert have "list" subcommand, but they are different
         agent = AgentCommand()
         cert = CertCommand()
         
@@ -274,12 +274,12 @@ class TestLevelIsolation:
         assert cert_list is not None
         assert agent_list.name == "start"  # MockCommand1
         assert cert_list.name == "stop"    # MockCommand2
-        # agent.list 和 cert.list 是不同的命令
+        # agent.list and cert.list are different commands
     
     def test_subcommand_not_global(self):
-        """子命令不是全局命令"""
+        """subcommands are not global commands"""
         self.registry.register(MockCommandWithSub)
         
-        # "list"是agent的子命令，不是一级命令
+        # "list" is agent's subcommand, not a top-level command
         assert not self.registry.has("list")
-        assert self.registry.count() == 1  # 只有agent
+        assert self.registry.count() == 1  # Only agent

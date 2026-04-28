@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 
 
 class InternalRequest(BaseModel):
-    action: str = Field(..., description="操作类型")
-    params: Dict[str, Any] = Field(default_factory=dict, description="请求参数")
+    action: str = Field(..., description="Operation type")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Request parameters")
     
     class Config:
         extra = "allow"

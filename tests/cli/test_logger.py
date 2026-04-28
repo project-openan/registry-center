@@ -1,7 +1,7 @@
 """
-CLI框架日志系统测试
+CLI framework logging system tests
 
-测试CLILogger的日志记录功能和日志级别控制。
+Tests CLILogger logging functionality and log level control.
 """
 
 import pytest
@@ -13,10 +13,10 @@ from agent_registry.cli.logger import CLILogger, cli_logger
 
 
 class TestCLILogger:
-    """CLILogger基础测试"""
+    """CLILogger basic tests"""
     
     def setup_method(self):
-        """每个测试方法前的设置"""
+        """setup before each test method"""
         self.temp_dir = tempfile.mkdtemp()
         self.log_file = os.path.join(self.temp_dir, "test_cli.log")
         self.test_logger = CLILogger(
@@ -25,7 +25,7 @@ class TestCLILogger:
         )
     
     def teardown_method(self):
-        """每个测试方法后的清理"""
+        """cleanup after each test method"""
         logger.remove()
         CLILogger._instance = None
         CLILogger._initialized = False
@@ -37,18 +37,18 @@ class TestCLILogger:
             os.rmdir(self.temp_dir)
     
     def test_singleton_pattern(self):
-        """应为单例模式"""
+        """should be singleton pattern"""
         logger1 = CLILogger(log_file=self.log_file)
         logger2 = CLILogger(log_file=self.log_file)
         assert logger1 is logger2
     
     def test_log_file_created(self):
-        """日志文件应被创建"""
+        """log file should be created"""
         self.test_logger.info("test message")
         assert os.path.exists(self.log_file)
     
     def test_info_log(self):
-        """INFO日志应写入文件"""
+        """INFO log should write to file"""
         self.test_logger.info("test info message")
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -56,7 +56,7 @@ class TestCLILogger:
         assert "test info message" in content
     
     def test_debug_log(self):
-        """DEBUG日志应写入文件（级别设为DEBUG）"""
+        """DEBUG log should write to file (level set to DEBUG)"""
         self.test_logger.debug("test debug message")
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -64,7 +64,7 @@ class TestCLILogger:
         assert "test debug message" in content
     
     def test_warning_log(self):
-        """WARNING日志应写入文件"""
+        """WARNING log should write to file"""
         self.test_logger.warning("test warning message")
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -72,7 +72,7 @@ class TestCLILogger:
         assert "test warning message" in content
     
     def test_error_log(self):
-        """ERROR日志应写入文件"""
+        """ERROR log should write to file"""
         self.test_logger.error("test error message")
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -80,7 +80,7 @@ class TestCLILogger:
         assert "test error message" in content
     
     def test_exception_log_with_trace(self):
-        """EXCEPTION日志应包含堆栈信息"""
+        """EXCEPTION log should include stack trace"""
         try:
             raise ValueError("test exception")
         except ValueError as e:
@@ -94,10 +94,10 @@ class TestCLILogger:
 
 
 class TestCommandLogging:
-    """命令审计日志测试"""
+    """Command audit logging tests"""
     
     def setup_method(self):
-        """每个测试方法前的设置"""
+        """setup before each test method"""
         self.temp_dir = tempfile.mkdtemp()
         self.log_file = os.path.join(self.temp_dir, "test_cli.log")
         self.test_logger = CLILogger(
@@ -106,7 +106,7 @@ class TestCommandLogging:
         )
     
     def teardown_method(self):
-        """每个测试方法后的清理"""
+        """cleanup after each test method"""
         logger.remove()
         CLILogger._instance = None
         CLILogger._initialized = False
@@ -118,7 +118,7 @@ class TestCommandLogging:
             os.rmdir(self.temp_dir)
     
     def test_log_command_start(self):
-        """命令开始日志"""
+        """command start log"""
         self.test_logger.log_command_start("agent list", {"org": "MyOrg"})
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -127,7 +127,7 @@ class TestCommandLogging:
         assert "org" in content
     
     def test_log_command_start_empty_args(self):
-        """命令开始日志（空参数）"""
+        """command start log (empty args)"""
         self.test_logger.log_command_start("start", {})
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -135,7 +135,7 @@ class TestCommandLogging:
         assert "args={}" in content
     
     def test_log_command_end_success(self):
-        """命令结束日志（成功）"""
+        """command end log (success)"""
         self.test_logger.log_command_end("agent list", 0, 0.5)
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -144,7 +144,7 @@ class TestCommandLogging:
         assert "exit_code=0" in content
     
     def test_log_command_end_failed(self):
-        """命令结束日志（失败）"""
+        """command end log (failed)"""
         self.test_logger.log_command_end("agent query", 2, 0.3)
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -153,7 +153,7 @@ class TestCommandLogging:
         assert "exit_code=2" in content
     
     def test_log_command_error_without_trace(self):
-        """命令错误日志（不含堆栈）"""
+        """command error log (no stack trace)"""
         error = ValueError("invalid argument")
         self.test_logger.log_command_error("agent query", error, include_trace=False)
         with open(self.log_file, 'r', encoding='utf-8') as f:
@@ -163,7 +163,7 @@ class TestCommandLogging:
         assert "invalid argument" in content
     
     def test_log_command_error_with_trace(self):
-        """命令错误日志（含堆栈）"""
+        """command error log (with stack trace)"""
         try:
             raise ValueError("test error")
         except ValueError as e:
@@ -176,15 +176,15 @@ class TestCommandLogging:
 
 
 class TestLogLevelControl:
-    """日志级别控制测试"""
+    """Log level control tests"""
     
     def setup_method(self):
-        """每个测试方法前的设置"""
+        """setup before each test method"""
         self.temp_dir = tempfile.mkdtemp()
         self.log_file = os.path.join(self.temp_dir, "test_cli.log")
     
     def teardown_method(self):
-        """每个测试方法后的清理"""
+        """cleanup after each test method"""
         logger.remove()
         CLILogger._instance = None
         CLILogger._initialized = False
@@ -196,7 +196,7 @@ class TestLogLevelControl:
             os.rmdir(self.temp_dir)
     
     def test_set_level_debug(self):
-        """设置为DEBUG级别"""
+        """set to DEBUG level"""
         test_logger = CLILogger(log_file=self.log_file, level="DEBUG")
         test_logger.debug("debug message")
         test_logger.info("info message")
@@ -206,7 +206,7 @@ class TestLogLevelControl:
         assert "info message" in content
     
     def test_set_level_info(self):
-        """设置为INFO级别"""
+        """set to INFO level"""
         test_logger = CLILogger(log_file=self.log_file, level="INFO")
         test_logger.debug("debug message")
         test_logger.info("info message")
@@ -216,7 +216,7 @@ class TestLogLevelControl:
         assert "info message" in content
     
     def test_set_level_warning(self):
-        """设置为WARNING级别"""
+        """set to WARNING level"""
         test_logger = CLILogger(log_file=self.log_file, level="WARNING")
         test_logger.debug("debug message")
         test_logger.info("info message")
@@ -230,7 +230,7 @@ class TestLogLevelControl:
         assert "error message" in content
     
     def test_set_level_error(self):
-        """设置为ERROR级别"""
+        """set to ERROR level"""
         test_logger = CLILogger(log_file=self.log_file, level="ERROR")
         test_logger.info("info message")
         test_logger.warning("warning message")
@@ -242,13 +242,13 @@ class TestLogLevelControl:
         assert "error message" in content
     
     def test_set_level_invalid(self):
-        """设置无效级别应抛异常"""
+        """setting invalid level should raise exception"""
         test_logger = CLILogger(log_file=self.log_file)
         with pytest.raises(ValueError):
             test_logger.set_level("INVALID")
     
     def test_dynamic_level_change(self):
-        """动态切换日志级别"""
+        """dynamic log level switching"""
         test_logger = CLILogger(log_file=self.log_file, level="DEBUG")
         test_logger.debug("before change")
         
@@ -264,16 +264,16 @@ class TestLogLevelControl:
 
 
 class TestConsoleOutput:
-    """控制台输出测试"""
+    """Console output tests"""
     
     def setup_method(self):
-        """每个测试方法前的设置"""
+        """setup before each test method"""
         self.temp_dir = tempfile.mkdtemp()
         self.log_file = os.path.join(self.temp_dir, "test_cli.log")
         self.test_logger = CLILogger(log_file=self.log_file)
     
     def teardown_method(self):
-        """每个测试方法后的清理"""
+        """cleanup after each test method"""
         logger.remove()
         CLILogger._instance = None
         CLILogger._initialized = False
@@ -285,18 +285,18 @@ class TestConsoleOutput:
             os.rmdir(self.temp_dir)
     
     def test_enable_console_output(self):
-        """启用控制台输出"""
+        """enable console output"""
         self.test_logger.enable_console_output()
         assert self.test_logger._console_handler_id is not None
     
     def test_disable_console_output(self):
-        """禁用控制台输出"""
+        """disable console output"""
         self.test_logger.enable_console_output()
         self.test_logger.disable_console_output()
         assert self.test_logger._console_handler_id is None
     
     def test_console_output_idempotent(self):
-        """多次启用控制台输出应为幂等"""
+        """multiple enable console output should be idempotent"""
         self.test_logger.enable_console_output()
         first_id = self.test_logger._console_handler_id
         self.test_logger.enable_console_output()
@@ -305,22 +305,22 @@ class TestConsoleOutput:
 
 
 class TestGlobalLogger:
-    """全局cli_logger测试"""
+    """Global cli_logger tests"""
     
     def test_global_logger_exists(self):
-        """全局cli_logger应存在"""
+        """global cli_logger should exist"""
         from agent_registry.cli.logger import cli_logger
         assert cli_logger is not None
         assert isinstance(cli_logger, CLILogger)
     
     def test_global_logger_is_singleton(self):
-        """全局cli_logger应为单例"""
+        """global cli_logger should be singleton"""
         from agent_registry.cli.logger import cli_logger as logger1
         from agent_registry.cli.logger import cli_logger as logger2
         assert logger1 is logger2
     
     def test_get_log_file_path(self):
-        """获取日志文件路径"""
+        """get log file path"""
         path = cli_logger.get_log_file_path()
         assert isinstance(path, Path)
         assert path.name == "cli.log"
@@ -328,7 +328,7 @@ class TestGlobalLogger:
 
 
 class TestArgsFormatting:
-    """参数格式化测试"""
+    """Argument formatting tests"""
     
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -347,7 +347,7 @@ class TestArgsFormatting:
             os.rmdir(self.temp_dir)
     
     def test_private_args_filtered(self):
-        """私有参数应被过滤"""
+        """private arguments should be filtered"""
         self.test_logger.log_command_start("test", {
             "public_arg": "value",
             "_private_arg": "hidden",

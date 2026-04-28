@@ -8,11 +8,11 @@ from common.util.password_util import input_password_with_validation
 
 def generate_self_signed_cert(cert_dir: str, cert_usage: str, password: str) -> bool:
     """
-    生成自签名证书（新接口）
-    :param cert_dir: 证书目录路径
-    :param cert_usage: 证书用途，serverAuth 或 dataSigning
-    :param password: 私钥加密口令
-    :return: 生成成功返回True，否则返回False
+    Generate self-signed certificate (new interface)
+    :param cert_dir: Certificate directory path
+    :param cert_usage: Certificate usage, serverAuth or dataSigning
+    :param password: Private key encryption password
+    :return: Returns True if generation successful, otherwise False
     """
     try:
         generator = CertificateGenerator(key_algorithm='RSA')

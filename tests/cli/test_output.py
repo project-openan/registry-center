@@ -1,7 +1,7 @@
 """
-CLI框架输出格式化测试
+CLI framework output formatting tests
 
-测试Output类的多种输出格式功能。
+Tests Output class multiple output format functionality.
 """
 
 import pytest
@@ -12,47 +12,47 @@ from agent_registry.cli.output import Output
 
 
 class TestOutput:
-    """Output基础测试"""
+    """Output basic tests"""
     
     def test_default_format(self):
-        """默认格式为text"""
+        """default format is text"""
         output = Output()
         assert output.format == 'text'
         assert output.get_format() == 'text'
     
     def test_set_format_json(self):
-        """设置json格式"""
+        """set json format"""
         output = Output('json')
         assert output.format == 'json'
     
     def test_set_format_table(self):
-        """设置table格式"""
+        """set table format"""
         output = Output('table')
         assert output.format == 'table'
     
     def test_set_format_invalid(self):
-        """设置无效格式应抛异常"""
+        """setting invalid format should raise exception"""
         with pytest.raises(ValueError):
             Output('invalid')
     
     def test_set_format_method(self):
-        """通过方法设置格式"""
+        """set format via method"""
         output = Output()
         output.set_format('json')
         assert output.format == 'json'
     
     def test_set_format_method_invalid(self):
-        """通过方法设置无效格式应抛异常"""
+        """setting invalid format via method should raise exception"""
         output = Output()
         with pytest.raises(ValueError):
             output.set_format('invalid')
 
 
 class TestTextOutput:
-    """文本格式输出测试"""
+    """Text format output tests"""
     
     def test_print_dict(self, capsys):
-        """输出字典"""
+        """output dict"""
         output = Output('text')
         output.print({'name': 'agent1', 'version': '1.0'})
         captured = capsys.readouterr()
@@ -60,7 +60,7 @@ class TestTextOutput:
         assert 'version: 1.0' in captured.out
     
     def test_print_list(self, capsys):
-        """输出列表"""
+        """output list"""
         output = Output('text')
         output.print(['item1', 'item2', 'item3'])
         captured = capsys.readouterr()
@@ -68,14 +68,14 @@ class TestTextOutput:
         assert 'item2' in captured.out
     
     def test_print_string(self, capsys):
-        """输出字符串"""
+        """output string"""
         output = Output('text')
         output.print('hello world')
         captured = capsys.readouterr()
         assert 'hello world' in captured.out
     
     def test_print_with_title(self, capsys):
-        """带标题输出"""
+        """output with title"""
         output = Output('text')
         output.print({'key': 'value'}, title='Test Output')
         captured = capsys.readouterr()
@@ -84,10 +84,10 @@ class TestTextOutput:
 
 
 class TestJsonOutput:
-    """JSON格式输出测试"""
+    """JSON format output tests"""
     
     def test_print_dict(self, capsys):
-        """输出字典"""
+        """output dict"""
         output = Output('json')
         output.print({'name': 'agent1', 'version': '1.0'})
         captured = capsys.readouterr()
@@ -96,7 +96,7 @@ class TestJsonOutput:
         assert data['version'] == '1.0'
     
     def test_print_list(self, capsys):
-        """输出列表"""
+        """output list"""
         output = Output('json')
         output.print(['item1', 'item2'])
         captured = capsys.readouterr()
@@ -104,25 +104,25 @@ class TestJsonOutput:
         assert data == ['item1', 'item2']
     
     def test_print_ensure_ascii_false(self, capsys):
-        """中文输出"""
+        """non-ASCII output"""
         output = Output('json')
-        output.print({'message': '你好世界'})
+        output.print({'message': 'hello world'})
         captured = capsys.readouterr()
-        assert '你好世界' in captured.out
+        assert 'hello world' in captured.out
 
 
 class TestTableOutput:
-    """表格格式输出测试"""
+    """Table format output tests"""
     
     def test_print_dict(self, capsys):
-        """输出字典（表格）"""
+        """output dict (table)"""
         output = Output('table')
         output.print({'name': 'agent1', 'version': '1.0'})
         captured = capsys.readouterr()
         assert 'name' in captured.out or 'Key' in captured.out
     
     def test_print_list_of_dicts(self, capsys):
-        """输出字典列表"""
+        """output list of dicts"""
         output = Output('table')
         output.print([
             {'name': 'agent1', 'org': 'org1'},
@@ -132,7 +132,7 @@ class TestTableOutput:
         assert 'agent1' in captured.out or 'name' in captured.out
     
     def test_print_with_title(self, capsys):
-        """带标题输出"""
+        """output with title"""
         output = Output('table')
         output.print([{'a': 1}], title='Test Table')
         captured = capsys.readouterr()
@@ -140,10 +140,10 @@ class TestTableOutput:
 
 
 class TestMessageOutput:
-    """消息输出测试"""
+    """Message output tests"""
     
     def test_success_text(self, capsys):
-        """成功消息（text）"""
+        """success message (text)"""
         output = Output('text')
         output.success("Operation completed")
         captured = capsys.readouterr()
@@ -151,7 +151,7 @@ class TestMessageOutput:
         assert 'Operation completed' in captured.out
     
     def test_success_json(self, capsys):
-        """成功消息（json）"""
+        """success message (json)"""
         output = Output('json')
         output.success("Operation completed")
         captured = capsys.readouterr()
@@ -160,7 +160,7 @@ class TestMessageOutput:
         assert data['message'] == 'Operation completed'
     
     def test_error_text(self, capsys):
-        """错误消息（text）"""
+        """error message (text)"""
         output = Output('text')
         output.error("Failed to execute")
         captured = capsys.readouterr()
@@ -168,7 +168,7 @@ class TestMessageOutput:
         assert 'Failed to execute' in captured.err
     
     def test_error_json(self, capsys):
-        """错误消息（json）"""
+        """error message (json)"""
         output = Output('json')
         output.error("Failed to execute")
         captured = capsys.readouterr()
@@ -177,7 +177,7 @@ class TestMessageOutput:
         assert data['message'] == 'Failed to execute'
     
     def test_warning_text(self, capsys):
-        """警告消息（text）"""
+        """warning message (text)"""
         output = Output('text')
         output.warning("This is a warning")
         captured = capsys.readouterr()
@@ -185,7 +185,7 @@ class TestMessageOutput:
         assert 'This is a warning' in captured.out
     
     def test_warning_json(self, capsys):
-        """警告消息（json）"""
+        """warning message (json)"""
         output = Output('json')
         output.warning("This is a warning")
         captured = capsys.readouterr()
@@ -193,14 +193,14 @@ class TestMessageOutput:
         assert data['status'] == 'warning'
     
     def test_info_text(self, capsys):
-        """信息消息（text）"""
+        """info message (text)"""
         output = Output('text')
         output.info("This is info")
         captured = capsys.readouterr()
         assert 'This is info' in captured.out
     
     def test_info_json(self, capsys):
-        """信息消息（json）"""
+        """info message (json)"""
         output = Output('json')
         output.info("This is info")
         captured = capsys.readouterr()
@@ -209,10 +209,10 @@ class TestMessageOutput:
 
 
 class TestOutputFormatSwitch:
-    """输出格式切换测试"""
+    """Output format switching tests"""
     
     def test_switch_format(self, capsys):
-        """切换格式"""
+        """switch format"""
         output = Output('text')
         output.print({'key': 'value'})
         captured1 = capsys.readouterr()

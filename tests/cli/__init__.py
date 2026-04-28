@@ -1,3 +1,3 @@
 """
-CLI框架测试包
+CLI framework test package
 """

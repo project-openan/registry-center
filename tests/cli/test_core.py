@@ -1,7 +1,7 @@
 """
-CLI框架核心引擎测试
+CLI framework core engine tests
 
-测试基于 cmd.Cmd 的交互式 CLI。
+Tests the interactive CLI based on cmd.Cmd.
 """
 
 import pytest
@@ -15,7 +15,7 @@ from agent_registry.cli.registry import CommandRegistry
 
 
 class MockCommand(BaseCommand):
-    """Mock 命令"""
+    """Mock command"""
     
     @property
     def name(self) -> str:
@@ -31,7 +31,7 @@ class MockCommand(BaseCommand):
 
 
 class MockFailCommand(BaseCommand):
-    """失败的命令"""
+    """Failing command"""
     
     @property
     def name(self) -> str:
@@ -46,7 +46,7 @@ class MockFailCommand(BaseCommand):
 
 
 class MockErrorCommand(BaseCommand):
-    """错误命令"""
+    """Error command"""
     
     @property
     def name(self) -> str:
@@ -61,7 +61,7 @@ class MockErrorCommand(BaseCommand):
 
 
 class MockValidateCommand(BaseCommand):
-    """带校验的命令"""
+    """Command with validation"""
     
     @property
     def name(self) -> str:
@@ -84,7 +84,7 @@ class MockValidateCommand(BaseCommand):
 
 
 class MockSubCommand(BaseCommand):
-    """子命令"""
+    """Subcommand"""
     
     @property
     def name(self) -> str:
@@ -100,7 +100,7 @@ class MockSubCommand(BaseCommand):
 
 
 class MockParentCommand(BaseCommand):
-    """父命令"""
+    """Parent command"""
     
     @property
     def name(self) -> str:
@@ -119,19 +119,19 @@ class MockParentCommand(BaseCommand):
 
 
 class TestCLI:
-    """CLI 门面类测试"""
+    """CLI facade class tests"""
     
     def setup_method(self):
         CLI._registry.clear()
     
     def test_singleton(self):
-        """单例模式"""
+        """singleton pattern"""
         cli1 = CLI()
         cli2 = CLI()
         assert cli1 is cli2
     
     def test_register_decorator(self):
-        """装饰器注册"""
+        """decorator registration"""
         CLI._registry.clear()
         
         @CLI.register
@@ -150,32 +150,32 @@ class TestCLI:
         assert CLI.get_registry().has("test")
     
     def test_get_registry(self):
-        """获取注册表"""
+        """get registry"""
         registry = CLI.get_registry()
         assert isinstance(registry, CommandRegistry)
 
 
 class TestInteractiveCLI:
-    """InteractiveCLI 测试"""
+    """InteractiveCLI tests"""
     
     def setup_method(self):
         CLI._registry.clear()
     
     def test_intro(self):
-        """intro 属性"""
+        """intro property"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         assert "agent-registry" in cli.intro
         assert "cmds" in cli.intro
     
     def test_prompt(self):
-        """prompt 属性"""
+        """prompt property"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         assert cli.prompt == "agent-registry> "
     
     def test_init_generates_methods(self):
-        """初始化生成方法"""
+        """init generates methods"""
         CLI.register(MockCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -184,7 +184,7 @@ class TestInteractiveCLI:
         assert hasattr(cli, "complete_mock")
     
     def test_emptyline(self):
-        """空行处理"""
+        """empty line handling"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         
@@ -192,7 +192,7 @@ class TestInteractiveCLI:
         assert result is None
     
     def test_do_exit(self, capsys):
-        """exit 命令"""
+        """exit command"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         
@@ -202,7 +202,7 @@ class TestInteractiveCLI:
         assert "Goodbye" in captured.out
     
     def test_do_quit(self):
-        """quit 别名"""
+        """quit alias"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         
@@ -210,7 +210,7 @@ class TestInteractiveCLI:
         assert result == True
     
     def test_do_q(self):
-        """q 别名"""
+        """q alias"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         
@@ -218,7 +218,7 @@ class TestInteractiveCLI:
         assert result == True
     
     def test_do_cmds(self, capsys):
-        """cmds 命令"""
+        """cmds command"""
         CLI.register(MockCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -230,13 +230,13 @@ class TestInteractiveCLI:
 
 
 class TestCommandExecution:
-    """命令执行测试"""
+    """Command execution tests"""
     
     def setup_method(self):
         CLI._registry.clear()
     
     def test_execute_success(self, capsys):
-        """成功执行"""
+        """successful execution"""
         CLI.register(MockCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -246,7 +246,7 @@ class TestCommandExecution:
         assert "Mock executed" in captured.out
     
     def test_execute_fail(self):
-        """失败执行"""
+        """failed execution"""
         CLI.register(MockFailCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -255,7 +255,7 @@ class TestCommandExecution:
         assert result == 1
     
     def test_execute_error(self, capsys):
-        """错误执行"""
+        """error execution"""
         CLI.register(MockErrorCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -266,7 +266,7 @@ class TestCommandExecution:
         assert "Error:" in captured.out
     
     def test_execute_version(self, capsys):
-        """-v 版本"""
+        """-v version"""
         CLI.register(MockCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -277,7 +277,7 @@ class TestCommandExecution:
         assert "v1.0.0" in captured.out
     
     def test_execute_validation_fail(self, capsys):
-        """校验失败"""
+        """validation failure"""
         CLI.register(MockValidateCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -286,7 +286,7 @@ class TestCommandExecution:
         assert result == 2
     
     def test_execute_validation_pass(self, capsys):
-        """校验通过"""
+        """validation passed"""
         CLI.register(MockValidateCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -295,7 +295,7 @@ class TestCommandExecution:
         assert result == 0
     
     def test_execute_subcommand(self, capsys):
-        """子命令执行"""
+        """subcommand execution"""
         CLI.register(MockParentCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -307,13 +307,13 @@ class TestCommandExecution:
 
 
 class TestCompletion:
-    """补齐测试"""
+    """Completion tests"""
     
     def setup_method(self):
         CLI._registry.clear()
     
     def test_completenames(self):
-        """命令名补齐"""
+        """command name completion"""
         CLI.register(MockCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -322,7 +322,7 @@ class TestCompletion:
         assert "mock" in completions
     
     def test_complete_command(self):
-        """命令补齐方法"""
+        """command completion method"""
         CLI.register(MockParentCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -331,7 +331,7 @@ class TestCompletion:
         assert "sub" in completions
     
     def test_complete_arguments(self):
-        """参数补齐"""
+        """argument completion"""
         CLI.register(MockValidateCommand)
         registry = CLI.get_registry()
         cli = InteractiveCLI(registry)
@@ -340,7 +340,7 @@ class TestCompletion:
         assert "--required" in completions
     
     def test_get_names(self):
-        """获取命令名列表"""
+        """get command names list"""
         CLI.register(MockCommand)
         CLI.register(MockParentCommand)
         registry = CLI.get_registry()
@@ -354,13 +354,13 @@ class TestCompletion:
 
 
 class TestGlobalOptions:
-    """全局选项测试"""
+    """Global options tests"""
     
     def setup_method(self):
         CLI._registry.clear()
     
     def test_parse_version(self):
-        """解析 -v"""
+        """parse -v"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         
@@ -369,7 +369,7 @@ class TestGlobalOptions:
         assert "mock" in argv
     
     def test_parse_debug(self):
-        """解析 -x"""
+        """parse -x"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         
@@ -378,7 +378,7 @@ class TestGlobalOptions:
         assert "mock" in argv
     
     def test_parse_both(self):
-        """解析 -v -x"""
+        """parse -v -x"""
         registry = CommandRegistry()
         cli = InteractiveCLI(registry)
         

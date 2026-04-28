@@ -154,7 +154,7 @@ class TestCertificateGenerator(unittest.TestCase):
         call_args = mock_audit_logger.audit.call_args[0][0]
         self.assertEqual(call_args["operation_name"], "Generate TLS Certificate")
         self.assertEqual(call_args["result"], "Success")
-        self.assertEqual(call_args["object_name"], "证书")
+        self.assertEqual(call_args["object_name"], "Certificate")
 
     def test_generate_certificates_with_data_signing(self):
         cert_usage = ["serverAuth", "dataSigning"]

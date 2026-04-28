@@ -14,7 +14,6 @@
 #    under the License.
 import json
 
-# tests/test_register.py
 import pytest
 from fastapi.testclient import TestClient
 from a2a.types import AgentCard
@@ -88,18 +87,18 @@ def test_register_agent_duplicate(client, mock_registry, valid_agent_data):
     "skills"
 ])
 def test_register_agent_missing_required_field(client, mock_registry, valid_agent_data, field_to_remove):
-    # 创建一个缺少指定字段的测试数据
+    # Create test data missing specified field
     invalid_data = valid_agent_data.copy()
 
-    # 处理嵌套字段，如 provider.organization
+    # Handle nested fields like provider.organization
     del invalid_data[field_to_remove]
 
-    # 尝试注册缺少字段的 Agent
+    # Attempt to register Agent with missing field
     response = client.post("/rest/a2a-t/v1/agents/register", json=invalid_data)
 
-    # 验证返回状态码为 422（请求无效）
+    # Verify return status code is 422 (invalid request)
     assert response.status_code == 422
 
-    # 验证错误信息中包含缺失字段
+    # Verify error message contains missing field
     error_detail = response.json()["detail"]
     assert any(f"Field required" in error["msg"] for error in error_detail)

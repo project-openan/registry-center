@@ -18,10 +18,10 @@ from pydantic import BaseModel, Field
 
 
 class InternalResponse(BaseModel):
-    success: bool = Field(..., description="操作是否成功")
-    message: Optional[str] = Field(None, description="响应消息")
-    error: Optional[str] = Field(None, description="错误信息")
-    data: Optional[Dict[str, Any]] = Field(None, description="响应数据")
+    success: bool = Field(..., description="Operation success status")
+    message: Optional[str] = Field(None, description="Response message")
+    error: Optional[str] = Field(None, description="Error message")
+    data: Optional[Dict[str, Any]] = Field(None, description="Response data")
     
     class Config:
         extra = "allow"
