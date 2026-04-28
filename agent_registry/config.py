@@ -18,6 +18,7 @@ from common.util.conf_util import get_persistence_conf
 PERSISTENCE_CONF = get_persistence_conf()
 PERSISTENCE_MODE = PERSISTENCE_CONF.get("persistence.mode", "file")
 PERSISTENCE_FILE = "agentcard.json"
+PERSISTENCE_METADATA_FILE = "agentmetadata.json"
 USE_VECTORDB = str(get_conf().get("use_vectordb", False)).lower() == 'true'
 COLLECTION_NAME = "agent_card_collection"
 MAX_REGISTER_NUM = 40

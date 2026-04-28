@@ -85,6 +85,7 @@ class PostgreSQLStorage(StorageBackend):
         try:
             with conn.cursor() as cur:
                 cur.execute(PostgreSQLQueries.CREATE_TABLE.value)
+                cur.execute(PostgreSQLQueries.ADD_COLUMN_STATUS.value)
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_ORG.value)
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_NAME.value)
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_STATUS.value)

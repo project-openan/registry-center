@@ -23,13 +23,14 @@ from a2a.types import AgentCard
 from google.protobuf.json_format import MessageToDict
 from loguru import logger
 
+from agent_registry.config import PERSISTENCE_METADATA_FILE
 from .base import StorageBackend
 
 
 class FileStorage(StorageBackend):
-    def __init__(self, file_path: str, registry_file: str = None, max_file_size: int = 100 * 1024 * 1024):
+    def __init__(self, file_path: str, metadata_file: str = None, max_file_size: int = 100 * 1024 * 1024):
         self.file_path = file_path
-        self.registry_file = registry_file or str(Path(file_path).parent / "agentregistry.json")
+        self.metadata_file = metadata_file or str(Path(file_path).parent / PERSISTENCE_METADATA_FILE)
         self.max_file_size = max_file_size
         self._agents: Dict[tuple, AgentCard] = {}
         self._status_map: Dict[tuple, str] = {}
@@ -38,10 +39,10 @@ class FileStorage(StorageBackend):
     @classmethod
     def init(cls, config: dict) -> 'FileStorage':
         file_path = config.get('file.path', 'data/agentcard.json')
-        registry_file = config.get('registry.file', 'data/agentregistry.json')
+        metadata_file = config.get('metadata.file', f'data/{PERSISTENCE_METADATA_FILE}')
         max_file_size = config.get('max_file_size', 100 * 1024 * 1024)
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-        instance = cls(file_path, registry_file, max_file_size)
+        instance = cls(file_path, metadata_file, max_file_size)
         logger.info(f"FileStorage initialized with path: {file_path}")
         return instance
 
@@ -184,11 +185,11 @@ class FileStorage(StorageBackend):
             })
 
         json_str = json.dumps(registry_data, ensure_ascii=False, indent=2)
-        Path(self.registry_file).parent.mkdir(parents=True, exist_ok=True)
-        with open(self.registry_file, 'w', encoding='utf-8') as f:
+        Path(self.metadata_file).parent.mkdir(parents=True, exist_ok=True)
+        with open(self.metadata_file, 'w', encoding='utf-8') as f:
             f.write(json_str)
-        os.chmod(self.registry_file, 0o600)
-        logger.info(f"Saved {len(self._status_map)} status mappings to {self.registry_file}")
+        os.chmod(self.metadata_file, 0o600)
+        logger.info(f"Saved {len(self._status_map)} status mappings to {self.metadata_file}")
 
     def _load(self) -> None:
         self._load_agents()
@@ -226,17 +227,17 @@ class FileStorage(StorageBackend):
             logger.error(f"Failed to load agents from {self.file_path}: {e}")
 
     def _load_registry(self) -> None:
-        if not os.path.exists(self.registry_file):
+        if not os.path.exists(self.metadata_file):
             for key in self._agents.keys():
                 self._status_map[key] = 'published'
             logger.info("No registry file found, defaulting all agents to published status")
             return
 
         try:
-            with open(self.registry_file, 'r', encoding='utf-8') as f:
+            with open(self.metadata_file, 'r', encoding='utf-8') as f:
                 registry_data = json.load(f)
             if not isinstance(registry_data, list):
-                logger.error(f"Invalid format in {self.registry_file}: expected a list")
+                logger.error(f"Invalid format in {self.metadata_file}: expected a list")
                 return
             for item in registry_data:
                 try:
@@ -244,6 +245,6 @@ class FileStorage(StorageBackend):
                     self._status_map[key] = item['status']
                 except Exception as e:
                     logger.error(f"Failed to load status from JSON: {e}, data: {item}")
-            logger.info(f"Loaded {len(self._status_map)} status mappings from {self.registry_file}")
+            logger.info(f"Loaded {len(self._status_map)} status mappings from {self.metadata_file}")
         except Exception as e:
-            logger.error(f"Failed to load registry from {self.registry_file}: {e}")
+            logger.error(f"Failed to load registry from {self.metadata_file}: {e}")

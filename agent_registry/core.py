@@ -24,7 +24,7 @@ from a2a.types import AgentCard
 from google.protobuf.json_format import MessageToDict
 from loguru import logger
 
-from agent_registry.config import PERSISTENCE_FILE, USE_VECTORDB, COLLECTION_NAME, PERSISTENCE_CONF, PERSISTENCE_MODE
+from agent_registry.config import PERSISTENCE_FILE, PERSISTENCE_METADATA_FILE, USE_VECTORDB, COLLECTION_NAME, PERSISTENCE_CONF, PERSISTENCE_MODE
 from agent_registry.persistence import save_to_file, load_from_file
 from agent_registry.persistence import StorageRegistry, StorageBackend
 from agent_registry.prompts import build_agent_selection_prompt
@@ -43,7 +43,9 @@ class RegistryCore:
     Supports persistence to a JSON file, PostgreSQL, or vectordb.
     """
 
-    def __init__(self, persistence_file: str = PERSISTENCE_FILE, use_vectordb: bool = USE_VECTORDB,
+    def __init__(self, persistence_file: str = PERSISTENCE_FILE, 
+                 persistence_metadata_file: str = PERSISTENCE_METADATA_FILE,
+                 use_vectordb: bool = USE_VECTORDB,
                  persistence_mode: str = PERSISTENCE_MODE, persistence_conf: dict = PERSISTENCE_CONF):
         self.llm = get_llm_instance()
         self.use_vectordb = use_vectordb
@@ -65,7 +67,7 @@ class RegistryCore:
             data_path.mkdir(exist_ok=True)
             os.chmod(data_path, 0o700)
             self.persistence_file = str(data_path / persistence_file)
-            self.registry_file = str(data_path / "agentregistry.json")
+            self.metadata_file = str(data_path / persistence_metadata_file)
             self._agents: Dict[Tuple[str, str], AgentCard] = {}
             self._load()
 
@@ -368,7 +370,7 @@ class RegistryCore:
         save_to_file(self.persistence_file, data)
 
     def _save_registry(self) -> None:
-        """Persist status map to agentregistry.json."""
+        """Persist status map to agentmetadata.json."""
         registry_data = []
         for key, status in self._status_map.items():
             registry_data.append({
@@ -376,7 +378,7 @@ class RegistryCore:
                 "agent_name": key[0],
                 "status": status
             })
-        save_to_file(self.registry_file, registry_data)
+        save_to_file(self.metadata_file, registry_data)
 
     def _load(self) -> None:
         """Load agents and status map from files."""
@@ -396,9 +398,9 @@ class RegistryCore:
         logger.info(f"Loaded {len(self._agents)} agents from persistence.")
 
     def _load_registry(self) -> None:
-        """Load status map from agentregistry.json."""
-        if os.path.exists(self.registry_file):
-            registry_data = load_from_file(self.registry_file)
+        """Load status map from agentmetadata.json."""
+        if os.path.exists(self.metadata_file):
+            registry_data = load_from_file(self.metadata_file)
             for item in registry_data:
                 try:
                     key = self._make_key(item['agent_name'], item['organization'])

@@ -43,6 +43,16 @@ class PostgreSQLQueries(str, Enum):
     CREATE_INDEX_STATUS = "CREATE INDEX IF NOT EXISTS idx_agent_status ON agent_card(status)"
     CREATE_INDEX_GIN = "CREATE INDEX IF NOT EXISTS idx_agent_card_json ON agent_card USING GIN(agent_card_json)"
 
+    ADD_COLUMN_STATUS = """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                           WHERE table_name='agent_card' AND column_name='status') THEN
+                ALTER TABLE agent_card ADD COLUMN status VARCHAR(20) DEFAULT 'published';
+            END IF;
+        END $$;
+    """
+
     CREATE_AGENT = """
         INSERT INTO agent_card (name, organization, description, url, version, status, provider_json,
                                 capabilities_json, skills_json, default_input_modes, default_output_modes,
