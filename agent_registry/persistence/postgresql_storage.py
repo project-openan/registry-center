@@ -86,6 +86,7 @@ class PostgreSQLStorage(StorageBackend):
             with conn.cursor() as cur:
                 cur.execute(PostgreSQLQueries.CREATE_TABLE.value)
                 cur.execute(PostgreSQLQueries.ADD_COLUMN_STATUS.value)
+                cur.execute(PostgreSQLQueries.ADD_COLUMN_TAG.value)
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_ORG.value)
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_NAME.value)
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_STATUS.value)
@@ -275,6 +276,67 @@ class PostgreSQLStorage(StorageBackend):
                 )
                 result = cur.fetchone()
             return result[0] if result else 0
+        finally:
+            self.pool.putconn(conn)
+
+    def get_tags(self, name: str, organization: str) -> List[str]:
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    PostgreSQLQueries.GET_TAGS.value,
+                    (name, organization)
+                )
+                result = cur.fetchone()
+            if result and result[0]:
+                tags = result[0] if isinstance(result[0], list) else json.loads(result[0])
+                return tags
+            return []
+        finally:
+            self.pool.putconn(conn)
+
+    def update_tags(self, name: str, organization: str, new_tags: List[str]) -> bool:
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                now = datetime.utcnow()
+                cur.execute(
+                    PostgreSQLQueries.UPDATE_TAGS.value,
+                    (json.dumps(new_tags), now, name, organization)
+                )
+                conn.commit()
+                affected = cur.rowcount
+            return affected > 0
+        finally:
+            self.pool.putconn(conn)
+
+    def get_created_at(self, name: str, organization: str) -> str:
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    PostgreSQLQueries.GET_CREATED_AT.value,
+                    (name, organization)
+                )
+                result = cur.fetchone()
+            if result and result[0]:
+                return result[0].isoformat() if hasattr(result[0], 'isoformat') else str(result[0])
+            return ''
+        finally:
+            self.pool.putconn(conn)
+
+    def get_updated_at(self, name: str, organization: str) -> str:
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    PostgreSQLQueries.GET_UPDATED_AT.value,
+                    (name, organization)
+                )
+                result = cur.fetchone()
+            if result and result[0]:
+                return result[0].isoformat() if hasattr(result[0], 'isoformat') else str(result[0])
+            return ''
         finally:
             self.pool.putconn(conn)
 

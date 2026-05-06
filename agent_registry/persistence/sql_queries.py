@@ -53,6 +53,16 @@ class PostgreSQLQueries(str, Enum):
         END $$;
     """
 
+    ADD_COLUMN_TAG = """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                           WHERE table_name='agent_card' AND column_name='tag') THEN
+                ALTER TABLE agent_card ADD COLUMN tag JSONB DEFAULT '[]'::jsonb;
+            END IF;
+        END $$;
+    """
+
     CREATE_AGENT = """
         INSERT INTO agent_card (name, organization, description, url, version, status, provider_json,
                                 capabilities_json, skills_json, default_input_modes, default_output_modes,
@@ -90,6 +100,16 @@ class PostgreSQLQueries(str, Enum):
         WHERE name = %s AND organization = %s
     """
 
+    GET_TAGS = """
+        SELECT tag FROM agent_card
+        WHERE name = %s AND organization = %s
+    """
+
+    UPDATE_TAGS = """
+        UPDATE agent_card SET tag = tag || %s::jsonb, updated_at = %s
+        WHERE name = %s AND organization = %s
+    """
+
     DELETE_AGENT = """
         DELETE FROM agent_card WHERE name = %s AND organization = %s
     """
@@ -97,3 +117,22 @@ class PostgreSQLQueries(str, Enum):
     COUNT = "SELECT COUNT(*) FROM agent_card"
 
     COUNT_BY_STATUS = "SELECT COUNT(*) FROM agent_card WHERE status = %s"
+
+    GET_METADATA = """
+        SELECT name, organization, status, tag FROM agent_card
+        WHERE name = %s AND organization = %s
+    """
+
+    GET_ALL_METADATA = """
+        SELECT name, organization, status, tag FROM agent_card
+    """
+
+    GET_CREATED_AT = """
+        SELECT created_at FROM agent_card
+        WHERE name = %s AND organization = %s
+    """
+
+    GET_UPDATED_AT = """
+        SELECT updated_at FROM agent_card
+        WHERE name = %s AND organization = %s
+    """

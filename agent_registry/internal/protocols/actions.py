@@ -18,3 +18,6 @@ from enum import Enum
 
 class Action(str, Enum):
     APPROVAL = "approval"
+    GET_AGENT = "get_agent"
+    LIST_AGENTS = "list_agents"
+    ADD_TAGS = "add_tags"

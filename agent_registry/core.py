@@ -18,6 +18,7 @@ import json
 import os
 from pathlib import Path
 from threading import Lock
+from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any
 
 from a2a.types import AgentCard
@@ -54,6 +55,9 @@ class RegistryCore:
         self.storage: Optional[StorageBackend] = None
         self._lock = Lock()
         self._status_map: Dict[Tuple[str, str], str] = {}
+        self._tags_map: Dict[Tuple[str, str], List[str]] = {}
+        self._created_at_map: Dict[Tuple[str, str], str] = {}
+        self._updated_at_map: Dict[Tuple[str, str], str] = {}
 
         if use_vectordb:
             self.vectordb = get_or_create_vectordb_tool_instance(get_vectordb_config_by_type(VectorDBType.Milvus))
@@ -112,6 +116,9 @@ class RegistryCore:
                 key = self._make_key(agent.name, agent.provider.organization)
                 self._agents[key] = agent
                 self._status_map[key] = 'published'
+                now = datetime.utcnow().isoformat()
+                self._created_at_map[key] = now
+                self._updated_at_map[key] = now
                 self._save()
                 logger.info(f"Registered agent: {agent.name} (org={agent.provider.organization})")
                 return True
@@ -147,6 +154,9 @@ class RegistryCore:
                 key = self._make_key(agent.name, agent.provider.organization)
                 self._agents[key] = agent
                 self._status_map[key] = initial_status
+                now = datetime.utcnow().isoformat()
+                self._created_at_map[key] = now
+                self._updated_at_map[key] = now
                 self._save()
                 logger.info(f"Registered agent: {agent.name} (org={agent.provider.organization}, status={initial_status})")
                 return True
@@ -370,13 +380,19 @@ class RegistryCore:
         save_to_file(self.persistence_file, data)
 
     def _save_registry(self) -> None:
-        """Persist status map to agentregistry.json."""
+        """Persist status and tags map to agentregistry.json."""
         registry_data = []
         for key, status in self._status_map.items():
+            tags = self._tags_map.get(key, [])
+            created_at = self._created_at_map.get(key, "")
+            updated_at = self._updated_at_map.get(key, "")
             registry_data.append({
                 "organization": key[1],
                 "agent_name": key[0],
-                "status": status
+                "status": status,
+                "tag": tags,
+                "created_at": created_at,
+                "updated_at": updated_at
             })
         save_to_file(self.metadata_file, registry_data)
 
@@ -398,19 +414,25 @@ class RegistryCore:
         logger.info(f"Loaded {len(self._agents)} agents from persistence.")
 
     def _load_registry(self) -> None:
-        """Load status map from agentregistry.json."""
+        """Load status and tags map from agentregistry.json."""
         if os.path.exists(self.metadata_file):
             registry_data = load_from_file(self.metadata_file)
             for item in registry_data:
                 try:
                     key = self._make_key(item['agent_name'], item['organization'])
-                    self._status_map[key] = item['status']
+                    self._status_map[key] = item.get('status', 'published')
+                    self._tags_map[key] = item.get('tag', [])
+                    self._created_at_map[key] = item.get('created_at', '')
+                    self._updated_at_map[key] = item.get('updated_at', '')
                 except Exception as e:
                     logger.error(f"Failed to load status from JSON: {e}, data: {item}")
             logger.info(f"Loaded {len(self._status_map)} status mappings from registry.")
         else:
             for key in self._agents.keys():
                 self._status_map[key] = 'published'
+                self._tags_map[key] = []
+                self._created_at_map[key] = ''
+                self._updated_at_map[key] = ''
             logger.info("No registry file found, defaulting all agents to published status")
 
     def _make_id(self, name: str, organization: str):
@@ -442,6 +464,87 @@ class RegistryCore:
             key = self._make_key(name, organization)
             return self._status_map.get(key)
 
+    def get_tags(self, name: str, organization: str) -> List[str]:
+        """Get agent tags from tags map."""
+        if self.persistence_mode == 'postgresql':
+            return self.storage.get_tags(name, organization)
+        else:
+            key = self._make_key(name, organization)
+            return self._tags_map.get(key, [])
+
+    def update_tags(self, name: str, organization: str, new_tags: List[str]) -> bool:
+        """
+        Update agent tags (append and deduplicate).
+        
+        Args:
+            name: Agent name
+            organization: Organization name
+            new_tags: New tags to append
+        
+        Returns:
+            bool: Whether update was successful
+        """
+        with self._lock:
+            if self.persistence_mode == 'postgresql':
+                agent = self.storage.find_by_key(name, organization)
+                if not agent:
+                    logger.warning(f"Agent not found: {name} ({organization})")
+                    return False
+                return self.storage.update_tags(name, organization, new_tags)
+            else:
+                key = self._make_key(name, organization)
+                if key not in self._agents:
+                    logger.warning(f"Agent not found: {name} ({organization})")
+                    return False
+                
+                current_tags = self._tags_map.get(key, [])
+                merged_tags = list(set(current_tags + new_tags))
+                self._tags_map[key] = merged_tags
+                self._updated_at_map[key] = datetime.utcnow().isoformat()
+                self._save_registry()
+                logger.info(f"Agent tags updated: {name} -> {merged_tags}")
+                return True
+
+    def get_metadata(self, name: str, organization: str) -> Dict[str, Any]:
+        """
+        Get agent metadata (agent_name, organization, status, tag).
+        
+        Args:
+            name: Agent name
+            organization: Organization name
+        
+        Returns:
+            dict: Agent metadata
+        """
+        status = self.get_status(name, organization) or 'published'
+        tags = self.get_tags(name, organization) or []
+        created_at = self.get_created_at(name, organization) or ''
+        updated_at = self.get_updated_at(name, organization) or ''
+        return {
+            "agent_name": name,
+            "organization": organization,
+            "status": status,
+            "tag": tags,
+            "created_at": created_at,
+            "updated_at": updated_at
+        }
+
+    def get_created_at(self, name: str, organization: str) -> str:
+        """Get agent created_at timestamp."""
+        if self.persistence_mode == 'postgresql':
+            return self.storage.get_created_at(name, organization)
+        else:
+            key = self._make_key(name, organization)
+            return self._created_at_map.get(key, '')
+
+    def get_updated_at(self, name: str, organization: str) -> str:
+        """Get agent updated_at timestamp."""
+        if self.persistence_mode == 'postgresql':
+            return self.storage.get_updated_at(name, organization)
+        else:
+            key = self._make_key(name, organization)
+            return self._updated_at_map.get(key, '')
+
     def update_status(self, name: str, organization: str, new_status: str) -> bool:
         """
         Update agent status.
@@ -469,6 +572,7 @@ class RegistryCore:
                     return False
                 
                 self._status_map[key] = new_status
+                self._updated_at_map[key] = datetime.utcnow().isoformat()
                 self._save_registry()
                 logger.info(f"Agent status updated: {name} -> {new_status}")
                 return True

@@ -15,5 +15,8 @@
 
 from agent_registry.internal.handlers.base_handler import BaseUDSHandler
 from agent_registry.internal.handlers.approval_handler import ApprovalHandler
+from agent_registry.internal.handlers.get_agent_handler import GetAgentHandler
+from agent_registry.internal.handlers.list_agents_handler import ListAgentsHandler
+from agent_registry.internal.handlers.add_tags_handler import AddTagsHandler
 
-__all__ = ['BaseUDSHandler', 'ApprovalHandler']
+__all__ = ['BaseUDSHandler', 'ApprovalHandler', 'GetAgentHandler', 'ListAgentsHandler', 'AddTagsHandler']
