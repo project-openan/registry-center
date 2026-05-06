@@ -357,7 +357,7 @@ async def register_agent(
     Returns True if registered, False if duplicate.
     """
     body = await request.json()
-    agent_cards = body.get("agent_cards", [])
+    agent_cards = body.get("agentCards", [])
     client_ip = request.client.host
 
     authenticate_handle = HandlerRegistry.get_handler(InterfaceType.AUTHENTICATE)
