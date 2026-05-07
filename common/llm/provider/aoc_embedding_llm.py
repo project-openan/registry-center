@@ -44,9 +44,6 @@ class AOCEmbeddingLLM(AOCBaseLLM):
         return '', json.dumps(vector)
 
     def _extract_embedding(self, data: Dict[str, Any]) -> List[float]:
-        """Extract embedding from response; subclasses may override for different response formats."""
-
-    def _extract_embedding(self, data: Dict[str, Any]) -> List[float]:
         """Extract embedding vector from response."""
         # Common format: {"data": [{"embedding": [...]}]}
         try:
