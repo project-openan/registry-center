@@ -224,31 +224,53 @@ class InteractiveCLI(cmd.Cmd):
         return []
     
     def _show_commands(self):
-        """Show all available commands with aligned formatting"""
-        print(f"\n{t('commands.header')}")
+        """Show all available commands in table format"""
+        print()
+        print(t('commands.header'))
+        print("=" * 50)
+        
+        from .output import Output
+        output = Output('table')
         
         commands_data = []
         
         for name, cmd_class in self._registry.get_all().items():
             cmd = cmd_class()
-            commands_data.append(('cmd', name, cmd.help_text))
+            commands_data.append({
+                'type': 'Command',
+                'name': name,
+                'description': cmd.help_text[:60] + '...' if len(cmd.help_text) > 60 else cmd.help_text
+            })
             
             if cmd.subcommands:
                 for sub_name, sub_cmd in cmd.subcommands.items():
                     full_name = f"{name} {sub_name}"
-                    commands_data.append(('subcmd', full_name, sub_cmd.help_text))
+                    commands_data.append({
+                        'type': 'Subcommand',
+                        'name': full_name,
+                        'description': sub_cmd.help_text[:60] + '...' if len(sub_cmd.help_text) > 60 else sub_cmd.help_text
+                    })
         
-        commands_data.append(('cmd', 'cmds', t('commands.internal.cmds')))
-        commands_data.append(('cmd', 'exit/quit/q', t('commands.internal.exit')))
+        commands_data.append({
+            'type': 'Internal',
+            'name': 'cmds',
+            'description': t('commands.internal.cmds')
+        })
+        commands_data.append({
+            'type': 'Internal',
+            'name': 'exit/quit/q',
+            'description': t('commands.internal.exit')
+        })
         
-        for item in commands_data:
-            type_, name, help_text = item
-            if type_ == 'cmd':
-                print(f"  {name:<{CMD_DISPLAY_WIDTH}}  {help_text}")
-            else:
-                print(f"    {name:<{SUBCMD_DISPLAY_WIDTH}}  {help_text}")
+        output.print_table(
+            commands_data,
+            columns=['type', 'name', 'description'],
+            headers={'type': 'Type', 'name': 'Name', 'description': 'Description'}
+        )
         
-        print(f"\n{t('commands.footer')}\n")
+        print()
+        print(t('commands.footer'))
+        print()
     
     def get_names(self):
         """
@@ -407,16 +429,53 @@ class InteractiveCLI(cmd.Cmd):
         return remaining, global_options
     
     def _build_parser(self) -> argparse.ArgumentParser:
-        """Build argument parser"""
+        """Build argument parser with custom help formatter"""
+        
+        class CleanHelpFormatter(argparse.RawDescriptionHelpFormatter):
+            """Custom formatter for cleaner help output"""
+            
+            def _format_action_invocation(self, action):
+                if not action.option_strings:
+                    return action.dest
+                parts = []
+                if action.option_strings:
+                    parts.append(', '.join(action.option_strings))
+                if action.nargs != 0:
+                    parts.append(self._format_args(action, action.dest.upper()))
+                return ' '.join(parts)
+            
+            def add_arguments(self, actions):
+                super().add_arguments(actions)
+            
+            def format_help(self):
+                help_text = super().format_help()
+                lines = help_text.split('\n')
+                result = []
+                for line in lines:
+                    if line.strip().startswith('-') and '=' in line:
+                        parts = line.split('=', 1)
+                        if len(parts) == 2:
+                            opt_part = parts[0].strip()
+                            desc_part = parts[1].strip()
+                            result.append(f"  {opt_part}")
+                            result.append(f"      {desc_part}")
+                        else:
+                            result.append(line)
+                    else:
+                        result.append(line)
+                return '\n'.join(result)
+        
         parser = argparse.ArgumentParser(
             prog="agent-registry",
-            add_help=True
+            add_help=True,
+            formatter_class=CleanHelpFormatter,
+            description="Agent Registry CLI - Manage agent registration and metadata"
         )
         
-        parser.add_argument('-v', '--version', action='store_true')
-        parser.add_argument('-x', '--debug', action='store_true')
+        parser.add_argument('-v', '--version', action='store_true', help='Show version')
+        parser.add_argument('-x', '--debug', action='store_true', help='Enable debug mode')
         
-        subparsers = parser.add_subparsers(dest='_command_name')
+        subparsers = parser.add_subparsers(dest='_command_name', title='Commands')
         
         for name, cmd_class in self._registry.get_all().items():
             self._add_command(subparsers, cmd_class())
@@ -425,17 +484,34 @@ class InteractiveCLI(cmd.Cmd):
     
     def _add_command(self, subparsers, command: BaseCommand, level: int = 0):
         """Recursively add command"""
+        
+        class CleanHelpFormatter(argparse.RawDescriptionHelpFormatter):
+            def _format_action_invocation(self, action):
+                if not action.option_strings:
+                    return action.dest
+                parts = []
+                if action.option_strings:
+                    parts.append(', '.join(action.option_strings))
+                if action.nargs != 0:
+                    parts.append(self._format_args(action, action.dest.upper()))
+                return ' '.join(parts)
+        
         cmd_parser = subparsers.add_parser(
             command.name,
             help=command.help_text,
-            aliases=command.aliases
+            aliases=command.aliases,
+            formatter_class=CleanHelpFormatter,
+            description=command.help_text
         )
         cmd_parser.set_defaults(_command=command)
         
         command.add_arguments(cmd_parser)
         
         if command.subcommands:
-            sub_subparsers = cmd_parser.add_subparsers(dest=f'_subcommand_{level}')
+            sub_subparsers = cmd_parser.add_subparsers(
+                dest=f'_subcommand_{level}',
+                title='Subcommands'
+            )
             for sub_name, sub_cmd in command.subcommands.items():
                 self._add_command(sub_subparsers, sub_cmd, level + 1)
     

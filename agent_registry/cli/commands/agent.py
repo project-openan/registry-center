@@ -57,8 +57,8 @@ class UDSGetCommand(BaseCommand):
                 'organization': 'Organization',
                 'status': 'Status',
                 'tags': 'Tags',
-                'created_at': 'Created',
-                'updated_at': 'Updated',
+                'created_at': 'Created At',
+                'updated_at': 'Updated At',
                 'agentcard': 'AgentCard JSON',
             }
         }
@@ -109,7 +109,7 @@ class UDSListCommand(BaseCommand):
 
     @property
     def help_text(self) -> str:
-        return "List all agents (agent_name, organization, status, tag, created_at, updated_at)"
+        return "List all agents (agent_name, organization, status, tag)"
 
     @property
     def display_config(self) -> Dict:
@@ -203,7 +203,7 @@ class ApprovalCommand(BaseCommand):
                 'agent_name': args.agent_name,
                 'organization': args.org,
                 'status': data.get('status', 'published'),
-                'approved': True,
+                'approved': 'Yes',
             }
             
             print(self.format_output(flattened_data, title="Approval Result"))

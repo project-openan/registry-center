@@ -51,27 +51,73 @@ class Output:
         else:
             self._print_text(data, title)
     
-    def print_table(self, headers: List[str], rows: List[List[Any]], title: Optional[str] = None):
+    def print_table(self, rows: List[Dict], columns: List[str], headers: Dict[str, str], 
+                    title: Optional[str] = None):
         """
-        Print data as formatted table
+        Print data as aligned table (no vertical bars)
         
         Args:
-            headers: Column headers
-            rows: Data rows
+            rows: List of row dictionaries
+            columns: Column keys to display
+            headers: Header labels mapping
             title: Optional title
         """
         if self.format == 'json':
-            data = [dict(zip(headers, row)) for row in rows]
+            data = [dict(zip(columns, [row.get(c, '') for c in columns])) for row in rows]
             self._print_json(data)
-        else:
-            self._print_formatted_table(headers, rows, title)
+            return
+        
+        lines = []
+        
+        if title:
+            lines.append(title)
+            lines.append("=" * 50)
+        
+        if not rows:
+            lines.append("")
+            lines.append("No items found")
+            print('\n'.join(lines))
+            return
+        
+        # Calculate column widths based on actual content
+        col_widths = {}
+        for col in columns:
+            header = headers.get(col, col)
+            max_width = len(header)
+            for row in rows:
+                value = self._format_value(str(row.get(col, '')))
+                max_width = max(max_width, len(value))
+            col_widths[col] = max_width
+        
+        # Header row
+        header_parts = []
+        for col in columns:
+            width = col_widths[col]
+            header_parts.append(headers.get(col, col).ljust(width))
+        lines.append('  '.join(header_parts))
+        
+        # Separator line
+        sep_parts = []
+        for col in columns:
+            width = col_widths[col]
+            sep_parts.append('-' * width)
+        lines.append('  '.join(sep_parts))
+        
+        # Data rows
+        for row in rows:
+            row_parts = []
+            for col in columns:
+                width = col_widths[col]
+                value = self._format_value(str(row.get(col, '')))
+                row_parts.append(value.ljust(width))
+            lines.append('  '.join(row_parts))
+        
+        print('\n'.join(lines))
     
     def print_dict_table(self, data: Dict, field_order: Optional[List[str]] = None, 
                          labels: Optional[Dict[str, str]] = None, title: Optional[str] = None):
         """
-        Print dictionary as attribute table
-        
-        First row shows attribute names, subsequent rows show values
+        Print dictionary as property table
         
         Args:
             data: Dictionary data
@@ -88,98 +134,41 @@ class Output:
         else:
             keys = list(data.keys())
         
-        headers = [labels.get(k, k) if labels else k for k in keys]
-        values = [self._format_value(data.get(k, '')) for k in keys]
+        rows = []
+        for k in keys:
+            rows.append({
+                'property': labels.get(k, k) if labels else k,
+                'value': self._format_value(str(data.get(k, '')))
+            })
         
-        self._print_formatted_table(headers, [values], title)
+        self.print_table(rows, ['property', 'value'], 
+                        {'property': 'Property', 'value': 'Value'}, title)
     
-    def print_separate(self, label: str, data: Any, max_width: int = 50):
+    def print_separate(self, label: str, data: Any):
         """
         Print large data separately
         
         Args:
             label: Label for the data
             data: Data to print
-            max_width: Maximum width for preview
         """
         if self.format == 'json':
             return
         
         print()
-        print(f'{label}:')
-        print('-' * len(label))
+        print(f"{label}:")
+        print("-" * 50)
         
         if isinstance(data, (dict, list)):
             print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
-            data_str = str(data)
-            if len(data_str) > max_width * 10:
-                print(data_str[:max_width * 5] + '\n...\n' + data_str[-max_width * 5:])
-            else:
-                print(data_str)
+            print(str(data))
     
-    def _print_formatted_table(self, headers: List[str], rows: List[List[Any]], title: Optional[str] = None):
-        """
-        Print formatted table with fixed-width columns
-        
-        Args:
-            headers: Column headers
-            rows: Data rows
-            title: Optional title
-        """
-        if title:
-            print(f'\n{title}')
-            print('=' * len(title))
-        
-        try:
-            from tabulate import tabulate
-            formatted_rows = []
-            for row in rows:
-                formatted_row = [self._format_value(v) for v in row]
-                formatted_rows.append(formatted_row)
-            print(tabulate(formatted_rows, headers=headers, tablefmt='grid'))
-        except ImportError:
-            self._print_simple_table(headers, rows)
-    
-    def _print_simple_table(self, headers: List[str], rows: List[List[Any]]):
-        """
-        Simple table format without tabulate
-        
-        Args:
-            headers: Column headers
-            rows: Data rows
-        """
-        col_width = 20
-        
-        header_line = ' | ' + ' | '.join(f'{h:<{col_width}}' for h in headers) + ' |'
-        separator = '-+-' + '-+-'.join('-' * col_width for _ in headers) + '-'
-        
-        print()
-        print(separator)
-        print(header_line)
-        print(separator)
-        
-        for row in rows:
-            formatted_row = ' | ' + ' | '.join(f'{self._truncate(str(v), col_width-3):<{col_width}}' for v in row) + ' |'
-            print(formatted_row)
-        
-        print(separator)
-    
-    def _format_value(self, value: Any, max_len: int = 50) -> str:
+    def _format_value(self, value: str, max_len: int = 100) -> str:
         """Format value for display"""
-        if isinstance(value, (dict, list)):
-            return json.dumps(value, ensure_ascii=False)[:max_len] + '...' if len(json.dumps(value)) > max_len else json.dumps(value, ensure_ascii=False)
-        if isinstance(value, bool):
-            return 'Yes' if value else 'No'
-        if value is None:
-            return ''
-        return str(value)
-    
-    def _truncate(self, text: str, max_len: int) -> str:
-        """Truncate text"""
-        if len(text) > max_len:
-            return text[:max_len - 3] + '...'
-        return text
+        if len(value) > max_len:
+            return value[:max_len - 3] + '...'
+        return value
     
     def _print_json(self, data: Any):
         """
@@ -198,24 +187,18 @@ class Output:
             data: Data
             title: Title
         """
-        if title:
-            print(f"\n{title}")
-            print('=' * len(title))
-        
-        try:
-            from tabulate import tabulate
-            
-            if isinstance(data, list) and data and isinstance(data[0], dict):
-                headers = list(data[0].keys())
-                rows = [[self._format_value(item.get(h, '')) for h in headers] for item in data]
-                print(tabulate(rows, headers=headers, tablefmt='grid'))
-            elif isinstance(data, dict):
-                rows = [[k, self._format_value(v)] for k, v in data.items()]
-                print(tabulate(rows, headers=['Property', 'Value'], tablefmt='grid'))
-            else:
-                print(data)
-        except ImportError:
-            self._print_text(data, title)
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            keys = list(data[0].keys())
+            rows = data
+            headers = dict(zip(keys, keys))
+            self.print_table(rows, keys, headers, title)
+        elif isinstance(data, dict):
+            self.print_dict_table(data, title=title)
+        else:
+            if title:
+                print(f"\n{title}")
+                print("=" * 50)
+            print(data)
     
     def _print_text(self, data: Any, title: Optional[str] = None):
         """
@@ -225,18 +208,22 @@ class Output:
             data: Data
             title: Title
         """
+        lines = []
+        
         if title:
-            print(f"\n{title}")
-            print('=' * len(title))
+            lines.append(title)
+            lines.append("=" * 50)
         
         if isinstance(data, dict):
             for k, v in data.items():
-                print(f"{k}: {v}")
+                lines.append(f"{k}: {v}")
         elif isinstance(data, list):
             for item in data:
-                print(item)
+                lines.append(str(item))
         else:
-            print(data)
+            lines.append(str(data))
+        
+        print('\n'.join(lines))
     
     def success(self, msg: str):
         """
@@ -248,7 +235,12 @@ class Output:
         if self.format == 'json':
             print(json.dumps({"status": "success", "message": msg}, ensure_ascii=False))
         else:
-            print(f"[OK] {msg}")
+            lines = []
+            lines.append("")
+            lines.append("=" * 50)
+            lines.append("[OK] " + msg)
+            lines.append("=" * 50)
+            print('\n'.join(lines))
     
     def error(self, msg: str):
         """
@@ -260,7 +252,12 @@ class Output:
         if self.format == 'json':
             print(json.dumps({"status": "error", "message": msg}, ensure_ascii=False), file=sys.stderr)
         else:
-            print(f"[ERROR] {msg}", file=sys.stderr)
+            lines = []
+            lines.append("")
+            lines.append("=" * 50)
+            lines.append("[ERROR] " + msg)
+            lines.append("=" * 50)
+            print('\n'.join(lines), file=sys.stderr)
     
     def warning(self, msg: str):
         """
@@ -272,7 +269,7 @@ class Output:
         if self.format == 'json':
             print(json.dumps({"status": "warning", "message": msg}, ensure_ascii=False))
         else:
-            print(f"[WARN] {msg}")
+            print("[WARN] " + msg)
     
     def info(self, msg: str):
         """

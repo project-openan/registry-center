@@ -115,7 +115,6 @@ class BaseCommand(ABC):
                     'field1': 'Display Name',
                     'field2': 'Another Name',
                 },
-                'max_width': 50,                             # Optional: max width for separate fields
             }
         
         Example:
@@ -222,16 +221,33 @@ class BaseCommand(ABC):
         Returns:
             str: Full help including command name, help text, aliases, subcommands
         """
-        help_parts = [f"{self.name}: {self.help_text}"]
+        lines = []
         
+        # Command header
+        lines.append(f"Command: {self.name}")
+        lines.append("=" * 50)
+        lines.append(f"Description: {self.help_text}")
+        
+        # Aliases
         if self.aliases:
-            help_parts.append(f"Aliases: {', '.join(self.aliases)}")
+            lines.append(f"Aliases:     {', '.join(self.aliases)}")
         
+        # Subcommands
         if self.subcommands:
-            subcmd_list = ', '.join(self.subcommands.keys())
-            help_parts.append(f"Subcommands: {subcmd_list}")
+            lines.append("")
+            lines.append("Subcommands:")
+            lines.append("-" * 50)
+            subcmd_data = []
+            for name, cmd in self.subcommands.items():
+                subcmd_data.append({
+                    'name': name,
+                    'description': cmd.help_text[:60] + '...' if len(cmd.help_text) > 60 else cmd.help_text,
+                    'aliases': ', '.join(cmd.aliases) if cmd.aliases else ''
+                })
+            lines.append(self._format_table(subcmd_data, ['name', 'description', 'aliases'], 
+                                            {'name': 'Name', 'description': 'Description', 'aliases': 'Aliases'}))
         
-        return '\n'.join(help_parts)
+        return '\n'.join(lines)
     
     def format_output(self, data: Dict, title: Optional[str] = None) -> str:
         """
@@ -255,40 +271,39 @@ class BaseCommand(ABC):
         table_fields = config.get('table_fields', [])
         separate_fields = config.get('separate_fields', [])
         field_labels = config.get('field_labels', {})
-        max_width = config.get('max_width', 50)
         
-        output_lines = []
+        lines = []
         
         if title:
-            output_lines.append(title)
-            output_lines.append('=' * len(title))
+            lines.append(title)
+            lines.append("=" * 50)
         
         if table_fields:
-            output_lines.append('')
-            header_row = []
-            value_row = []
+            lines.append("")
+            table_data = []
             for field in table_fields:
                 label = field_labels.get(field, field)
                 value = self._get_field_value(data, field)
-                header_row.append(label)
-                value_row.append(self._truncate_value(str(value), max_width))
-            
-            output_lines.append(self._format_table_row(header_row, 'header'))
-            output_lines.append(self._format_table_row(value_row, 'value'))
+                table_data.append({
+                    'property': label,
+                    'value': self._format_value_for_table(value)
+                })
+            lines.append(self._format_table(table_data, ['property', 'value'],
+                                            {'property': 'Property', 'value': 'Value'}))
         
         for field in separate_fields:
             if field in data or self._nested_field_exists(data, field):
                 label = field_labels.get(field, field)
                 value = self._get_field_value(data, field)
-                output_lines.append('')
-                output_lines.append(f'{label}:')
-                output_lines.append('-' * len(label))
+                lines.append("")
+                lines.append(f"{label}:")
+                lines.append("-" * 50)
                 if isinstance(value, (dict, list)):
-                    output_lines.append(json.dumps(value, indent=2, ensure_ascii=False))
+                    lines.append(json.dumps(value, indent=2, ensure_ascii=False))
                 else:
-                    output_lines.append(str(value))
+                    lines.append(str(value))
         
-        return '\n'.join(output_lines)
+        return '\n'.join(lines)
     
     def format_list_output(self, items: List[Dict], title: Optional[str] = None) -> str:
         """
@@ -305,62 +320,119 @@ class BaseCommand(ABC):
         table_fields = config.get('table_fields', [])
         field_labels = config.get('field_labels', {})
         
-        if not items:
-            return f"{title or 'Results'}: No items found"
-        
-        output_lines = []
+        lines = []
         
         if title:
-            output_lines.append(title)
-            output_lines.append('=' * len(title))
+            lines.append(title)
+            lines.append("=" * 50)
+        
+        if not items:
+            lines.append("")
+            lines.append("No items found")
+            return '\n'.join(lines)
         
         if table_fields:
-            output_lines.append('')
-            header_row = [field_labels.get(f, f) for f in table_fields]
-            output_lines.append(self._format_table_row(header_row, 'header'))
-            
+            lines.append("")
+            formatted_items = []
             for item in items:
-                value_row = []
+                formatted_item = {}
                 for field in table_fields:
                     value = self._get_field_value(item, field)
-                    value_row.append(self._truncate_value(str(value), 40))
-                output_lines.append(self._format_table_row(value_row, 'value'))
+                    formatted_item[field] = self._format_value_for_table(value)
+                formatted_items.append(formatted_item)
+            
+            headers = [field_labels.get(f, f) for f in table_fields]
+            lines.append(self._format_table(formatted_items, table_fields, dict(zip(table_fields, headers))))
         else:
             for item in items:
-                output_lines.append(self._format_simple(item))
+                lines.append(self._format_simple(item))
         
-        return '\n'.join(output_lines)
+        return '\n'.join(lines)
+    
+    def _format_table(self, rows: List[Dict], columns: List[str], headers: Dict[str, str]) -> str:
+        """
+        Format data as aligned table (no vertical bars)
+        
+        Args:
+            rows: List of row dictionaries
+            columns: Column keys to display
+            headers: Header labels
+            
+        Returns:
+            str: Formatted table
+        """
+        # Calculate column widths
+        col_widths = {}
+        for col in columns:
+            header = headers.get(col, col)
+            max_width = len(header)
+            for row in rows:
+                value = str(row.get(col, ''))
+                max_width = max(max_width, len(value))
+            col_widths[col] = max_width
+        
+        # Build table lines
+        lines = []
+        
+        # Header row
+        header_parts = []
+        for col in columns:
+            width = col_widths[col]
+            header_parts.append(headers.get(col, col).ljust(width))
+        lines.append('  '.join(header_parts))
+        
+        # Separator line
+        sep_parts = []
+        for col in columns:
+            width = col_widths[col]
+            sep_parts.append('-' * width)
+        lines.append('  '.join(sep_parts))
+        
+        # Data rows
+        for row in rows:
+            row_parts = []
+            for col in columns:
+                width = col_widths[col]
+                value = str(row.get(col, ''))
+                row_parts.append(value.ljust(width))
+            lines.append('  '.join(row_parts))
+        
+        return '\n'.join(lines)
     
     def _format_simple(self, data: Dict, title: Optional[str] = None) -> str:
         """Simple text format fallback"""
         lines = []
         if title:
             lines.append(title)
-            lines.append('=' * len(title))
+            lines.append("=" * 50)
         for k, v in data.items():
-            lines.append(f'{k}: {v}')
+            lines.append(f"{k}: {v}")
         return '\n'.join(lines)
     
-    def _format_table_row(self, values: List[str], row_type: str = 'value') -> str:
+    def _format_value_for_table(self, value: Any, max_len: int = 100) -> str:
         """
-        Format a single table row with fixed-width columns
+        Format value for table display
         
         Args:
-            values: List of column values
-            row_type: 'header' or 'value'
+            value: Value to format
+            max_len: Maximum length
             
         Returns:
-            str: Formatted row
+            str: Formatted value
         """
-        col_width = 20
-        formatted = [f'{v:<{col_width}}' for v in values]
-        return ' | ' + ' | '.join(formatted) + ' |'
-    
-    def _truncate_value(self, value: str, max_len: int = 40) -> str:
-        """Truncate long values"""
-        if len(value) > max_len:
-            return value[:max_len - 3] + '...'
-        return value
+        if isinstance(value, (dict, list)):
+            formatted = json.dumps(value, ensure_ascii=False)
+            if len(formatted) > max_len:
+                return formatted[:max_len - 3] + '...'
+            return formatted
+        if isinstance(value, bool):
+            return 'Yes' if value else 'No'
+        if value is None:
+            return ''
+        result = str(value)
+        if len(result) > max_len:
+            return result[:max_len - 3] + '...'
+        return result
     
     def _get_field_value(self, data: Dict, field: str) -> Any:
         """
