@@ -469,7 +469,7 @@ async def register_agent(
             try:
                 validate_agent_card(agent)
             except HTTPException as e:
-                logger.error(f"Agent card validation failed: {agent.name}")
+                logger.error(f"Agent card validation failed: {agent.name}, {agent.provider.organization}")
                 raise CustomHTTPException(e.status_code, e.detail)
             logger.info(f"Register agent success: name={agent.name}, org={agent.provider.organization}")
 
@@ -589,7 +589,7 @@ async def update_agent(
             try:
                 validate_agent_card(agent_data)
             except HTTPException as e:
-                logger.error(f"Agent card validation failed: {agent_data.name}")
+                logger.error(f"Agent card validation failed: {agent_data.name}, {agent_data.provider.organization}")
                 raise CustomHTTPException(e.status_code, e.detail)
             await _check_agent_limit(registry, client_ip, details)
 
