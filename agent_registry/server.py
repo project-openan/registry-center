@@ -25,18 +25,20 @@ and persistence using a JSON file.
 import asyncio
 import json
 from functools import partial
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 
 import anyio
 from a2a.types import AgentCard
 from fastapi import FastAPI, HTTPException, Query, Request, Depends, status, Path
 from fastapi.responses import JSONResponse
 from google.protobuf.json_format import Parse, MessageToDict
+from jwt import PyJWK
 from loguru import logger
 from limits import strategies, storage, parse_many
 
 from starlette.responses import Response
 
+from agent_registry.agent_registry.jwk_provider import JWKProvider, CertLoadError
 from agent_registry.config import (
     MAX_REQUEST_BODY_SIZE,
     MAX_URL_LENGTH, CONN_TIMEOUT, CONN_MAX, FLOW_CTL_PARALLEL_REGISTER, FLOW_CTL_PARALLEL_QUERY, FLOW_CTL_REGISTER,
@@ -750,3 +752,60 @@ app.add_event_handler("shutdown", close_registry)
 def _make_agent_key(name: str, organization: str) -> Tuple[str, str]:
     """Create a normalized key for indexing."""
     return name.strip(), organization.strip()
+
+
+# ---------- JWK Endpoint ----------
+jwk_provider = JWKProvider(cert_path=config.get("JWK_CERT_PATH", "cert.pem"))
+jwk_kid = config.get("JWK_KID", None)
+
+jwk_rate_item = parse_rate_limit('jwk')
+
+
+@app.get("/.well-known/jwks.json")
+async def get_jwks(request: Request):
+    """
+    Download public key in PEM format for JWT signature verification.
+    This endpoint does not require authentication.
+    """
+    if jwk_rate_item and not await async_hit(jwk_rate_item, request.client.host):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too Many Requests"
+        )
+
+    acquired = False
+    try:
+        jwk_semaphore.acquire_nowait()
+        acquired = True
+        public_key_pem = jwk_provider.get_public_key_pem()
+        return Response(
+            content=public_key_pem,
+            media_type="application/x-pem-file",
+            headers={
+                "Content-Disposition": "attachment; filename=public_key.pem"
+            }
+        )
+    except CertLoadError as e:
+        logger.error(f"Failed to load JWK: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in JWK endpoint: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    finally:
+        if acquired:
+            jwk_semaphore.release()
+
+
+def _enhance_jwk(jwk: PyJWK) -> Dict[str, Any]:
+    """Enhance JWK with kid and key_ops fields."""
+    jwk_dict = jwk._jwk_data.copy()
+    if jwk_kid:
+        jwk_dict["kid"] = jwk_kid
+    jwk_dict["key_ops"] = ["verify"]
+    return jwk_dict
