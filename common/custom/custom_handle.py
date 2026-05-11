@@ -24,15 +24,15 @@ from common.util.cipher_util import decrypt
 
 
 class BaseHandler(ABC):
-    """统一的抽象基类，所有接口实现必须继承此类并实现 handle 方法"""
+    """Abstract base class for all interface implementations. Subclasses must implement the handle method."""
 
     @abstractmethod
     async def handle(self, *args, **kwargs):
-        """具体业务逻辑由子类实现"""
+        """Business logic to be implemented by subclasses"""
         pass
 
 
-# ==================== 默认实现 ====================
+# ==================== Default Implementations ====================
 class DecryptHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
         return decrypt(*args)
@@ -51,7 +51,9 @@ class AuthenticateHandler(BaseHandler):
 class InsertHandler(BaseHandler):
 
     async def handle(self, *args, **kwargs):
-        return await get_registry().register(*args)
+        initial_status = kwargs.get('initial_status', 'published')
+        owner = kwargs.get('owner')
+        return get_registry().register_with_status(*args, initial_status=initial_status, owner=owner)
 
 
 class QueryHandler(BaseHandler):
@@ -60,11 +62,13 @@ class QueryHandler(BaseHandler):
 
 class UpdateHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
-        return get_registry().update(*args)
+        owner = kwargs.get('owner')
+        return get_registry().update(*args, owner=owner)
 
 class GetHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
-        return get_registry().get_by_key(*args)
+        owner = kwargs.get('owner')
+        return get_registry().get_by_key_with_owner(*args, owner=owner)
 
 class RetrieveHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
@@ -72,18 +76,19 @@ class RetrieveHandler(BaseHandler):
 
 class DeregisterHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
-        return get_registry().deregister(*args)
+        owner = kwargs.get('owner')
+        return get_registry().deregister(*args, owner=owner)
 
-# ==================== 注册表 ====================
+# ==================== Registry ====================
 class HandlerRegistry:
     _registry: Dict[str, Type[BaseHandler]] = {}
 
     @classmethod
     def register(cls, interface_type: InterfaceType, handler_class: Type[BaseHandler]) -> None:
         """
-        注册用户自定义实现类
-        :param interface_type: 接口类型标识，例如 "decrypt", "audit", "authenticate", "insert", "query"
-        :param handler_class: 继承自 BaseHandler 的自定义类
+        Register a user-defined handler implementation.
+        :param interface_type: Interface type identifier, e.g., "decrypt", "audit", "authenticate", "insert", "query".
+        :param handler_class: Custom class inheriting from BaseHandler.
         """
         if not issubclass(handler_class, BaseHandler):
             raise TypeError("handler_class must be a subclass of BaseHandler")
@@ -92,15 +97,15 @@ class HandlerRegistry:
     @classmethod
     def get_handler(cls, interface_type: InterfaceType) -> BaseHandler:
         """
-        根据接口类型获取处理器实例
-        :param interface_type: 接口类型标识
-        :return: BaseHandler 实例（用户自定义或默认）
+        Get handler instance by interface type.
+        :param interface_type: Interface type identifier.
+        :return: BaseHandler instance (user-defined or default).
         """
-        # 若存在用户注册的类，则实例化并返回
+        # If a user-registered class exists, instantiate and return
         if interface_type.value in cls._registry:
             return cls._registry[interface_type.value]()
 
-        # 否则返回对应的默认实现
+        # Otherwise return the corresponding default implementation
         default_map = {
             "decrypt": DecryptHandler,
             "audit": AuditHandler,

@@ -8,11 +8,11 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/opt/registry-center
+WorkingDirectory=/OpenA2A-T/registry-center
 Environment="APP_USER=root"
 Environment="APP_UID=0"
 Environment="APP_GID=0"
-Environment="OPENSSL_CONF=/opt/registry-center/etc/conf/custom_openssl.cnf"
+Environment="OPENSSL_CONF=/OpenA2A-T/registry-center/etc/conf/custom_openssl.cnf"
 ExecStart=/usr/bin/python -m agent_registry.start
 ExecStop=/bin/kill -15 $MAINPID
 Restart=on-failure

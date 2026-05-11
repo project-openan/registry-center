@@ -27,10 +27,10 @@ class SignatureCertificateManager:
             self._check_certificate_exists()
             cert = self._load_certificate()
             self._validate_certificate_format(cert)
-            
+
             if self.external_validator:
                 self._call_external_validator(cert)
-            
+
             return True
         except CertificateValidationError:
             raise

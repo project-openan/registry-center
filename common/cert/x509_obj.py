@@ -23,6 +23,7 @@ class CertObj:
     version = None
     public_key = None
     org_cert = None
+    cn = None
 
 
     @classmethod
@@ -36,6 +37,7 @@ class CertObj:
         obj.version = cert_dict.get('version', '')
         obj.public_key = cert_dict.get('public_key', None)
         obj.org_cert = cert_dict.get('org_cert', None)
+        obj.cn = cert_dict.get('cn', None)
         return obj
 
 

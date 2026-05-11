@@ -13,13 +13,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from abc import ABC, abstractmethod
+from enum import Enum
 
 
-class EmbeddingTool(ABC):
-    def __init__(self, config: dict):
-        self.config = config
-
-    @abstractmethod
-    def get_embedding_vector(self,context:str):
-        pass
+class Action(str, Enum):
+    APPROVAL = "approval"
+    GET_AGENT = "get_agent"
+    LIST_AGENTS = "list_agents"
+    ADD_TAG = "add_tag"
+    REMOVE_TAG = "remove_tag"
+    UPDATE_TAG = "update_tag"
+    GET_TAG = "get_tag"
+    LIST_TAG = "list_tag"

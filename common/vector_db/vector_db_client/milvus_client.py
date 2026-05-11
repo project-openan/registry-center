@@ -44,7 +44,7 @@ class MilvusDBClient(VectorDBClient):
             collection_name = data.get("collection_name")
 
             if not collection_name:
-                raise ValueError("collection_name 不能为空")
+                raise ValueError("collection_name cannot be empty")
 
             if self.client.has_collection(collection_name):
                 logger.info(f"Collection {collection_name} already exists")
@@ -67,7 +67,7 @@ class MilvusDBClient(VectorDBClient):
                 if key == "id":
                     continue
                 schema.add_field(field_name=key, datatype=DataType.VARCHAR, max_length=VARCHAR_MAX_LENGTH,
-                                 description=f"{key}字段")
+                                 description=f"Field: {key}")
 
             self.client.create_collection(
                 collection_name=collection_name,
@@ -100,24 +100,24 @@ class MilvusDBClient(VectorDBClient):
             collection_name = data.get("collection_name")
             insert_entity = data.get("entity", {})
             if not collection_name:
-                raise ValueError("collection_name 不能为空")
+                raise ValueError("collection_name cannot be empty")
 
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
-                logger.info("当前数据库无此collection，已创建此collection")
+                logger.info("Collection does not exist in database, created it")
 
-            # 1. 校验 embedding 维度
+            # 1. Validate embedding dimension
             embedding = insert_entity.get("embedding", [])
             if not isinstance(embedding, list) or len(embedding) != EMBEDDING_VECTOR_DIVISION_LENGTH:
-                raise ValueError(F"向量维度必须为 {EMBEDDING_VECTOR_DIVISION_LENGTH}")
+                raise ValueError(f"Vector dimension must be {EMBEDDING_VECTOR_DIVISION_LENGTH}")
 
-            # 2. 执行插入操作
+            # 2. Execute insert
             result = self.client.insert(
                 collection_name=collection_name,
                 data=insert_entity
             )
 
-            # 3. 获取插入的主键
+            # 3. Get inserted primary key
             insert_id = result.get("ids", [None])[0] if isinstance(result.get("ids"), list) else result.get("ids")
 
             logger.info(f"Insert success! insert_id:{insert_id}")
@@ -129,39 +129,39 @@ class MilvusDBClient(VectorDBClient):
 
     def delete_entity(self, data):
         """
-        删除实体数据（带异常处理）
+        Delete entity data (with exception handling)
 
-        参数:
-            data: dict, 包含 collection_name 和 id
+        Args:
+            data: dict, containing collection_name and id
 
-        返回:
-            bool: 删除成功返回 True，失败返回 False
+        Returns:
+            bool: True on success, False on failure
         """
         try:
-            # 1. 参数校验
+            # 1. Parameter validation
             collection_name = data.get("collection_name")
             primary_key = data.get("id")
 
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
-                logger.info("当前数据库无此collection，已创建此collection。内容为空，无需删除操作")
+                logger.info("Collection does not exist in database, created it. Collection is empty, no delete needed.")
                 return False
 
             if primary_key is None:
-                logger.error("✗ 删除失败：id 不能为空")
+                logger.error("Delete failed: id cannot be empty")
                 return False
 
-            # 2. 执行删除
+            # 2. Execute delete
             self.client.delete(
                 collection_name=collection_name,
                 ids=[primary_key]
             )
 
-            logger.info(f"✓ 删除成功：collection={collection_name}, id={primary_key}")
+            logger.info(f"Delete successful: collection={collection_name}, id={primary_key}")
             return True
 
         except Exception as e:
-            print(f"✗ 删除失败：{e}")
+            logger.error(f"Delete failed: {e}")
             return False
 
     def update_entity(self, data):
@@ -181,8 +181,8 @@ class MilvusDBClient(VectorDBClient):
         query_embedding = data.get("embedding")
         top_n = data.get("top_n",10)
         if not self.client.has_collection(collection_name):
-            self.create_collection(data)
-            logger.info("当前数据库无此collection，已创建此collection")
+                self.create_collection(data)
+                logger.info("Collection does not exist in database, created it")
         try:
             self.client.load_collection(collection_name=collection_name)
             results = self.client.search(
@@ -198,16 +198,16 @@ class MilvusDBClient(VectorDBClient):
                 formatted_results.append(json.loads(result["entity"]["agent_card"]))
             return formatted_results
         except Exception as e:
-            logger.error(f"向量检索失败： {e}")
+            logger.error(f"Vector search failed: {e}")
             return []
 
     def query_by_key(self, data):
         try:
-            # 构建过滤表达式
+            # Build filter expression
             collection_name = data.get("collection_name")
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
-                logger.info("当前数据库无此collection，已创建此collection")
+                logger.info("Collection does not exist in database, created it")
             key = data.get("key")
             value = data.get("value")
             if isinstance(value, str):
@@ -215,7 +215,7 @@ class MilvusDBClient(VectorDBClient):
             else:
                 filter_expr = f'{key} == {value}'
 
-            # 执行查询
+            # Execute query
             self.client.load_collection(collection_name=collection_name)
             results = self.client.query(
                 collection_name=collection_name,
@@ -231,7 +231,7 @@ class MilvusDBClient(VectorDBClient):
                 output.append(json.loads(results[0]["agent_card"]))
                 return output
         except Exception as e:
-            logger.error(f"查询失败： {e}")
+            logger.error(f"Query failed: {e}")
             return []
 
     def get_all_entities(self, data):
@@ -239,14 +239,14 @@ class MilvusDBClient(VectorDBClient):
             collection_name = data.get("collection_name")
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
-                logger.info("当前数据库无此collection，已创建此collection")
+                logger.info("Collection does not exist in database, created it")
                 return []
             self.client.load_collection(collection_name=collection_name)
             results = self.client.query(
                 collection_name=collection_name,
                 filter="id != \" \"",
                 output_fields=output_fields,
-                limit=int(get_conf().get(AGENT_NUM_MAX, 40))  # 单次最大查询量
+                limit=int(get_conf().get(AGENT_NUM_MAX, 40))  # Max query count per request
             )
             output = []
             if len(results) > 0:
@@ -254,8 +254,8 @@ class MilvusDBClient(VectorDBClient):
                     output.append(json.loads(result["agent_card"]))
                 return output
             else:
-                logger.info("collection内无数据")
+                logger.info("Collection is empty")
                 return output
         except Exception as e:
-            logger.error(f"获取全部信息失败：{e}")
+            logger.error(f"Failed to get all entities: {e}")
             return []

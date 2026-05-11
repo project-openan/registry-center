@@ -3,7 +3,7 @@ import string
 
 
 class PasswordGenerator:
-    """口令生成器，负责生成符合复杂度要求的随机口令"""
+    """Password generator for producing random passwords meeting complexity requirements."""
 
     DIGITS = string.digits
     UPPER = string.ascii_uppercase
@@ -15,9 +15,9 @@ class PasswordGenerator:
 
     def generate_password(self, length: int = 16) -> str:
         """
-        生成符合复杂度要求的随机口令
-        :param length: 口令长度，默认16
-        :return: 随机口令
+        Generate a random password meeting complexity requirements.
+        :param length: Password length, default 16.
+        :return: Random password.
         """
         if length < 8:
             raise ValueError("Password length must be at least 8")
@@ -37,8 +37,8 @@ class PasswordGenerator:
 
     def _generate_random_char(self, chars: str) -> str:
         """
-        从指定字符集中生成一个随机字符
-        :param chars: 字符集
-        :return: 随机字符
+        Generate a random character from the given character set.
+        :param chars: Character set.
+        :return: Random character.
         """
         return random.choice(chars)

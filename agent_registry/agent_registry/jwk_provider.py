@@ -23,15 +23,15 @@ class JWKProvider:
         try:
             with open(self.cert_path, 'rb') as f:
                 cert_data = f.read()
-            
+
             cert = x509.load_pem_x509_certificate(cert_data, default_backend())
             public_key = cert.public_key()
-            
+
             public_key_pem = public_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
             )
-            
+
             return public_key_pem
         except Exception as e:
             raise CertLoadError(f"Failed to load public key: {e}")
@@ -40,13 +40,13 @@ class JWKProvider:
         try:
             with open(self.cert_path, 'rb') as f:
                 cert_data = f.read()
-            
+
             cert = x509.load_pem_x509_certificate(cert_data, default_backend())
             public_key = cert.public_key()
-            
+
             jwk_dict = self._public_key_to_jwk_dict(public_key)
             jwk = PyJWK(jwk_dict)
-            
+
             return [jwk]
         except Exception as e:
             raise CertLoadError(f"Failed to load certificate: {e}")
@@ -56,7 +56,7 @@ class JWKProvider:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
-        
+
         if public_key.__class__.__name__ == 'RSAPublicKey':
             return self._rsa_to_jwk_dict(public_key)
         elif public_key.__class__.__name__ == 'EllipticCurvePublicKey':
@@ -66,12 +66,12 @@ class JWKProvider:
 
     def _rsa_to_jwk_dict(self, public_key) -> Dict[str, Any]:
         from cryptography.hazmat.primitives.asymmetric import rsa
-        
+
         if not isinstance(public_key, rsa.RSAPublicKey):
             raise CertLoadError("Expected RSA public key")
-        
+
         numbers = public_key.public_numbers()
-        
+
         return {
             "kty": "RSA",
             "n": self._base64url_encode(numbers.n.to_bytes((numbers.n.bit_length() + 7) // 8, 'big')),
@@ -82,24 +82,24 @@ class JWKProvider:
 
     def _ec_to_jwk_dict(self, public_key) -> Dict[str, Any]:
         from cryptography.hazmat.primitives.asymmetric import ec
-        
+
         if not isinstance(public_key, ec.EllipticCurvePublicKey):
             raise CertLoadError("Expected EC public key")
-        
+
         numbers = public_key.public_numbers()
         curve_name = public_key.curve.name
-        
+
         curve_map = {
             'secp256r1': 'P-256',
             'secp384r1': 'P-384',
             'secp521r1': 'P-521'
         }
-        
+
         if curve_name not in curve_map:
             raise CertLoadError(f"Unsupported curve: {curve_name}")
-        
+
         coord_bytes = (numbers.x.bit_length() + 7) // 8
-        
+
         return {
             "kty": "EC",
             "crv": curve_map[curve_name],

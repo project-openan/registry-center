@@ -13,42 +13,22 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from common.plugin_framework.registry import PluginRegistry
 from common.vector_db.vector_db_client.config.vector_db_client import VectorDBClient
 from common.vector_db.vector_db_client.config.vector_db_config import VectorDBType, VectorDBConfig
 
+VECTORDB_REGISTRY = PluginRegistry()
+vectordb_tool_instance: dict[VectorDBType, VectorDBClient] = {}
 
-def vectordb_tool_register(keys):
-    def decorator(cls):
-        if isinstance(keys,list):
-            for key in keys:
-                VECTORDB_REGISTRY.register(key,cls)
-        else:
-            VECTORDB_REGISTRY.register(keys,cls)
-        return cls
+vectordb_tool_register = VECTORDB_REGISTRY.make_decorator()
 
-    return decorator
 
-class VectorDBToolRegistry:
-    def __init__(self):
-        self.providers = {}
+def create_vectordb_tool_instance(config: VectorDBConfig):
+    return VECTORDB_REGISTRY.create_instance(config.vectordb_type, config.__dict__)
 
-    def register(self,key,provider_cls):
-        self.providers[key] = provider_cls
 
-    def get_provider(self,vector_type:VectorDBType):
-        return self.providers[vector_type]
-
-VECTORDB_REGISTRY = VectorDBToolRegistry()
-
-vectordb_tool_instance = {str:VectorDBClient}
-
-def create_vectordb_tool_instance(config:VectorDBConfig):
-    return VECTORDB_REGISTRY.get_provider(config.vectordb_type)(config.__dict__)
-
-def get_or_create_vectordb_tool_instance(config:VectorDBConfig) -> VectorDBClient:
-    if config.vectordb_type in vectordb_tool_instance:
-        return vectordb_tool_instance[config.vectordb_type]
-    else:
-        vectordb_tool = create_vectordb_tool_instance(config)
-        vectordb_tool_instance[config.vectordb_type] = vectordb_tool
-        return vectordb_tool
+def get_or_create_vectordb_tool_instance(config: VectorDBConfig) -> VectorDBClient:
+    import common.vector_db.vector_db_client.milvus_client  # noqa: F401 trigger decorator registration
+    return VECTORDB_REGISTRY.get_or_create_instance(
+        config.vectordb_type, config.__dict__, vectordb_tool_instance
+    )

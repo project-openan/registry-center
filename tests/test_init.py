@@ -259,7 +259,7 @@ class TestInitCommand(unittest.TestCase):
         init_cmd.validate_file_permissions = MagicMock(return_value=(True, ""))
 
         with patch('builtins.input', return_value=''):
-            result = init_cmd.input_path("请输入路径", "/default/path.cer", ".cer")
+            result = init_cmd.input_path("Enter path", "/default/path.cer", ".cer")
             self.assertEqual(result, "/default/path.cer")
 
     def test_input_path_with_default_new_input(self):
@@ -268,7 +268,7 @@ class TestInitCommand(unittest.TestCase):
         init_cmd.validate_file_permissions = MagicMock(return_value=(True, ""))
 
         with patch('builtins.input', return_value='/new/path.cer'):
-            result = init_cmd.input_path("请输入路径", "/default/path.cer", ".cer")
+            result = init_cmd.input_path("Enter path", "/default/path.cer", ".cer")
             self.assertEqual(result, "/new/path.cer")
 
     def test_input_path_track_change_unchanged(self):
@@ -277,7 +277,7 @@ class TestInitCommand(unittest.TestCase):
         init_cmd.validate_file_permissions = MagicMock(return_value=(True, ""))
 
         with patch('builtins.input', return_value=''):
-            path, changed = init_cmd.input_path("请输入路径", "/default/path.pem", ".pem", track_change=True)
+            path, changed = init_cmd.input_path("Enter path", "/default/path.pem", ".pem", track_change=True)
             self.assertEqual(path, "/default/path.pem")
             self.assertFalse(changed)
 
@@ -287,7 +287,7 @@ class TestInitCommand(unittest.TestCase):
         init_cmd.validate_file_permissions = MagicMock(return_value=(True, ""))
 
         with patch('builtins.input', return_value='/new/path.pem'):
-            path, changed = init_cmd.input_path("请输入路径", "/default/path.pem", ".pem", track_change=True)
+            path, changed = init_cmd.input_path("Enter path", "/default/path.pem", ".pem", track_change=True)
             self.assertEqual(path, "/new/path.pem")
             self.assertTrue(changed)
 

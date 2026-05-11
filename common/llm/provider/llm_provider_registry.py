@@ -13,42 +13,23 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from common.plugin_framework.registry import PluginRegistry
 from common.llm.config.llm_config import LLMType, LLMConfig
 from common.llm.provider.base_llm import BaseLLM
 
-
-class LLMProviderRegistry:
-    def __init__(self):
-        self.providers = {}
-
-    def register(self, key, provider_cls):
-        self.providers[key] = provider_cls
-
-    def get_provider(self, llm_type: LLMType):
-        return self.providers[llm_type]
-
-
-def registry_provider(keys):
-    def decorator(cls):
-        if isinstance(keys, list):
-            for key in keys:
-                LLM_REGISTRY.register(key, cls)
-        else:
-            LLM_REGISTRY.register(keys, cls)
-        return cls
-
-    return decorator
-
-
-LLM_REGISTRY = LLMProviderRegistry()
-
+LLM_REGISTRY = PluginRegistry()
 llm_instance = {}
+
+registry_provider = LLM_REGISTRY.make_decorator()
 
 
 def get_or_create_llm_instance(config: LLMConfig) -> BaseLLM:
+    import common.llm.provider.aoc_chat_llm  # noqa: F401 trigger decorator registration
+    import common.llm.provider.aoc_embedding_llm  # noqa: F401
+    import common.llm.provider.aoc_reranker_llm  # noqa: F401
+    import common.llm.provider.llm_openai  # noqa: F401
     if config.llm_type in llm_instance:
         return llm_instance[config.llm_type]
-    else:
-        llm = LLM_REGISTRY.get_provider(config.llm_type)(config)
-        llm_instance[config.llm_type] = llm
-        return llm
+    llm = LLM_REGISTRY.create_instance(config.llm_type, config)
+    llm_instance[config.llm_type] = llm
+    return llm

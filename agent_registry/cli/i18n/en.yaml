@@ -1,0 +1,68 @@
+# CLI English Language Configuration
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+
+cli:
+  intro: "agent-registry v{version}\nType 'cmds' for available commands, 'exit' to quit.\n"
+  prompt: "agent-registry> "
+  goodbye: "Goodbye!"
+  no_command: "No command specified. Type 'cmds' for available commands."
+  unknown_command: "Unknown command. Type 'cmds' for available commands."
+  
+commands:
+  header: "Available commands:"
+  internal:
+    cmds: "Show command list"
+    exit: "Exit CLI"
+  footer: "Use TAB to autocomplete commands and arguments"
+  
+errors:
+  syntax: "Syntax error: {error}"
+  not_found: "Command not found: {command}"
+  validation: "Validation error: {error}"
+  service: "Service error: {error}"
+  config: "Configuration error: {error}"
+  permission: "Permission denied: {error}"
+  argument_missing: "Missing required argument: {argument}"
+  subcommand_not_found: "Subcommand not found: {subcommand}"
+  command_conflict: "Command conflict: {command} already registered"
+  connection_failed: "Failed to connect to service at {url}"
+  timeout: "Request timeout after {seconds} seconds"
+  
+messages:
+  success: "[OK] {message}"
+  error: "[ERROR] {message}"
+  warning: "[WARN] {message}"
+  info: "[INFO] {message}"
+  loading: "Loading..."
+  saving: "Saving..."
+  deleted: "Deleted: {item}"
+  created: "Created: {item}"
+  updated: "Updated: {item}"
+  
+agent:
+  list_header: "Registered Agents"
+  list_empty: "No agents registered"
+  not_found: "Agent not found: {name}"
+  already_exists: "Agent already exists: {name}"
+  register_success: "Agent registered successfully: {name}"
+  unregister_success: "Agent unregistered successfully: {name}"
+  
+status:
+  service_running: "Service is running"
+  service_stopped: "Service is not running"
+  service_url: "Service URL: {url}"
+  uptime: "Uptime: {uptime}"
+  version: "Version: {version}"
+  
+help:
+  usage: "Usage: {usage}"
+  options: "Options:"
+  arguments: "Arguments:"
+  examples: "Examples:"
+  see_also: "See also:"
+  
+debug:
+  command_start: "Executing: {command}"
+  command_end: "Completed in {duration}s with exit code {code}"
+  request: "HTTP {method} {url}"
+  response: "Response: {status} ({size} bytes)"

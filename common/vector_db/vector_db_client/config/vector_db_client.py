@@ -13,36 +13,36 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
-class VectorDBClient(ABC):
-    def __init__(self, config: dict):
-        self.config = config
+from common.plugin_framework.base_plugin import BasePlugin
 
+
+class VectorDBClient(BasePlugin):
     @abstractmethod
-    def create_collection(self,data):
+    def create_collection(self, data):
         pass
 
     @abstractmethod
-    def insert_entity(self,data):
+    def insert_entity(self, data):
         pass
 
     @abstractmethod
-    def delete_entity(self,data):
+    def delete_entity(self, data):
         pass
 
     @abstractmethod
-    def update_entity(self,data):
+    def update_entity(self, data):
         pass
 
     @abstractmethod
-    def retrieve_entity(self,data):
+    def retrieve_entity(self, data):
         pass
 
     @abstractmethod
-    def query_by_key(self,data):
+    def query_by_key(self, data):
         pass
 
     @abstractmethod
-    def get_all_entities(self,data):
+    def get_all_entities(self, data):
         pass

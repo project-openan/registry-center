@@ -18,12 +18,12 @@ from typing import Any, Optional, Dict
 
 
 class AuthFailureReason(Enum):
-    """认证失败原因枚举"""
+    """Authentication failure reason enum"""
     INVALID_CREDENTIALS = "Invalid credentials"
 
 
 class AuthenticationError(Exception):
-    """认证失败异常"""
+    """Authentication failure exception"""
 
     def __init__(self, reason: AuthFailureReason, detail: str = None):
         self.reason = reason
@@ -32,7 +32,7 @@ class AuthenticationError(Exception):
 
 
 class Principal:
-    """认证成功后的用户身份信息主体"""
+    """Principal identity after successful authentication"""
 
     def __init__(self, client_ip: str):
         self.client_ip = client_ip
@@ -42,4 +42,4 @@ def authenticate(client_ip: str, request: Any, context: Optional[Dict[str, Any]]
     try:
         return Principal(client_ip=client_ip)
     except Exception as e:
-        raise AuthenticationError(AuthFailureReason.INVALID_CREDENTIALS, "认证失败") from e
+        raise AuthenticationError(AuthFailureReason.INVALID_CREDENTIALS, "Authentication failed") from e

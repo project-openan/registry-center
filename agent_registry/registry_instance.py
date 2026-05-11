@@ -14,19 +14,30 @@
 #    under the License.
 
 # ---------- Dependency: Registry Core (Singleton) ----------
-from functools import lru_cache
-
-from agent_registry.config import PERSISTENCE_FILE
-from agent_registry.core import RegistryCore
+_registry_instance = None
 
 
-@lru_cache(maxsize=1)
-def get_registry() -> RegistryCore:
+def get_registry():
     """
     Return a singleton instance of RegistryCore.
-    The @lru_cache ensures the same instance is reused across requests,
-    avoiding repeated loading of the persistence file.
     """
-    return RegistryCore(persistence_file=PERSISTENCE_FILE)
+    from agent_registry.core import RegistryCore
+    from agent_registry.config import PERSISTENCE_FILE, PERSISTENCE_CONF, PERSISTENCE_MODE
+    global _registry_instance
+    if _registry_instance is None:
+        _registry_instance = RegistryCore(
+            persistence_file=PERSISTENCE_FILE,
+            persistence_mode=PERSISTENCE_MODE,
+            persistence_conf=PERSISTENCE_CONF
+        )
+    return _registry_instance
 
-get_registry()
+
+def initialize_registry():
+    """
+    Initialize the registry with storage backend.
+    Called during app startup.
+    """
+    registry = get_registry()
+    registry.initialize()
+    return registry
