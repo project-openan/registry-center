@@ -23,7 +23,6 @@ from loguru import logger
 from agent_registry.config import MAX_FILE_SIZE_BYTES
 from .base import StorageBackend
 from .file_storage import FileStorage
-from .postgresql_storage import PostgreSQLStorage
 
 
 def save_to_file(file_path: str, agents: List[Dict[str, Any]]) -> None:
@@ -80,11 +79,13 @@ class StorageRegistry:
 
     @classmethod
     def get_backend(cls, mode: str, config: dict) -> StorageBackend:
-        if mode not in cls._backends:
+        if mode == "file":
+            return FileStorage.init(config)
+        elif mode == "postgresql":
+            from .postgresql_storage import PostgreSQLStorage
+            return PostgreSQLStorage.init(config)
+        else:
             raise ValueError(f"Unknown storage mode: {mode}")
-        backend = cls._backends[mode]
-        return backend.init(config)
 
 
 StorageRegistry.register("file", FileStorage)
-StorageRegistry.register("postgresql", PostgreSQLStorage)
