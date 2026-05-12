@@ -1,14 +1,15 @@
 import json
 import base64
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from loguru import logger
 
 from common.util.config_util import get_conf
+from a2a.types import AgentCard
 from a2a.utils.signing import create_signature_verifier, InvalidSignaturesError, NoSignatureError
+from google.protobuf.json_format import MessageToDict
 
 from agent_registry.signature.models import SignatureObject, ProtectedHeader
 from agent_registry.signature.jwk_fetcher import JWKFetcher
-from agent_registry.model.validated_agentcard import ValidatedAgentCard
 
 
 class ValidationResult:
@@ -27,7 +28,7 @@ class ValidationResult:
 
 
 class AgentCardSignatureValidator:
-    """AgentCard signature validator"""
+    """AgentCard signature validator (supports protobuf AgentCard)"""
 
     def __init__(self, jwk_fetcher: JWKFetcher):
         self.jwk_fetcher = jwk_fetcher
@@ -46,23 +47,22 @@ class AgentCardSignatureValidator:
             return enabled.lower() == 'true'
         except Exception as e:
             logger.error(f"Failed to load signature validation config: {e}")
-            return True  # Validation enabled by default
+            return True
 
     def validate_agent_card(
         self,
-        agent_card: ValidatedAgentCard
+        agent_card: AgentCard
     ) -> ValidationResult:
         """
         Validate AgentCard signature.
 
         Args:
-            agent_card: ValidatedAgentCard object.
+            agent_card: protobuf AgentCard object.
 
         Returns:
             ValidationResult: Validation result.
         """
         try:
-            # Check if signature validation is enabled
             if not self._signature_validation_enabled:
                 logger.info("Signature validation is disabled, skipping validation")
                 return ValidationResult(is_valid=True)
@@ -71,8 +71,7 @@ class AgentCardSignatureValidator:
             agent_name = agent_card.name
             provider_url = agent_card.provider.url
 
-            agent_card_data = agent_card.model_dump()
-            signatures = self._extract_signatures(agent_card_data)
+            signatures = self._extract_signatures_from_protobuf(agent_card)
             if not signatures:
                 return ValidationResult(
                     is_valid=False,
@@ -84,7 +83,6 @@ class AgentCardSignatureValidator:
                     }
                 )
 
-            # Step 1: Iterate over the signatures array
             for sig_obj in signatures:
                 protected_header = self._decode_protected(sig_obj.protected)
                 if not protected_header:
@@ -94,9 +92,8 @@ class AgentCardSignatureValidator:
                 kid = protected_header.kid
 
                 backend_key_fetcher = self.jwk_fetcher.create_backend_key_fetcher(organization, agent_name, provider_url)
-                backend_key = backend_key_fetcher(kid, "")  # jku not needed for backend keys, use empty string
+                backend_key = backend_key_fetcher(kid, "")
 
-                # Step 2: Try to get public key from backend and verify
                 if backend_key:
                     logger.info(f"Using backend key for kid: {kid}")
                     verifier = create_signature_verifier(backend_key_fetcher, ['ES256', 'RS256'])
@@ -107,20 +104,18 @@ class AgentCardSignatureValidator:
                     except (NoSignatureError, InvalidSignaturesError) as e:
                         logger.warning(f"Backend key validation failed: {e}")
 
-            # Step 3: Try to get public key from jku and verify
-            logger.info(f"Trying jku key signature.")
+            logger.info("Trying jku key signature.")
             jku_key_fetcher = lambda key_id, jku: self.jwk_fetcher.fetch_jku_key(key_id, jku)
             verifier = create_signature_verifier(jku_key_fetcher, ['ES256', 'RS256'])
             try:
                 verifier(agent_card)
-                logger.info(f"Signature validation passed with jku key.")
+                logger.info("Signature validation passed with jku key.")
                 return ValidationResult(is_valid=True)
             except NoSignatureError:
                 logger.error("No jku key found.")
             except InvalidSignaturesError:
                 logger.error("Jku key signature validations failed")
 
-            # Both verification methods failed; report failure
             logger.error("All signature validations failed")
             return ValidationResult(
                 is_valid=False,
@@ -140,8 +135,39 @@ class AgentCardSignatureValidator:
                 details={"error": str(e)}
             )
 
+    def _extract_signatures_from_protobuf(self, agent_card: AgentCard) -> List[SignatureObject]:
+        """Extract signatures from protobuf AgentCard"""
+        try:
+            signatures = agent_card.signatures
+            if not signatures:
+                return []
+
+            signature_objects = []
+            for sig in signatures:
+                protected = sig.protected
+                signature = sig.signature
+                
+                if not protected or not signature:
+                    logger.warning("Missing required fields in signature")
+                    continue
+
+                sig_dict = {
+                    "protected": protected,
+                    "signature": signature
+                }
+                if sig.header:
+                    sig_dict["header"] = MessageToDict(sig.header)
+                
+                signature_objects.append(SignatureObject(**sig_dict))
+
+            return signature_objects
+
+        except Exception as e:
+            logger.error(f"Failed to extract signatures: {e}")
+            return []
+
     def _extract_signatures(self, agent_card_data: dict) -> List[SignatureObject]:
-        """Extract signatures field"""
+        """Extract signatures field from dict"""
         try:
             signatures = agent_card_data.get("signatures")
             if not signatures:

@@ -48,6 +48,9 @@ from agent_registry.core import RegistryCore
 from agent_registry.model.validated_agentcard import validate_agent_card
 from agent_registry.registry_instance import get_registry, initialize_registry
 from agent_registry.middleware import ConnectionLimitMiddleware, TimeoutMiddleware
+from agent_registry.signature.agent_card_signature_validator import AgentCardSignatureValidator
+from agent_registry.signature.jwk_fetcher import JWKFetcher
+from agent_registry.signature.public_key_manager import PublicKeyManager
 
 from common.custom.custom_handle import HandlerRegistry
 from common.custom.interface_type import InterfaceType
@@ -62,6 +65,18 @@ sync_storage = storage.MemoryStorage()
 limiter = strategies.MovingWindowRateLimiter(sync_storage)
 
 audit_handle = HandlerRegistry.get_handler(InterfaceType.AUDIT)
+
+_signature_validator: Optional[AgentCardSignatureValidator] = None
+
+
+def get_signature_validator() -> AgentCardSignatureValidator:
+    """Get or create signature validator instance"""
+    global _signature_validator
+    if _signature_validator is None:
+        public_key_manager = PublicKeyManager()
+        jwk_fetcher = JWKFetcher(public_key_manager)
+        _signature_validator = AgentCardSignatureValidator(jwk_fetcher)
+    return _signature_validator
 
 
 def parse_rate_limit(interface_name: str):
@@ -435,6 +450,7 @@ async def register_agent(
         request: Request,
         _: Any = Depends(RateLimiter('register')),
         registry: RegistryCore = Depends(get_registry),
+        signature_validator: AgentCardSignatureValidator = Depends(get_signature_validator),
 ):
     """
     Register a new agent.
@@ -448,6 +464,8 @@ async def register_agent(
     owner = None
     if OWNER_ISOLATION_ENABLED:
         owner = _get_owner_from_request(request)
+
+    logger.info(client_ip)
 
     authenticate_handle = HandlerRegistry.get_handler(InterfaceType.AUTHENTICATE)
     await authenticate_handle.handle(client_ip, request)
@@ -467,15 +485,30 @@ async def register_agent(
             await _check_agent_limit(registry, client_ip, details)
             await _check_duplicate_agent(agent, registry, client_ip, details)
             validate_agent_card(agent)
+            
+            signature_result = signature_validator.validate_agent_card(agent)
+            if not signature_result.is_valid:
+                details["message"] = signature_result.error_message
+                await audit_handle.handle({
+                    "operation_name": OperationName.REGISTER_AGENT,
+                    "level": LogLevel.MINOR,
+                    "result": OperationResult.FAILURE,
+                    "object_name": OperatorObject.AGENT,
+                    "details": details,
+                    "client_ip": client_ip
+                })
+                raise CustomHTTPException(
+                    status.HTTP_401_UNAUTHORIZED,
+                    signature_result.error_message or "Signature verification failed"
+                )
+            
             logger.info(f"Register agent success: name={agent.name}, org={agent.provider.organization}")
 
             approval_enabled = config.get('agent_approval_enabled', 'false')
             if approval_enabled == 'true':
                 initial_status = 'registered'
-                status_message = "Agent registered, waiting for approval"
             else:
                 initial_status = 'published'
-                status_message = "Agent registered and published"
 
             result = await _perform_registration(agent, client_ip, details, initial_status=initial_status, owner=owner)
             await audit_handle.handle({
@@ -548,7 +581,9 @@ async def update_agent(
         request: Request,
         name: str = Path(..., description="Agent name"),
         organization: str = Path(..., description="Agent organization"),
-        registry: RegistryCore = Depends(get_registry), _: Any = Depends(RateLimiter('update'))
+        registry: RegistryCore = Depends(get_registry),
+        _: Any = Depends(RateLimiter('update')),
+        signature_validator: AgentCardSignatureValidator = Depends(get_signature_validator),
 ):
     """
     Fully replace an existing agent. The name and organization in the body must match the path/query.
@@ -578,6 +613,23 @@ async def update_agent(
                 "url": agent_data.provider.url,
             }
             validate_agent_card(agent_data)
+            
+            signature_result = signature_validator.validate_agent_card(agent_data)
+            if not signature_result.is_valid:
+                details["message"] = signature_result.error_message
+                await audit_handle.handle({
+                    "operation_name": OperationName.UPDATE_AGENT,
+                    "level": LogLevel.MINOR,
+                    "result": OperationResult.FAILURE,
+                    "object_name": OperatorObject.AGENT,
+                    "details": details,
+                    "client_ip": client_ip
+                })
+                raise CustomHTTPException(
+                    status.HTTP_401_UNAUTHORIZED,
+                    signature_result.error_message or "Signature verification failed"
+                )
+            
             await _check_agent_limit(registry, client_ip, details)
 
             data = MessageToDict(agent_data, preserving_proto_field_name=True)
@@ -743,8 +795,19 @@ def close_registry():
     registry.close()
 
 
-app.add_event_handler("startup", initialize_registry)
-app.add_event_handler("shutdown", close_registry)
+try:
+    app.add_event_handler("startup", initialize_registry)
+    app.add_event_handler("shutdown", close_registry)
+except AttributeError:
+    from contextlib import asynccontextmanager
+    
+    @asynccontextmanager
+    async def lifespan(app_instance):
+        await initialize_registry()
+        yield
+        close_registry()
+    
+    app.router.lifespan_context = lifespan
 
 
 def _make_agent_key(name: str, organization: str) -> Tuple[str, str]:

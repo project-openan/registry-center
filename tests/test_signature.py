@@ -8,13 +8,23 @@ This script demonstrates how to:
 3. Construct AgentCard data
 4. Sign AgentCard
 5. Test signature verification
+
+Adapted for a2a-sdk 1.0.0+ (protobuf-based AgentCard)
 """
 
 import json
 import base64
+import os
+from datetime import datetime, timezone
 from a2a.types import AgentCard
-from a2a.utils.helpers import canonicalize_agent_card
-from a2a.utils.signing import create_agent_card_signer, create_signature_verifier
+from google.protobuf.json_format import ParseDict, MessageToDict
+from a2a.utils.signing import (
+    create_agent_card_signer,
+    create_signature_verifier,
+    ProtectedHeader,
+    InvalidSignaturesError,
+    NoSignatureError
+)
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -67,7 +77,6 @@ def public_key_to_jwk(public_key, kid="test-key-1"):
     """
     public_numbers = public_key.public_numbers()
     
-    # Convert coordinates to base64url encoding
     x_bytes = public_numbers.x.to_bytes(32, byteorder='big')
     y_bytes = public_numbers.y.to_bytes(32, byteorder='big')
     
@@ -86,44 +95,85 @@ def public_key_to_jwk(public_key, kid="test-key-1"):
     return jwk
 
 
-def create_agent_card():
+def create_agent_card_dict():
     """
-    Create AgentCard data (excluding signatures field)
+    Create AgentCard data dict (excluding signatures field)
+    
+    Note: JSON field names must use camelCase for protobuf ParseDict
     
     Returns:
         dict: AgentCard data
     """
-    agent_card = {
-        "name": "TestAgent",
-        "provider": {
-            "organization": "TestOrg",
-            "url": "https://test.org"
+    agent_card_dict = {
+      "name": "TestAgent",
+      "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
+      "version": "1.0.0",
+      "provider": {
+        "organization": "TestOrg",
+        "url": "https://www.huawei.com"
+      },
+      "skills": [
+        {
+          "id": "ran-es-intent-exploration",
+          "name": "RAN ES Intent Exploration",
+          "description": "评估并确定指定RAN ES意图目标的最佳可能性，考虑当前资源状况和系统能力。",
+          "tags": [
+            "wireless",
+            "energy-saving",
+            "intent"
+          ]
         },
-        "description": "Test Description",
-        "capabilities": {
-            "skills": ["text-generation", "code-generation"],
-            "input_modes": ["text/plain", "application/json"],
-            "output_modes": ["text/plain", "application/json"]
+        {
+          "id": "ran-es-intent-lifecycle-management",
+          "name": "RAN ES Intent Lifecycle Management",
+          "description": "管理RAN节能意图的生命周期，包括创建、修改、删除、激活、去激活意图，并执行数据采集、分析、解决方案制定与配置。",
+          "tags": [
+            "wireless",
+            "energy-saving",
+            "intent"
+          ]
         },
-        "default_input_modes": ["text/plain"],
-        "default_output_modes": ["text/plain"],
-        "url": "https://agent.test",
-        "version": "1.0.0",
-        "skills": [
-            {
-                "id": "skill-1",
-                "name": "TestSkill",
-                "description": "Test Skill Description",
-                "tags": ["test", "skill"],
-                "input_modes": ["text/plain"],
-                "output_modes": ["text/plain"]
-            }
-        ]
+        {
+          "id": "ran-es-intent-reporting",
+          "name": "RAN ES Intent Reporting",
+          "description": "提供意图报告查询、订阅、通知功能，报告意图实现状态、达成值、推荐值及配置修改信息。",
+          "tags": [
+            "wireless",
+            "energy-saving",
+            "reporting"
+          ]
+        }
+      ],
+      "capabilities": {
+        "streaming": True,
+        "pushNotifications": False,
+        "extensions": []
+      },
+      "defaultInputModes": [
+        "text",
+        "json"
+      ],
+      "defaultOutputModes": [
+        "text",
+        "json"
+      ],
+      "supportedInterfaces": [
+        {
+          "protocolBinding": "GPRC",
+          "protocolVersion": "1.0.0",
+          "url": "http://127.0.0.1:5000/"
+        },
+        {
+          "protocolBinding": "HTTP+JSON",
+          "protocolVersion": "1.0.0",
+          "url": "http://127.0.0.1:5000/"
+        }
+      ]
     }
-    return agent_card
+    return agent_card_dict
 
 
-def create_protected_header(kid, jku_url):
+def create_protected_header(kid, jku_url) -> ProtectedHeader:
     """
     Create protected header
     
@@ -132,9 +182,9 @@ def create_protected_header(kid, jku_url):
         jku_url: JWK Set URL
     
     Returns:
-        dict: protected header
+        ProtectedHeader: protected header
     """
-    protected = {
+    protected: ProtectedHeader = {
         "alg": "ES256",
         "typ": "JOSE",
         "kid": kid,
@@ -158,35 +208,46 @@ def base64url_encode(data):
     return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
 
 
-def sign_agent_card(private_key, agent_card, protected_header):
+def base64url_decode(data):
+    """
+    Base64URL decoding
+    
+    Args:
+        data: String
+    
+    Returns:
+        bytes: decoded bytes
+    """
+    padding = 4 - len(data) % 4
+    if padding != 4:
+        data += '=' * padding
+    return base64.urlsafe_b64decode(data)
+
+
+def sign_agent_card(private_key_pem: str, agent_card: AgentCard, protected_header: ProtectedHeader) -> dict:
     """
     Sign AgentCard
 
     Args:
-        private_key: Private key object
-        agent_card: AgentCard data
+        private_key_pem: PEM format private key string
+        agent_card: AgentCard protobuf object
         protected_header: protected header
 
     Returns:
-        dict: signature object
+        dict: signature object (for compatibility with existing code)
     """
-    # 1. Create signer
-    signer = create_agent_card_signer(private_key, protected_header=protected_header)
+    signer = create_agent_card_signer(private_key_pem, protected_header=protected_header)
 
-    # 2. Use verifier to generate signed request
-    agent_card_obj = AgentCard(**agent_card)
-    signed_card = signer(agent_card_obj)
+    signed_card = signer(agent_card)
 
-    canonical_payload = canonicalize_agent_card(agent_card_obj)
-    protected_b64url = signed_card.model_dump().get("signatures")[0].get('protected')
-    payload_b64url = base64url_encode(canonical_payload.encode('utf-8'))
-    sign_input = f"{protected_b64url}.{payload_b64url}"
+    signature = signed_card.signatures[0]
+    
+    protected_json = base64url_decode(signature.protected).decode('utf-8')
     print('=' * 100)
-    print('sign_input:')
-    print(sign_input)
+    print('Protected header decoded:')
+    print(protected_json)
     print('=' * 100)
 
-    # 3. Try direct signature verification
     organization = "TestOrg"
     agent_name = "TestAgent"
     kid = "test-key-1"
@@ -196,10 +257,16 @@ def sign_agent_card(private_key, agent_card, protected_header):
     backend_key = backend_key_fetcher(kid, "")
     if backend_key:
         verifier = create_signature_verifier(backend_key_fetcher, ['ES256', 'RS256'])
-        verifier(signed_card)
+        try:
+            verifier(signed_card)
+            print('[OK] Signature verification passed with backend key')
+        except (NoSignatureError, InvalidSignaturesError) as e:
+            print(f'[WARN] Backend key verification failed: {e}')
 
-
-    return signed_card.model_dump().get("signatures")[0]
+    return {
+        "protected": signature.protected,
+        "signature": signature.signature
+    }
 
 
 def create_backend_key_file(organization, agent_name, jwk):
@@ -219,10 +286,9 @@ def create_backend_key_file(organization, agent_name, jwk):
         "organization": organization,
         "agent_name": agent_name,
         "keys": [jwk],
-        "updated_at": datetime.utcnow().isoformat() + "Z"
+        "updated_at": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     }
     
-    import os
     os.makedirs(org_dir, exist_ok=True)
     
     with open(file_path, 'w', encoding='utf-8') as f:
@@ -238,7 +304,7 @@ def create_complete_agent_card_with_signature():
     Create complete AgentCard with signature
     
     Returns:
-        tuple: (agent_card_with_signature, private_key_pem, public_key_jwk)
+        tuple: (agent_card_with_signature_dict, private_key_pem, public_key_jwk)
     """
     print("=" * 60)
     print("Step 1: Generate ECDSA key pair")
@@ -264,12 +330,20 @@ def create_complete_agent_card_with_signature():
     print("\n" + "=" * 60)
     print("Step 3: Create AgentCard data")
     print("=" * 60)
-    agent_card = create_agent_card()
+    agent_card_dict = create_agent_card_dict()
     print(f"[OK] AgentCard data created")
-    print(json.dumps(agent_card, indent=2))
+    print(json.dumps(agent_card_dict, indent=2))
     
     print("\n" + "=" * 60)
-    print("Step 4: Create protected header")
+    print("Step 4: Create protobuf AgentCard from dict")
+    print("=" * 60)
+    agent_card = ParseDict(agent_card_dict, AgentCard())
+    print(f"[OK] AgentCard protobuf created")
+    print(f"   name: {agent_card.name}")
+    print(f"   provider.organization: {agent_card.provider.organization}")
+    
+    print("\n" + "=" * 60)
+    print("Step 5: Create protected header")
     print("=" * 60)
     kid = "test-key-1"
     jku_url = "https://test.org/jwks.json"
@@ -278,21 +352,21 @@ def create_complete_agent_card_with_signature():
     print(json.dumps(protected_header, indent=2))
     
     print("\n" + "=" * 60)
-    print("Step 5: Sign AgentCard")
+    print("Step 6: Sign AgentCard")
     print("=" * 60)
-    signature_obj = sign_agent_card(private_key, agent_card, protected_header)
+    signature_dict = sign_agent_card(private_key_pem, agent_card, protected_header)
     print(f"[OK] Signature successful")
-    print(json.dumps(signature_obj, indent=2))
+    print(json.dumps(signature_dict, indent=2))
     
     print("\n" + "=" * 60)
-    print("Step 6: Construct complete AgentCard (with signatures)")
+    print("Step 7: Construct complete AgentCard (with signatures)")
     print("=" * 60)
-    agent_card_with_signature = agent_card.copy()
-    agent_card_with_signature["signatures"] = [signature_obj]
+    agent_card_with_signature_dict = agent_card_dict.copy()
+    agent_card_with_signature_dict["signatures"] = [signature_dict]
     print(f"[OK] Complete AgentCard constructed")
-    print(json.dumps(agent_card_with_signature, indent=2))
+    print(json.dumps(agent_card_with_signature_dict, indent=2))
     
-    return agent_card_with_signature, private_key_pem, public_key_jwk
+    return agent_card_with_signature_dict, private_key_pem, public_key_jwk
 
 
 def test_signature_verification():
@@ -300,10 +374,10 @@ def test_signature_verification():
     Test signature verification
     """
     print("\n" + "=" * 60)
-    print("Step 7: Test signature verification")
+    print("Step 8: Test signature verification")
     print("=" * 60)
     
-    agent_card_with_signature, private_key_pem, public_key_jwk = create_complete_agent_card_with_signature()
+    agent_card_with_signature_dict, private_key_pem, public_key_jwk = create_complete_agent_card_with_signature()
     
     print("\n" + "=" * 60)
     print("Test Instructions")
@@ -313,7 +387,7 @@ Now you can use the following curl command to test the signature verification en
 
 curl -X POST "http://localhost:8000/rest/a2a-t/v1/agents/register" \\
   -H "Content-Type: application/json" \\
-  -d '""" + json.dumps(agent_card_with_signature) + """'
+  -d '""" + json.dumps(agent_card_with_signature_dict) + """'
 
 Expected results:
 - If signature verification succeeds: Returns 201 Created and true
@@ -328,6 +402,12 @@ Signature verification flow:
 6. If backend public key verification fails or not found, fetch public key from jku URL
 7. Use fetched public key for verification
 8. After verification passes, continue registration process
+
+API Changes for a2a-sdk 1.0.0+:
+- AgentCard is now a protobuf message (not pydantic)
+- Use ParseDict/MessageToDict for conversion
+- ProtectedHeader is a TypedDict
+- create_agent_card_signer returns a callable that modifies the AgentCard directly
     """)
 
 
