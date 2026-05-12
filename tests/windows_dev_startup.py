@@ -6,9 +6,61 @@ This script starts both TCP internal service and HTTP server on Windows for loca
 Unlike production code which blocks Windows startup, this script allows Windows development.
 
 Usage:
-    python tests/test_windows_startup.py
+    python tests/windows_dev_startup.py
 
 To stop: Press Ctrl+C
+
+IMPORTANT - How to enable CLI commands on Windows:
+    
+    The CLI (python -m agent_registry.cli) uses UDS (Unix Domain Socket) which is NOT 
+    supported on Windows. To enable CLI commands for Windows debugging, you need to 
+    manually modify the following files:
+
+    1. agent_registry/cli/uds_client.py:
+       - Comment out the Windows platform check (lines 62-68):
+         
+         BEFORE:
+             if self.is_windows:
+                 logger.error("Registry center startup failed...")
+                 return {...}
+         
+         AFTER:
+             # if self.is_windows:
+             #     logger.error("Registry center startup failed...")
+             #     return {...}
+       
+       - Change socket type from AF_UNIX to AF_INET:
+         
+         BEFORE (line 75):
+             client_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+         
+         AFTER:
+             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+       
+       - Change connect from socket path to TCP address:
+         
+         BEFORE (line 77):
+             client_socket.connect(self.socket_path)
+         
+         AFTER:
+             client_socket.connect(("127.0.0.1", 1108))
+
+    2. agent_registry/cli/uds_client.py (bottom of file):
+       - Comment out the warning in get_uds_client() (lines 184-185):
+         
+         BEFORE:
+             if IS_WINDOWS:
+                 logger.error("Registry center startup failed...")
+         
+         AFTER:
+             # if IS_WINDOWS:
+             #     logger.error("Registry center startup failed...")
+
+    After these modifications:
+    - Run: python tests/windows_dev_startup.py
+    - Then CLI commands will work: python -m agent_registry.cli
+
+    Remember to revert these changes before committing to production!
 
 Note:
     - UDS (Unix Domain Socket) is not supported on Windows, so we use TCP socket instead
@@ -22,7 +74,6 @@ import socket
 import sys
 import threading
 import time
-import signal
 import platform
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,7 +81,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from loguru import logger
 
 
-HTTP_PORT = 1107
+HTTP_PORT = 5000
 TCP_INTERNAL_PORT = 1108
 TCP_INTERNAL_HOST = "127.0.0.1"
 
@@ -151,18 +202,6 @@ _http_thread = None
 _shutdown_event = threading.Event()
 
 
-def signal_handler(signum, frame):
-    """Handle Ctrl+C to shutdown gracefully"""
-    logger.info("\nReceived shutdown signal, stopping services...")
-    _shutdown_event.set()
-    
-    global _tcp_service
-    if _tcp_service:
-        _tcp_service.stop()
-    
-    sys.exit(0)
-
-
 def start_tcp_internal_service():
     """Start TCP internal service"""
     from agent_registry.registry_instance import get_registry
@@ -220,9 +259,10 @@ def print_startup_info():
     print(f"    - Agent Cards:        http://127.0.0.1:{HTTP_PORT}/rest/v1/registry-center/agent-cards")
     print(f"    - Semantic Query:     http://127.0.0.1:{HTTP_PORT}/rest/v1/registry-center/agent-cards/semantic-query")
     print(f"    - JWKS:               http://127.0.0.1:{HTTP_PORT}/.well-known/jwks.json")
-    print("\n  Note: UDS is not supported on Windows, using TCP socket instead.")
-    print("  Press Ctrl+C to stop all services.")
-    print("=" * 70 + "\n")
+    print("\n  IMPORTANT: To enable CLI commands, see file header for")
+    print("  instructions on modifying agent_registry/cli/uds_client.py")
+    print("=" * 70)
+    print("\n  Press Ctrl+C to stop all services.\n")
 
 
 def main():
@@ -231,9 +271,6 @@ def main():
         logger.error("This script is designed for Windows environment only.")
         logger.error("For Linux, use the production startup script: python -m agent_registry.start")
         sys.exit(1)
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
     
     print_startup_info()
     
@@ -252,9 +289,17 @@ def main():
     logger.info("All services started. Running until Ctrl+C...")
     logger.info(f"HTTP: http://127.0.0.1:{HTTP_PORT}")
     logger.info(f"TCP:  127.0.0.1:{TCP_INTERNAL_PORT}")
+    logger.info("Note: Press Ctrl+C in this terminal to stop services.")
     
-    while not _shutdown_event.is_set():
-        _shutdown_event.wait(timeout=1.0)
+    try:
+        while not _shutdown_event.is_set():
+            _shutdown_event.wait(timeout=1.0)
+    except KeyboardInterrupt:
+        logger.info("\nKeyboardInterrupt received, stopping services...")
+        global _tcp_service
+        if _tcp_service:
+            _tcp_service.stop()
+        logger.info("Services stopped.")
 
 
 if __name__ == "__main__":
