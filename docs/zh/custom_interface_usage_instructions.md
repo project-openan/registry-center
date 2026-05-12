@@ -25,23 +25,40 @@
 - `deregister`: 处理Agent注销
 
 ### 2.自定义处理器
-创建并注册自定义处理器
+创建并注册自定义处理器,在common/custom目录下新增__init__.py和my_custom_handle.py文件，
+在my_custom_handle.py文件中添加如下代码：
 ```python
-from custom_handle import BaseHandle, HandlerRegistry, InterfaceType
+from common.custom.custom_handle import BaseHandler
 
-class MyCustomHandle(BaseHandle):
+class MyCustomHandle(BaseHandler):
     async def handle(self, *args, **kwargs):
         # 自定义实现
         return "自定义结果"
+```
+在__init__.py文件中增加如下代码
+```python
+from common.custom.custom_handle import HandlerRegistry
+from common.custom.interface_type import InterfaceType
+from common.custom.my_custom_handle import MyCustomHandle
 
-# 注册自定义处理器
-HandlerRegistry.register(InterfaceType.QUERY, MyCustomHandle)
+# register第一个参数interface_type为接口类型，比如要覆写认证接口，那么就应该传入InterfaceType.AUTHENTICATE，如果要覆写解密参数，那么应该传入InterfaceType.DECRYPT
+# 映射关系如下：
+# InterfaceType.DECRYPT  --> 解密
+# InterfaceType.AUDIT  --> 记录审计日志
+# InterfaceType.AUTHENTICATE  --> 认证
+# InterfaceType.INSERT  --> 保存
+# InterfaceType.QUERY  --> 查询
+# InterfaceType.UPDATE  --> 更新
+# InterfaceType.GET  --> 唯一查询
+# InterfaceType.RETRIEVE  --> 检索
+# InterfaceType.DEREGISTER  --> 注销
+HandlerRegistry.register(InterfaceType.AUTHENTICATE, MyCustomHandle)
 ```
 
 ### 3.使用处理器
 使用处理器（默认或自定义）：
 ```python
-from custom_handle import HandlerRegistry, InterfaceType
+from common.custom.custom_handle import HandlerRegistry, InterfaceType
 
 # 获取处理器实例
 handle = HandlerRegistry.get_handler(InterfaceType.QUERY)
