@@ -128,35 +128,34 @@ class UDSClient:
             "tags": tags
         })
 
-    def remove_tags(self, agent_name: str, organization: str, tags: List[str]) -> Dict[str, Any]:
-        """Remove tags from agent"""
-        return self.send_request("remove_tag", {
-            "agent_name": agent_name,
-            "organization": organization,
-            "tags": tags
-        })
+    # Tag entity management methods
+    def create_tag(self, name: str) -> Dict[str, Any]:
+        """Create a new tag entity"""
+        return self.send_request("create_tag", {"name": name})
 
-    def update_tags(self, agent_name: str, organization: str, tags: List[str]) -> Dict[str, Any]:
-        """Update agent tags (full replacement)"""
+    def get_tag(self, tag_id: str = None, name: str = None) -> Dict[str, Any]:
+        """Get tag by tag_id or name"""
+        params = {}
+        if tag_id:
+            params["tag_id"] = tag_id
+        elif name:
+            params["name"] = name
+        return self.send_request("get_tag", params)
+
+    def update_tag(self, tag_id: str, new_name: str) -> Dict[str, Any]:
+        """Update tag name"""
         return self.send_request("update_tag", {
-            "agent_name": agent_name,
-            "organization": organization,
-            "tags": tags
+            "tag_id": tag_id,
+            "name": new_name
         })
 
-    def get_tags(self, agent_name: str, organization: str) -> Dict[str, Any]:
-        """Get agent tags"""
-        return self.send_request("get_tag", {
-            "agent_name": agent_name,
-            "organization": organization
-        })
+    def delete_tag(self, tag_id: str) -> Dict[str, Any]:
+        """Delete a tag"""
+        return self.send_request("delete_tag", {"tag_id": tag_id})
 
-    def find_by_tag(self, tag: str) -> Dict[str, Any]:
-        """Find agents by tag"""
-        return self.send_request("list_tag", {
-            "tag": tag
-        })
-
+    def list_tags(self) -> Dict[str, Any]:
+        """List all tags"""
+        return self.send_request("list_tags", {})
 
 _client: Optional[UDSClient] = None
 

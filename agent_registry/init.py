@@ -332,11 +332,21 @@ class InitCommand:
     def config_persistence(self) -> dict:
         config = {}
 
+        allowed_modes = ['file', 'postgresql']
         default_mode = self.existing_persistence_config.get('persistence.mode', 'file')
-        mode_input = input(
-            f"\nSelect storage mode persistence.mode (file/postgresql, default: {default_mode}): "
-        ).strip()
-        config['persistence.mode'] = mode_input or default_mode
+        
+        while True:
+            mode_input = input(
+                f"\nSelect storage mode persistence.mode ({'/'.join(allowed_modes)}, default: {default_mode}): "
+            ).strip()
+            
+            mode = mode_input or default_mode
+            
+            if mode in allowed_modes:
+                config['persistence.mode'] = mode
+                break
+            else:
+                print(f"Error: Invalid storage mode '{mode}', allowed modes: {', '.join(allowed_modes)}")
 
         if config['persistence.mode'] == 'postgresql':
             print("\nConfigure PostgreSQL database connection:")

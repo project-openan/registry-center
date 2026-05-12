@@ -1,265 +1,204 @@
-# Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# All Rights Reserved.
-#
-#    Licensed under the Apache License, Version 2.0 (the "License"); you may
-#    not use this file except in compliance with the License. You may obtain
-#    a copy of the License at
-#
-#         http://www.apache.org/licenses/LICENSE-2.0
-#
-#    Unless required by applicable law or agreed to in writing, software
-#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-#    License for the specific language governing permissions and limitations
-#    under the License.
+"""
+Tag Handler implementations for tag entity management.
 
-from typing import Dict, Any, List
+Handlers for create/get/update/delete/list operations on independent tag entities.
+"""
+
+import json
+from typing import Dict, Any
 from loguru import logger
 
 from agent_registry.internal.handlers.base_handler import BaseUDSHandler
-from agent_registry.internal.protocols.response import InternalResponse
-from agent_registry.internal.utils.tag_validator import TagValidator
 
 
-class TagAddHandler(BaseUDSHandler):
+class TagCreateHandler(BaseUDSHandler):
+    """Handler for creating a new tag entity."""
+
     def handle(self, params: Dict[str, Any], registry, config) -> Dict[str, Any]:
-        logger.info(f"[TagAddHandler] Entering handle method with params: {params}")
-        validator = TagValidator()
+        logger.info(f"[TagCreateHandler] Entering handle method with params: {params}")
         
-        agent_name = params.get('agent_name')
-        organization = params.get('organization')
-        new_tags = params.get('tags', [])
-        
-        if not agent_name or not organization:
-            return InternalResponse(
-                success=False,
-                error="Missing required params: agent_name or organization"
-            ).model_dump()
-        
-        agent = registry.find_by_key(agent_name, organization)
-        if not agent:
-            return InternalResponse(
-                success=False,
-                error="Agent not found",
-                message=f"Agent '{agent_name}' from organization '{organization}' not found"
-            ).model_dump()
-        
-        if not new_tags:
-            return InternalResponse(
-                success=False,
-                error="No tags provided"
-            ).model_dump()
-        
-        current_tags = registry.get_tags(agent_name, organization)
-        valid, error = validator.validate_add_tags(current_tags or [], new_tags)
-        if not valid:
-            return InternalResponse(
-                success=False,
-                error=error
-            ).model_dump()
-        
+        name = params.get('name')
+        if not name:
+            return {
+                "success": False,
+                "error": "Missing required parameter: name"
+            }
+
         try:
-            registry.add_tags(agent_name, organization, new_tags)
-            updated_tags = registry.get_tags(agent_name, organization)
-            logger.info(f"Tags added to agent: {agent_name} ({organization})")
-            
-            return InternalResponse(
-                success=True,
-                message="Tags added successfully",
-                data={
-                    "agent_name": agent_name,
-                    "organization": organization,
-                    "tags": updated_tags
+            tag = registry.create_tag(name)
+            if tag:
+                return {
+                    "success": True,
+                    "data": {
+                        "tag_id": tag.tag_id,
+                        "name": tag.name,
+                        "created_at": tag.created_at,
+                        "updated_at": tag.updated_at
+                    },
+                    "message": f"Tag '{name}' created successfully"
                 }
-            ).model_dump()
-        except Exception as e:
-            logger.error(f"Failed to add tags: {e}")
-            return InternalResponse(
-                success=False,
-                error=str(e),
-                message="Failed to add tags"
-            ).model_dump()
-
-
-class TagRemoveHandler(BaseUDSHandler):
-    def handle(self, params: Dict[str, Any], registry, config) -> Dict[str, Any]:
-        logger.info(f"[TagRemoveHandler] Entering handle method with params: {params}")
-        agent_name = params.get('agent_name')
-        organization = params.get('organization')
-        tags_to_remove = params.get('tags', [])
-        
-        if not agent_name or not organization:
-            return InternalResponse(
-                success=False,
-                error="Missing required params: agent_name or organization"
-            ).model_dump()
-        
-        agent = registry.find_by_key(agent_name, organization)
-        if not agent:
-            return InternalResponse(
-                success=False,
-                error="Agent not found",
-                message=f"Agent '{agent_name}' from organization '{organization}' not found"
-            ).model_dump()
-        
-        if not tags_to_remove:
-            return InternalResponse(
-                success=False,
-                error="No tags provided to remove"
-            ).model_dump()
-        
-        try:
-            registry.remove_tags(agent_name, organization, tags_to_remove)
-            updated_tags = registry.get_tags(agent_name, organization)
-            logger.info(f"Tags removed from agent: {agent_name} ({organization})")
-            
-            return InternalResponse(
-                success=True,
-                message="Tags removed successfully",
-                data={
-                    "agent_name": agent_name,
-                    "organization": organization,
-                    "tags": updated_tags
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to create tag",
+                    "message": f"Tag '{name}' may already exist"
                 }
-            ).model_dump()
         except Exception as e:
-            logger.error(f"Failed to remove tags: {e}")
-            return InternalResponse(
-                success=False,
-                error=str(e),
-                message="Failed to remove tags"
-            ).model_dump()
-
-
-class TagUpdateHandler(BaseUDSHandler):
-    def handle(self, params: Dict[str, Any], registry, config) -> Dict[str, Any]:
-        logger.info(f"[TagUpdateHandler] Entering handle method with params: {params}")
-        validator = TagValidator()
-        
-        agent_name = params.get('agent_name')
-        organization = params.get('organization')
-        new_tags = params.get('tags', [])
-        
-        if not agent_name or not organization:
-            return InternalResponse(
-                success=False,
-                error="Missing required params: agent_name or organization"
-            ).model_dump()
-        
-        agent = registry.find_by_key(agent_name, organization)
-        if not agent:
-            return InternalResponse(
-                success=False,
-                error="Agent not found",
-                message=f"Agent '{agent_name}' from organization '{organization}' not found"
-            ).model_dump()
-        
-        valid, error = validator.validate_tags(new_tags)
-        if not valid:
-            return InternalResponse(
-                success=False,
-                error=error
-            ).model_dump()
-        
-        try:
-            registry.update_tags(agent_name, organization, new_tags)
-            logger.info(f"Tags updated for agent: {agent_name} ({organization})")
-            
-            return InternalResponse(
-                success=True,
-                message="Tags updated successfully",
-                data={
-                    "agent_name": agent_name,
-                    "organization": organization,
-                    "tags": new_tags
-                }
-            ).model_dump()
-        except Exception as e:
-            logger.error(f"Failed to update tags: {e}")
-            return InternalResponse(
-                success=False,
-                error=str(e),
-                message="Failed to update tags"
-            ).model_dump()
+            logger.error(f"Failed to create tag: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 class TagGetHandler(BaseUDSHandler):
+    """Handler for getting a tag by tag_id or name."""
+
     def handle(self, params: Dict[str, Any], registry, config) -> Dict[str, Any]:
         logger.info(f"[TagGetHandler] Entering handle method with params: {params}")
-        agent_name = params.get('agent_name')
-        organization = params.get('organization')
         
-        if not agent_name or not organization:
-            return InternalResponse(
-                success=False,
-                error="Missing required params: agent_name or organization"
-            ).model_dump()
-        
-        agent = registry.find_by_key(agent_name, organization)
-        if not agent:
-            return InternalResponse(
-                success=False,
-                error="Agent not found",
-                message=f"Agent '{agent_name}' from organization '{organization}' not found"
-            ).model_dump()
-        
-        tags = registry.get_tags(agent_name, organization)
-        
-        return InternalResponse(
-            success=True,
-            message="Tags retrieved successfully",
-            data={
-                "agent_name": agent_name,
-                "organization": organization,
-                "tags": tags or []
+        tag_id = params.get('tag_id')
+        name = params.get('name')
+
+        try:
+            tag = None
+            if tag_id:
+                tag = registry.get_tag(tag_id)
+            elif name:
+                tag = registry.get_tag_by_name(name)
+            else:
+                return {
+                    "success": False,
+                    "error": "Missing required parameter: tag_id or name"
+                }
+
+            if tag:
+                return {
+                    "success": True,
+                    "data": {
+                        "tag_id": tag.tag_id,
+                        "name": tag.name,
+                        "created_at": tag.created_at,
+                        "updated_at": tag.updated_at
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Tag not found"
+                }
+        except Exception as e:
+            logger.error(f"Failed to get tag: {e}")
+            return {
+                "success": False,
+                "error": str(e)
             }
-        ).model_dump()
+
+
+class TagUpdateHandler(BaseUDSHandler):
+    """Handler for updating a tag."""
+
+    def handle(self, params: Dict[str, Any], registry, config) -> Dict[str, Any]:
+        logger.info(f"[TagUpdateHandler] Entering handle method with params: {params}")
+        
+        tag_id = params.get('tag_id')
+        new_name = params.get('name')
+
+        if not tag_id or not new_name:
+            return {
+                "success": False,
+                "error": "Missing required parameters: tag_id and name"
+            }
+
+        try:
+            success = registry.update_tag(tag_id, new_name)
+            if success:
+                tag = registry.get_tag(tag_id)
+                return {
+                    "success": True,
+                    "data": {
+                        "tag_id": tag.tag_id,
+                        "name": tag.name,
+                        "updated_at": tag.updated_at
+                    },
+                    "message": f"Tag updated successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to update tag",
+                    "message": "Tag may not exist or name already taken"
+                }
+        except Exception as e:
+            logger.error(f"Failed to update tag: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+
+class TagDeleteHandler(BaseUDSHandler):
+    """Handler for deleting a tag."""
+
+    def handle(self, params: Dict[str, Any], registry, config) -> Dict[str, Any]:
+        logger.info(f"[TagDeleteHandler] Entering handle method with params: {params}")
+        
+        tag_id = params.get('tag_id')
+        if not tag_id:
+            return {
+                "success": False,
+                "error": "Missing required parameter: tag_id"
+            }
+
+        try:
+            success = registry.delete_tag(tag_id)
+            if success:
+                return {
+                    "success": True,
+                    "message": f"Tag deleted successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to delete tag",
+                    "message": "Tag may not exist"
+                }
+        except Exception as e:
+            logger.error(f"Failed to delete tag: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 class TagListHandler(BaseUDSHandler):
+    """Handler for listing all tags."""
+
     def handle(self, params: Dict[str, Any], registry, config) -> Dict[str, Any]:
         logger.info(f"[TagListHandler] Entering handle method with params: {params}")
-        tag = params.get('tag')
-        
-        if not tag:
-            return InternalResponse(
-                success=False,
-                error="Missing required param: tag"
-            ).model_dump()
-        
-        validator = TagValidator()
-        valid, error = validator.validate_single_tag(tag)
-        if not valid:
-            return InternalResponse(
-                success=False,
-                error=f"Invalid tag '{tag}': {error}"
-            ).model_dump()
-        
+
         try:
-            agents = registry.find_by_tag(tag)
-            agent_list = []
-            for agent in agents:
-                agent_list.append({
-                    "agent_name": agent.name,
-                    "organization": agent.provider.organization,
-                    "description": agent.description[:100] if agent.description else ""
-                })
-            
-            logger.info(f"Found {len(agents)} agents with tag: {tag}")
-            
-            return InternalResponse(
-                success=True,
-                message=f"Found {len(agents)} agents with tag '{tag}'",
-                data={
-                    "tag": tag,
-                    "agents": agent_list,
-                    "count": len(agents)
+            tags = registry.list_tags()
+            tag_list = [
+                {
+                    "tag_id": tag.tag_id,
+                    "name": tag.name,
+                    "created_at": tag.created_at,
+                    "updated_at": tag.updated_at
                 }
-            ).model_dump()
+                for tag in tags
+            ]
+            
+            return {
+                "success": True,
+                "data": {
+                    "tags": tag_list,
+                    "count": len(tag_list)
+                }
+            }
         except Exception as e:
-            logger.error(f"Failed to list agents by tag: {e}")
-            return InternalResponse(
-                success=False,
-                error=str(e),
-                message="Failed to list agents by tag"
-            ).model_dump()
+            logger.error(f"Failed to list tags: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }

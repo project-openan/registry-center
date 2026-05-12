@@ -18,6 +18,7 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 
 from a2a.types import AgentCard
+from agent_registry.model.tag import Tag
 
 
 @dataclass
@@ -82,16 +83,46 @@ class StorageBackend(ABC):
     def count(self) -> int:
         pass
 
+    # Agent tags methods
     @abstractmethod
-    def get_tags(self, name: str, organization: str) -> List[str]:
+    def get_agent_tags(self, name: str, organization: str) -> List[str]:
+        """Get tags associated with an agent (from agent_card table)."""
         pass
 
     @abstractmethod
-    def update_tags(self, name: str, organization: str, tags: List[str]) -> bool:
+    def update_agent_tags(self, name: str, organization: str, tags: List[str]) -> bool:
+        """Update tags for an agent (in agent_card table)."""
+        pass
+
+    # Tag entity management methods (for managing independent tag entities)
+    @abstractmethod
+    def create_tag(self, tag: Tag) -> bool:
+        """Create a new tag entity."""
         pass
 
     @abstractmethod
-    def find_by_tag(self, tag: str) -> List[AgentCard]:
+    def get_tag(self, tag_id: str) -> Optional[Tag]:
+        """Get tag by tag_id."""
+        pass
+
+    @abstractmethod
+    def get_tag_by_name(self, name: str) -> Optional[Tag]:
+        """Get tag by name."""
+        pass
+
+    @abstractmethod
+    def update_tag(self, tag_id: str, tag: Tag) -> bool:
+        """Update tag entity."""
+        pass
+
+    @abstractmethod
+    def delete_tag(self, tag_id: str) -> bool:
+        """Delete tag entity."""
+        pass
+
+    @abstractmethod
+    def list_tags(self) -> List[Tag]:
+        """List all tags."""
         pass
 
     @abstractmethod

@@ -25,6 +25,7 @@ from a2a.types import AgentCard
 from google.protobuf.json_format import MessageToDict
 from loguru import logger
 
+from agent_registry.model.tag import Tag
 from agent_registry.config import PERSISTENCE_FILE, PERSISTENCE_METADATA_FILE, USE_VECTORDB, COLLECTION_NAME, \
     PERSISTENCE_CONF, PERSISTENCE_MODE
 from agent_registry.persistence import save_to_file, load_from_file
@@ -62,7 +63,8 @@ class RegistryCore:
         self.storage: Optional[StorageBackend] = None
         self._lock = Lock()
         self._status_map: Dict[Tuple[str, str], str] = {}
-        self._tags_map: Dict[Tuple[str, str], List[str]] = {}
+        self._registry_tags_map: Dict[Tuple[str, str], List[str]] = {}
+        self._tags: Dict[str, Tag] = {}
         self._owner_map: Dict[Tuple[str, str], Optional[str]] = {}
         self._created_at_map: Dict[Tuple[str, str], str] = {}
         self._updated_at_map: Dict[Tuple[str, str], str] = {}
@@ -80,8 +82,11 @@ class RegistryCore:
             os.chmod(data_path, 0o700)
             self.persistence_file = str(data_path / persistence_file)
             self.metadata_file = str(data_path / persistence_metadata_file)
+            self.tags_file = str(data_path / "tags.json")
             self._agents: Dict[Tuple[str, str], AgentCard] = {}
-            self._load()
+            self._load_agents()
+            self._load_registry()
+            self._load_tags()
 
     def initialize(self):
         """Initialize storage backend for PostgreSQL mode."""
@@ -305,7 +310,7 @@ class RegistryCore:
 
                 del self._agents[key]
                 self._status_map.pop(key, None)
-                self._tags_map.pop(key, None)
+                self._registry_tags_map.pop(key, None)
                 self._owner_map.pop(key, None)
                 self._created_at_map.pop(key, None)
                 self._updated_at_map.pop(key, None)
@@ -440,7 +445,7 @@ class RegistryCore:
                     status=self._status_map.get(key, 'published'),
                     created_at=self._created_at_map.get(key, ''),
                     updated_at=self._updated_at_map.get(key, ''),
-                    tags=self._tags_map.get(key, [])
+                    tags=self._registry_tags_map.get(key, [])
                 )
             return None
 
@@ -464,7 +469,7 @@ class RegistryCore:
                             status=self._status_map.get(key, 'published'),
                             created_at=self._created_at_map.get(key, ''),
                             updated_at=self._updated_at_map.get(key, ''),
-                            tags=self._tags_map.get(key, [])
+                            tags=self._registry_tags_map.get(key, [])
                         ))
             return result
 
@@ -483,19 +488,18 @@ class RegistryCore:
         save_to_file(self.persistence_file, data)
 
     def _save_registry(self) -> None:
-        """Persist status and tags map to agentregistry.json."""
+        """Save status and tags map to agentregistry.json (file mode only)."""
         registry_data = []
         for key, status in self._status_map.items():
-            tags = self._tags_map.get(key, [])
-            owner = self._owner_map.get(key)
-            created_at = self._created_at_map.get(key, "")
-            updated_at = self._updated_at_map.get(key, "")
+            tags = self._registry_tags_map.get(key, [])
+            created_at = self._created_at_map.get(key, '')
+            updated_at = self._updated_at_map.get(key, '')
             registry_data.append({
                 "organization": key[1],
                 "agent_name": key[0],
                 "status": status,
-                "tag": tags,
-                "owner": owner,
+                "owner": self._owner_map.get(key),
+                "tags": tags,
                 "created_at": created_at,
                 "updated_at": updated_at
             })
@@ -520,14 +524,14 @@ class RegistryCore:
         logger.info(f"Loaded {len(self._agents)} agents from persistence.")
 
     def _load_registry(self) -> None:
-        """Load status and tags map from agentregistry.json."""
+        """Load status and tags map from agentregistry.json (file mode only)."""
         if os.path.exists(self.metadata_file):
             registry_data = load_from_file(self.metadata_file)
             for item in registry_data:
                 try:
                     key = self._make_key(item['agent_name'], item['organization'])
                     self._status_map[key] = item.get('status', 'published')
-                    self._tags_map[key] = item.get('tag', [])
+                    self._registry_tags_map[key] = item.get('tags', [])
                     self._owner_map[key] = item.get('owner')
                     self._created_at_map[key] = item.get('created_at', '')
                     self._updated_at_map[key] = item.get('updated_at', '')
@@ -537,11 +541,41 @@ class RegistryCore:
         else:
             for key in self._agents.keys():
                 self._status_map[key] = 'published'
-                self._tags_map[key] = []
+                self._registry_tags_map[key] = []
                 self._owner_map[key] = None
                 self._created_at_map[key] = ''
                 self._updated_at_map[key] = ''
             logger.info("No registry file found, defaulting all agents to published status")
+
+    def _load_tags(self) -> None:
+        """Load tag entities from tags.json (file mode only)."""
+        if not os.path.exists(self.tags_file):
+            logger.info("No tags file found, starting with empty tags")
+            return
+        
+        try:
+            with open(self.tags_file, 'r', encoding='utf-8') as f:
+                tag_data = json.load(f)
+            for item in tag_data:
+                tag = Tag(**item)
+                self._tags[tag.tag_id] = tag
+            logger.info(f"Loaded {len(self._tags)} tags from {self.tags_file}")
+        except Exception as e:
+            logger.error(f"Failed to load tags from {self.tags_file}: {e}")
+
+    def _save_tags(self) -> None:
+        """Save tag entities to tags.json (file mode only)."""
+        tag_data = []
+        for tag in self._tags.values():
+            tag_data.append({
+                "tag_id": tag.tag_id,
+                "name": tag.name,
+                "created_at": tag.created_at,
+                "updated_at": tag.updated_at
+            })
+        
+        save_to_file(self.tags_file, tag_data)
+        logger.info(f"Saved {len(self._tags)} tags to {self.tags_file}")
 
     def _make_id(self, name: str, organization: str):
         return name + organization
@@ -585,7 +619,7 @@ class RegistryCore:
             dict: Agent metadata
         """
         status = self.get_status(name, organization) or 'published'
-        tags = self.get_tags(name, organization) or []
+        tags = self.get_agent_tags(name, organization) or []
         created_at = self.get_created_at(name, organization) or ''
         updated_at = self.get_updated_at(name, organization) or ''
         return {
@@ -671,111 +705,113 @@ class RegistryCore:
         else:
             return len(self._agents)
 
-    def get_tags(self, name: str, organization: str) -> List[str]:
-        """Get agent tags."""
+    # Agent tags methods (for other systems)
+    def get_agent_tags(self, name: str, organization: str) -> List[str]:
+        """Get tags associated with an agent."""
         if self.persistence_mode == 'postgresql':
-            return self.storage.get_tags(name, organization)
+            return self.storage.get_agent_tags(name, organization)
         else:
-            key = self._make_key(name, organization)
-            return self._tags_map.get(key, [])
+            agent_record = self.storage.find_by_key(name, organization)
+            return agent_record.tags if agent_record else []
 
-    def update_tags(self, name: str, organization: str, tags: List[str]) -> bool:
-        """Update agent tags (full replacement)."""
+    def update_agent_tags(self, name: str, organization: str, tags: List[str]) -> bool:
+        """Update tags for an agent (full replacement)."""
         with self._lock:
             if self.persistence_mode == 'postgresql':
-                return self.storage.update_tags(name, organization, tags)
+                return self.storage.update_agent_tags(name, organization, tags)
             else:
-                key = self._make_key(name, organization)
-                if key not in self._agents:
-                    logger.warning(f"Agent not found: {name} ({organization})")
-                    return False
-                self._tags_map[key] = tags
-                self._save_tags()
-                logger.info(f"Agent tags updated: {name} -> {tags}")
-                return True
+                return self.storage.update_agent_tags(name, organization, tags)
 
-    def add_tags(self, name: str, organization: str, tags: List[str]) -> bool:
-        """Add tags to agent (deduplicated)."""
+    def find_agents_by_tag(self, tag: str) -> List[AgentCard]:
+        """Find agents that have a specific tag."""
+        return self.storage.find_by_tag(tag)
+
+    # Tag entity management methods
+    def create_tag(self, name: str) -> Tag:
+        """Create a new tag entity."""
         with self._lock:
             if self.persistence_mode == 'postgresql':
-                current_tags = self.storage.get_tags(name, organization)
-                merged_tags = list(set((current_tags or []) + tags))
-                return self.storage.update_tags(name, organization, merged_tags)
+                tag = Tag(name=name)
+                if self.storage.create_tag(tag):
+                    logger.info(f"Tag created: {name}")
+                    return tag
+                else:
+                    logger.warning(f"Failed to create tag: {name}")
+                    return None
             else:
-                key = self._make_key(name, organization)
-                if key not in self._agents:
-                    logger.warning(f"Agent not found: {name} ({organization})")
-                    return False
-                current_tags = self._tags_map.get(key, [])
-                merged_tags = list(set(current_tags + tags))
-                self._tags_map[key] = merged_tags
-                self._updated_at_map[key] = datetime.utcnow().isoformat()
+                tag = Tag(name=name)
+                if tag.tag_id in self._tags:
+                    logger.warning(f"Tag already exists: {tag.tag_id}")
+                    return None
+                for existing_tag in self._tags.values():
+                    if existing_tag.name == name:
+                        logger.warning(f"Tag name already exists: {name}")
+                        return None
+                self._tags[tag.tag_id] = tag
                 self._save_tags()
-                self._save_registry()
-                logger.info(f"Agent tags added: {name} -> {merged_tags}")
-                return True
+                logger.info(f"Tag created: {name}")
+                return tag
 
-    def remove_tags(self, name: str, organization: str, tags: List[str]) -> bool:
-        """Remove specified tags from agent."""
-        with self._lock:
-            if self.persistence_mode == 'postgresql':
-                current_tags = self.storage.get_tags(name, organization)
-                remaining_tags = [t for t in (current_tags or []) if t not in tags]
-                return self.storage.update_tags(name, organization, remaining_tags)
-            else:
-                key = self._make_key(name, organization)
-                if key not in self._agents:
-                    logger.warning(f"Agent not found: {name} ({organization})")
-                    return False
-                current_tags = self._tags_map.get(key, [])
-                remaining_tags = [t for t in current_tags if t not in tags]
-                self._tags_map[key] = remaining_tags
-                self._updated_at_map[key] = datetime.utcnow().isoformat()
-                self._save_tags()
-                self._save_registry()
-                logger.info(f"Agent tags removed: {name} -> {remaining_tags}")
-                return True
-
-    def find_by_tag(self, tag: str) -> List[AgentCard]:
-        """Find agents by tag."""
+    def get_tag(self, tag_id: str) -> Optional[Tag]:
+        """Get tag by tag_id."""
         if self.persistence_mode == 'postgresql':
-            return self.storage.find_by_tag(tag)
+            return self.storage.get_tag(tag_id)
         else:
-            result = []
-            for key, tags in self._tags_map.items():
-                if tag in tags:
-                    agent = self._agents.get(key)
-                    if agent:
-                        result.append(agent)
-            return result
+            return self._tags.get(tag_id)
 
-    def _save_tags(self) -> None:
-        """Save tags to file (for file storage mode)."""
-        if self.persistence_mode != 'postgresql':
-            tags_file = Path(get_root_path()) / "data" / "agent_tags.json"
-            tags_data = []
-            for key, tags in self._tags_map.items():
-                tags_data.append({
-                    "organization": key[1],
-                    "agent_name": key[0],
-                    "tags": tags
-                })
-            save_to_file(str(tags_file), tags_data)
+    def get_tag_by_name(self, name: str) -> Optional[Tag]:
+        """Get tag by name."""
+        if self.persistence_mode == 'postgresql':
+            return self.storage.get_tag_by_name(name)
+        else:
+            for tag in self._tags.values():
+                if tag.name == name:
+                    return tag
+            return None
 
-    def _load_tags(self) -> None:
-        """Load tags from file (for file storage mode)."""
-        if self.persistence_mode != 'postgresql':
-            tags_file = Path(get_root_path()) / "data" / "agent_tags.json"
-            if tags_file.exists():
-                tags_data = load_from_file(str(tags_file))
-                for item in tags_data:
-                    try:
-                        key = self._make_key(item['agent_name'], item['organization'])
-                        self._tags_map[key] = item.get('tags', [])
-                    except Exception as e:
-                        logger.error(f"Failed to load tags from JSON: {e}, data: {item}")
-                logger.info(f"Loaded {len(self._tags_map)} tags mappings.")
+    def update_tag(self, tag_id: str, new_name: str) -> bool:
+        """Update tag name."""
+        with self._lock:
+            if self.persistence_mode == 'postgresql':
+                tag = self.storage.get_tag(tag_id)
+                if not tag:
+                    logger.warning(f"Tag not found: {tag_id}")
+                    return False
+                tag.name = new_name
+                tag.update_timestamp()
+                return self.storage.update_tag(tag_id, tag)
             else:
-                for key in self._agents.keys():
-                    self._tags_map[key] = []
-                logger.info("No tags file found, defaulting all agents to empty tags")
+                if tag_id not in self._tags:
+                    logger.warning(f"Tag not found: {tag_id}")
+                    return False
+                for existing_tag_id, existing_tag in self._tags.items():
+                    if existing_tag_id != tag_id and existing_tag.name == new_name:
+                        logger.warning(f"Tag name already exists: {new_name}")
+                        return False
+                tag = self._tags[tag_id]
+                tag.name = new_name
+                tag.update_timestamp()
+                self._save_tags()
+                logger.info(f"Tag updated: {tag_id} -> {new_name}")
+                return True
+
+    def delete_tag(self, tag_id: str) -> bool:
+        """Delete a tag entity."""
+        with self._lock:
+            if self.persistence_mode == 'postgresql':
+                return self.storage.delete_tag(tag_id)
+            else:
+                if tag_id not in self._tags:
+                    logger.warning(f"Tag not found: {tag_id}")
+                    return False
+                deleted_tag = self._tags.pop(tag_id)
+                self._save_tags()
+                logger.info(f"Tag deleted: {tag_id}")
+                return True
+
+    def list_tags(self) -> List[Tag]:
+        """List all tags."""
+        if self.persistence_mode == 'postgresql':
+            return self.storage.list_tags()
+        else:
+            return list(self._tags.values())

@@ -468,7 +468,11 @@ async def register_agent(
             }
             await _check_agent_limit(registry, client_ip, details)
             await _check_duplicate_agent(agent, registry, client_ip, details)
-            validate_agent_card(agent)
+            try:
+                validate_agent_card(agent)
+            except HTTPException as e:
+                logger.error(f"Agent card validation failed: {agent.name}, {agent.provider.organization}")
+                raise CustomHTTPException(e.status_code, e.detail)
             logger.info(f"Register agent success: name={agent.name}, org={agent.provider.organization}")
 
             approval_enabled = config.get('agent_approval_enabled', 'false')
@@ -492,6 +496,11 @@ async def register_agent(
         return Response(status_code=status.HTTP_201_CREATED)
     except anyio.WouldBlock as e:
         raise CustomHTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Server is busy") from e
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error in registry:{e}")
+        raise CustomHTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal server error") from e
     finally:
         if acquired:
             register_semaphore.release()
@@ -579,7 +588,11 @@ async def update_agent(
                 "organization": agent_data.provider.organization,
                 "url": agent_data.provider.url,
             }
-            validate_agent_card(agent_data)
+            try:
+                validate_agent_card(agent_data)
+            except HTTPException as e:
+                logger.error(f"Agent card validation failed: {agent_data.name}, {agent_data.provider.organization}")
+                raise CustomHTTPException(e.status_code, e.detail)
             await _check_agent_limit(registry, client_ip, details)
 
             data = MessageToDict(agent_data, preserving_proto_field_name=True)
@@ -590,6 +603,8 @@ async def update_agent(
         return Response(status_code=status.HTTP_200_OK)
     except ValueError as e:
         raise CustomHTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.error(f"Unexpected error in full update:{e}")
         raise CustomHTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal server error") from e

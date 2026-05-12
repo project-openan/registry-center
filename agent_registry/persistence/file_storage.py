@@ -24,12 +24,14 @@ from google.protobuf.json_format import MessageToDict, Parse
 from loguru import logger
 
 from agent_registry.config import PERSISTENCE_METADATA_FILE, PERSISTENCE_TAGS_FILE
+from agent_registry.model.tag import Tag
 from .base import StorageBackend, AgentRecord
 
 
 
 class FileStorage(StorageBackend):
-    def __init__(self, file_path: str, metadata_file: str = None, tags_file: str = None, max_file_size: int = 100 * 1024 * 1024):
+    def __init__(self, file_path: str, metadata_file: str = None, 
+                 tags_file: str = None, max_file_size: int = 100 * 1024 * 1024):
         self.file_path = file_path
         self.metadata_file = metadata_file or str(Path(file_path).parent / PERSISTENCE_METADATA_FILE)
         self.tags_file = tags_file or str(Path(file_path).parent / PERSISTENCE_TAGS_FILE)
@@ -37,18 +39,19 @@ class FileStorage(StorageBackend):
         self._agents: Dict[tuple, AgentCard] = {}
         self._status_map: Dict[tuple, str] = {}
         self._owner_map: Dict[tuple, Optional[str]] = {}
-        self._tags_map: Dict[tuple, List[str]] = {}
+        self._agent_tags_map: Dict[tuple, List[str]] = {}
         self._created_at_map: Dict[tuple, str] = {}
         self._updated_at_map: Dict[tuple, str] = {}
-        self._tags_map: Dict[tuple, List[str]] = {}
+        self._tag_list: Dict[str, Tag] = {}
         self._load()
 
     @classmethod
     def init(cls, config: dict) -> 'FileStorage':
         file_path = config.get('file.path', 'data/agentcard.json')
-        metadata_file = config.get('metadata.file', f'data/{PERSISTENCE_METADATA_FILE}')
-        tags_file = config.get('tags.file', f'data/{PERSISTENCE_TAGS_FILE}')
+        metadata_file = config.get('metadata.file')
+        tags_file = config.get('tags.file')
         max_file_size = config.get('max_file_size', 100 * 1024 * 1024)
+        
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         instance = cls(file_path, metadata_file, tags_file, max_file_size)
         logger.info(f"FileStorage initialized with path: {file_path}")
@@ -64,9 +67,8 @@ class FileStorage(StorageBackend):
             self._status_map[key] = agent.status
         else:
             self._status_map[key] = 'published'
-        self._tags_map[key] = []
+        self._agent_tags_map[key] = []
         self._owner_map[key] = owner
-        self._tags_map[key] = []
         now = datetime.utcnow().isoformat()
         self._created_at_map[key] = now
         self._updated_at_map[key] = now
@@ -88,7 +90,7 @@ class FileStorage(StorageBackend):
                 status=status,
                 created_at=self._created_at_map.get(key, ''),
                 updated_at=self._updated_at_map.get(key, ''),
-                tags=self._tags_map.get(key, [])
+                tags=self._agent_tags_map.get(key, [])
             )
         return None
 
@@ -182,12 +184,10 @@ class FileStorage(StorageBackend):
         del self._agents[key]
         if key in self._status_map:
             del self._status_map[key]
-        if key in self._tags_map:
-            del self._tags_map[key]
+        if key in self._agent_tags_map:
+            del self._agent_tags_map[key]
         if key in self._owner_map:
             del self._owner_map[key]
-        if key in self._tags_map:
-            del self._tags_map[key]
         if key in self._created_at_map:
             del self._created_at_map[key]
         if key in self._updated_at_map:
@@ -206,7 +206,7 @@ class FileStorage(StorageBackend):
     def _save(self) -> None:
         self._save_agents()
         self._save_registry()
-        self._save_tags()
+        self._save_tag_list()
 
     def _save_agents(self) -> None:
         agent_cards = []
@@ -241,7 +241,7 @@ class FileStorage(StorageBackend):
                         status=status,
                         created_at=self._created_at_map.get(key, ''),
                         updated_at=self._updated_at_map.get(key, ''),
-                        tags=self._tags_map.get(key, [])
+                        tags=self._agent_tags_map.get(key, [])
                     ))
         logger.debug(f"Found {len(result)} agents by owner '{owner}'")
         return result
@@ -254,7 +254,7 @@ class FileStorage(StorageBackend):
                 "agent_name": key[0],
                 "status": status,
                 "owner": self._owner_map.get(key),
-                "tag": self._tags_map.get(key, []),
+                "tags": self._agent_tags_map.get(key, []),
                 "created_at": self._created_at_map.get(key, ''),
                 "updated_at": self._updated_at_map.get(key, '')
             })
@@ -269,7 +269,7 @@ class FileStorage(StorageBackend):
     def _load(self) -> None:
         self._load_agents()
         self._load_registry()
-        self._load_tags()
+        self._load_tag_list()
 
     def _load_agents(self) -> None:
         if not os.path.exists(self.file_path):
@@ -307,7 +307,7 @@ class FileStorage(StorageBackend):
             for key in self._agents.keys():
                 self._status_map[key] = 'published'
                 self._owner_map[key] = None
-                self._tags_map[key] = []
+                self._agent_tags_map[key] = []
                 self._created_at_map[key] = ''
                 self._updated_at_map[key] = ''
             logger.info("No registry file found, defaulting all agents to published status")
@@ -324,7 +324,7 @@ class FileStorage(StorageBackend):
                     key = (item['agent_name'].strip(), item['organization'].strip())
                     self._status_map[key] = item.get('status', 'published')
                     self._owner_map[key] = item.get('owner')
-                    self._tags_map[key] = item.get('tag', [])
+                    self._agent_tags_map[key] = item.get('tags', [])
                     self._created_at_map[key] = item.get('created_at', '')
                     self._updated_at_map[key] = item.get('updated_at', '')
                 except Exception as e:
@@ -333,65 +333,132 @@ class FileStorage(StorageBackend):
         except Exception as e:
             logger.error(f"Failed to load registry from {self.metadata_file}: {e}")
 
-    def _load_tags(self) -> None:
-        if not os.path.exists(self.tags_file):
-            for key in self._agents.keys():
-                self._tags_map[key] = []
-            logger.info("No tags file found, defaulting all agents to empty tags")
-            return
-
-        try:
-            with open(self.tags_file, 'r', encoding='utf-8') as f:
-                tags_data = json.load(f)
-            if not isinstance(tags_data, list):
-                logger.error(f"Invalid format in {self.tags_file}: expected a list")
-                return
-            for item in tags_data:
-                try:
-                    key = (item['agent_name'].strip(), item['organization'].strip())
-                    self._tags_map[key] = item.get('tags', [])
-                except Exception as e:
-                    logger.error(f"Failed to load tags from JSON: {e}, data: {item}")
-            logger.info(f"Loaded {len(self._tags_map)} tags mappings from {self.tags_file}")
-        except Exception as e:
-            logger.error(f"Failed to load tags from {self.tags_file}: {e}")
-
-    def _save_tags(self) -> None:
-        tags_data = []
-        for key, tags in self._tags_map.items():
-            tags_data.append({
-                "organization": key[1],
-                "agent_name": key[0],
-                "tags": tags
-            })
-
-        json_str = json.dumps(tags_data, ensure_ascii=False, indent=2)
-        Path(self.tags_file).parent.mkdir(parents=True, exist_ok=True)
-        with open(self.tags_file, 'w', encoding='utf-8') as f:
-            f.write(json_str)
-        os.chmod(self.tags_file, 0o600)
-        logger.info(f"Saved {len(self._tags_map)} tags mappings to {self.tags_file}")
-
-    def get_tags(self, name: str, organization: str) -> List[str]:
+    def get_agent_tags(self, name: str, organization: str) -> List[str]:
+        """Get tags associated with an agent."""
         key = (name.strip(), organization.strip())
-        return self._tags_map.get(key, [])
+        return self._agent_tags_map.get(key, [])
 
-    def update_tags(self, name: str, organization: str, tags: List[str]) -> bool:
+    def update_agent_tags(self, name: str, organization: str, tags: List[str]) -> bool:
+        """Update tags for an agent."""
         key = (name.strip(), organization.strip())
         if key not in self._agents:
             logger.warning(f"Agent not found: {name} ({organization})")
             return False
 
-        self._tags_map[key] = tags
-        self._save_tags()
+        self._agent_tags_map[key] = tags
+        self._updated_at_map[key] = datetime.utcnow().isoformat()
+        self._save_registry()
         logger.info(f"Agent tags updated: {name} -> {tags}")
         return True
 
     def find_by_tag(self, tag: str) -> List[AgentCard]:
+        """Find agents by tag (from agent_tags_map)."""
         result = []
-        for key, tags in self._tags_map.items():
+        for key, tags in self._agent_tags_map.items():
             if tag in tags:
                 agent = self._agents.get(key)
                 if agent:
                     result.append(agent)
         return result
+
+    # Tag entity management methods
+    def _load_tag_list(self) -> None:
+        """Load tag entities from tags.json."""
+        if not os.path.exists(self.tags_file):
+            logger.info("No tag list file found, starting with empty tag list")
+            return
+
+        try:
+            with open(self.tags_file, 'r', encoding='utf-8') as f:
+                tag_data = json.load(f)
+            if not isinstance(tag_data, list):
+                logger.error(f"Invalid format in {self.tags_file}: expected a list")
+                return
+            for item in tag_data:
+                try:
+                    tag = Tag(**item)
+                    self._tag_list[tag.tag_id] = tag
+                except Exception as e:
+                    logger.error(f"Failed to load tag from JSON: {e}, data: {item}")
+            logger.info(f"Loaded {len(self._tag_list)} tags from {self.tags_file}")
+        except Exception as e:
+            logger.error(f"Failed to load tag list from {self.tags_file}: {e}")
+
+    def _save_tag_list(self) -> None:
+        """Save tag entities to tags.json."""
+        tag_data = []
+        for tag in self._tag_list.values():
+            tag_data.append({
+                "tag_id": tag.tag_id,
+                "name": tag.name,
+                "created_at": tag.created_at,
+                "updated_at": tag.updated_at
+            })
+
+        json_str = json.dumps(tag_data, ensure_ascii=False, indent=2)
+        Path(self.tags_file).parent.mkdir(parents=True, exist_ok=True)
+        with open(self.tags_file, 'w', encoding='utf-8') as f:
+            f.write(json_str)
+        os.chmod(self.tags_file, 0o600)
+        logger.info(f"Saved {len(self._tag_list)} tags to {self.tags_file}")
+
+    def create_tag(self, tag: Tag) -> bool:
+        """Create a new tag entity."""
+        if tag.tag_id in self._tag_list:
+            logger.warning(f"Tag already exists: {tag.tag_id}")
+            return False
+        
+        # Check if tag name already exists
+        for existing_tag in self._tag_list.values():
+            if existing_tag.name == tag.name:
+                logger.warning(f"Tag name already exists: {tag.name}")
+                return False
+
+        self._tag_list[tag.tag_id] = tag
+        self._save_tag_list()
+        logger.info(f"Tag created: {tag.name} (ID: {tag.tag_id})")
+        return True
+
+    def get_tag(self, tag_id: str) -> Optional[Tag]:
+        """Get tag by tag_id."""
+        return self._tag_list.get(tag_id)
+
+    def get_tag_by_name(self, name: str) -> Optional[Tag]:
+        """Get tag by name."""
+        for tag in self._tag_list.values():
+            if tag.name == name:
+                return tag
+        return None
+
+    def update_tag(self, tag_id: str, tag: Tag) -> bool:
+        """Update tag entity."""
+        if tag_id not in self._tag_list:
+            logger.warning(f"Tag not found: {tag_id}")
+            return False
+
+        # Check if new name conflicts with existing tags
+        for existing_tag_id, existing_tag in self._tag_list.items():
+            if existing_tag_id != tag_id and existing_tag.name == tag.name:
+                logger.warning(f"Tag name already exists: {tag.name}")
+                return False
+
+        tag.update_timestamp()
+        self._tag_list[tag_id] = tag
+        self._save_tag_list()
+        logger.info(f"Tag updated: {tag.name} (ID: {tag_id})")
+        return True
+
+    def delete_tag(self, tag_id: str) -> bool:
+        """Delete tag entity."""
+        if tag_id not in self._tag_list:
+            logger.warning(f"Tag not found: {tag_id}")
+            return False
+
+        deleted_tag = self._tag_list.pop(tag_id)
+        self._save_tag_list()
+        logger.info(f"Tag deleted: {deleted_tag.name} (ID: {tag_id})")
+        return True
+
+    def list_tags(self) -> List[Tag]:
+        """List all tags."""
+        return list(self._tag_list.values())

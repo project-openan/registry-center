@@ -26,9 +26,11 @@ from agent_registry.internal.handlers import BaseUDSHandler
 from agent_registry.internal.handlers.approval_handler import ApprovalHandler
 from agent_registry.internal.handlers.get_agent_handler import GetAgentHandler
 from agent_registry.internal.handlers.list_agents_handler import ListAgentsHandler
+from agent_registry.internal.handlers.add_tags_handler import (
+    AddTagsHandler
+)
 from agent_registry.internal.handlers.tag_handler import (
-    TagAddHandler, TagRemoveHandler, TagUpdateHandler,
-    TagGetHandler, TagListHandler
+    TagCreateHandler, TagGetHandler, TagUpdateHandler, TagDeleteHandler, TagListHandler
 )
 from agent_registry.internal.protocols.actions import Action
 from agent_registry.internal.protocols.request import InternalRequest
@@ -41,11 +43,12 @@ class RequestDispatcher:
         Action.APPROVAL: ApprovalHandler,
         Action.GET_AGENT: GetAgentHandler,
         Action.LIST_AGENTS: ListAgentsHandler,
-        Action.ADD_TAG: TagAddHandler,
-        Action.REMOVE_TAG: TagRemoveHandler,
-        Action.UPDATE_TAG: TagUpdateHandler,
+        Action.ADD_TAG: AddTagsHandler,
+        Action.CREATE_TAG: TagCreateHandler,
         Action.GET_TAG: TagGetHandler,
-        Action.LIST_TAG: TagListHandler,
+        Action.UPDATE_TAG: TagUpdateHandler,
+        Action.DELETE_TAG: TagDeleteHandler,
+        Action.LIST_TAGS: TagListHandler,
     }
 
     def get_handler(self, action: str) -> Optional[BaseUDSHandler]:

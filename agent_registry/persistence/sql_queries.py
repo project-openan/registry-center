@@ -177,6 +177,7 @@ class PostgreSQLQueries(str, Enum):
         WHERE name = %s AND organization = %s AND (owner = %s OR owner IS NULL)
     """
 
+    # Agent card tags column
     ADD_COLUMN_TAGS = """
         DO $$
         BEGIN
@@ -187,16 +188,52 @@ class PostgreSQLQueries(str, Enum):
         END $$;
     """
 
-    GET_TAGS = """
+    GET_AGENT_TAGS = """
         SELECT tags FROM agent_card WHERE name = %s AND organization = %s
     """
 
-    UPDATE_TAGS = """
+    UPDATE_AGENT_TAGS = """
         UPDATE agent_card SET tags = %s, updated_at = %s
         WHERE name = %s AND organization = %s
     """
 
-    FIND_BY_TAG = """
-        SELECT agent_card_json FROM agent_card 
-        WHERE tags @> %s::jsonb
+    # Independent tag table (for tag entity management)
+    CREATE_TAG_TABLE = """
+        CREATE TABLE IF NOT EXISTS tag (
+            tag_id VARCHAR(50) PRIMARY KEY,
+            name VARCHAR(50) NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """
+
+    CREATE_TAG_INDEX_NAME = "CREATE INDEX IF NOT EXISTS idx_tag_name ON tag(name)"
+
+    CREATE_TAG = """
+        INSERT INTO tag (tag_id, name, created_at, updated_at)
+        VALUES (%s, %s, %s, %s)
+    """
+
+    GET_TAG_BY_ID = """
+        SELECT tag_id, name, created_at, updated_at FROM tag
+        WHERE tag_id = %s
+    """
+
+    GET_TAG_BY_NAME = """
+        SELECT tag_id, name, created_at, updated_at FROM tag
+        WHERE name = %s
+    """
+
+    UPDATE_TAG = """
+        UPDATE tag SET name = %s, updated_at = %s
+        WHERE tag_id = %s
+    """
+
+    DELETE_TAG = """
+        DELETE FROM tag WHERE tag_id = %s
+    """
+
+    LIST_TAGS = """
+        SELECT tag_id, name, created_at, updated_at FROM tag
+        ORDER BY created_at DESC
     """

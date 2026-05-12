@@ -23,6 +23,7 @@ from a2a.types import AgentCard
 from google.protobuf.json_format import MessageToDict, Parse
 from loguru import logger
 
+from agent_registry.model.tag import Tag
 from .base import StorageBackend, AgentRecord
 from .sql_queries import PostgreSQLQueries
 
@@ -83,6 +84,7 @@ class PostgreSQLStorage(StorageBackend):
         conn.autocommit = True
         try:
             with conn.cursor() as cur:
+                # Create agent_card table
                 cur.execute(PostgreSQLQueries.CREATE_TABLE.value)
                 cur.execute(PostgreSQLQueries.ADD_COLUMN_STATUS.value)
                 cur.execute(PostgreSQLQueries.ADD_COLUMN_TAGS.value)
@@ -95,6 +97,11 @@ class PostgreSQLStorage(StorageBackend):
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_OWNER.value)
                 cur.execute(PostgreSQLQueries.CREATE_INDEX_GIN.value)
                 logger.info("Table 'agent_card' and indexes created/verified")
+                
+                # Create tag table (independent tag management)
+                cur.execute(PostgreSQLQueries.CREATE_TAG_TABLE.value)
+                cur.execute(PostgreSQLQueries.CREATE_TAG_INDEX_NAME.value)
+                logger.info("Table 'tag' and indexes created/verified")
         finally:
             connection_pool.putconn(conn)
 
@@ -311,12 +318,13 @@ class PostgreSQLStorage(StorageBackend):
         finally:
             self.pool.putconn(conn)
 
-    def get_tags(self, name: str, organization: str) -> List[str]:
+    def get_agent_tags(self, name: str, organization: str) -> List[str]:
+        """Get tags associated with an agent (from agent_card table)."""
         conn = self.pool.getconn()
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    PostgreSQLQueries.GET_TAGS.value,
+                    PostgreSQLQueries.GET_AGENT_TAGS.value,
                     (name, organization)
                 )
                 result = cur.fetchone()
@@ -327,13 +335,14 @@ class PostgreSQLStorage(StorageBackend):
         finally:
             self.pool.putconn(conn)
 
-    def update_tags(self, name: str, organization: str, new_tags: List[str]) -> bool:
+    def update_agent_tags(self, name: str, organization: str, new_tags: List[str]) -> bool:
+        """Update tags for an agent (in agent_card table)."""
         conn = self.pool.getconn()
         try:
             with conn.cursor() as cur:
                 now = datetime.utcnow()
                 cur.execute(
-                    PostgreSQLQueries.UPDATE_TAGS.value,
+                    PostgreSQLQueries.UPDATE_AGENT_TAGS.value,
                     (json.dumps(new_tags), now, name, organization)
                 )
                 conn.commit()
@@ -393,6 +402,7 @@ class PostgreSQLStorage(StorageBackend):
             self.pool.putconn(conn)
 
     def find_by_tag(self, tag: str) -> List[AgentCard]:
+        """Find agents by tag (from agent_card table)."""
         conn = self.pool.getconn()
         try:
             with conn.cursor() as cur:
@@ -403,6 +413,123 @@ class PostgreSQLStorage(StorageBackend):
                 rows = cur.fetchall()
             result = [AgentCard(**(r[0] if isinstance(r[0], dict) else json.loads(r[0]))) for r in rows]
             logger.debug(f"Found {len(result)} agents by tag '{tag}' in PostgreSQL")
+            return result
+        finally:
+            self.pool.putconn(conn)
+
+    # Tag entity management methods
+    def create_tag(self, tag: Tag) -> bool:
+        """Create a new tag entity."""
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    PostgreSQLQueries.CREATE_TAG.value,
+                    (tag.tag_id, tag.name, tag.created_at, tag.updated_at)
+                )
+                conn.commit()
+            logger.info(f"Tag created in PostgreSQL: {tag.name} (ID: {tag.tag_id})")
+            return True
+        except psycopg2.IntegrityError as e:
+            logger.warning(f"Tag already exists: {tag.name} - {e}")
+            return False
+        finally:
+            self.pool.putconn(conn)
+
+    def get_tag(self, tag_id: str) -> Optional[Tag]:
+        """Get tag by tag_id."""
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    PostgreSQLQueries.GET_TAG_BY_ID.value,
+                    (tag_id,)
+                )
+                row = cur.fetchone()
+            if row:
+                return Tag(
+                    tag_id=row[0],
+                    name=row[1],
+                    created_at=row[2].isoformat() if hasattr(row[2], 'isoformat') else str(row[2]),
+                    updated_at=row[3].isoformat() if hasattr(row[3], 'isoformat') else str(row[3])
+                )
+            return None
+        finally:
+            self.pool.putconn(conn)
+
+    def get_tag_by_name(self, name: str) -> Optional[Tag]:
+        """Get tag by name."""
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    PostgreSQLQueries.GET_TAG_BY_NAME.value,
+                    (name,)
+                )
+                row = cur.fetchone()
+            if row:
+                return Tag(
+                    tag_id=row[0],
+                    name=row[1],
+                    created_at=row[2].isoformat() if hasattr(row[2], 'isoformat') else str(row[2]),
+                    updated_at=row[3].isoformat() if hasattr(row[3], 'isoformat') else str(row[3])
+                )
+            return None
+        finally:
+            self.pool.putconn(conn)
+
+    def update_tag(self, tag_id: str, tag: Tag) -> bool:
+        """Update tag entity."""
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                now = datetime.utcnow().isoformat()
+                cur.execute(
+                    PostgreSQLQueries.UPDATE_TAG.value,
+                    (tag.name, now, tag_id)
+                )
+                conn.commit()
+                affected = cur.rowcount
+            logger.info(f"Tag updated in PostgreSQL: {tag.name} (ID: {tag_id})")
+            return affected > 0
+        except psycopg2.IntegrityError as e:
+            logger.warning(f"Tag name already exists: {tag.name} - {e}")
+            return False
+        finally:
+            self.pool.putconn(conn)
+
+    def delete_tag(self, tag_id: str) -> bool:
+        """Delete tag entity."""
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    PostgreSQLQueries.DELETE_TAG.value,
+                    (tag_id,)
+                )
+                conn.commit()
+                affected = cur.rowcount
+            logger.info(f"Tag deleted in PostgreSQL: ID {tag_id}")
+            return affected > 0
+        finally:
+            self.pool.putconn(conn)
+
+    def list_tags(self) -> List[Tag]:
+        """List all tags."""
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(PostgreSQLQueries.LIST_TAGS.value)
+                rows = cur.fetchall()
+            result = []
+            for row in rows:
+                result.append(Tag(
+                    tag_id=row[0],
+                    name=row[1],
+                    created_at=row[2].isoformat() if hasattr(row[2], 'isoformat') else str(row[2]),
+                    updated_at=row[3].isoformat() if hasattr(row[3], 'isoformat') else str(row[3])
+                ))
+            logger.debug(f"Listed {len(result)} tags from PostgreSQL")
             return result
         finally:
             self.pool.putconn(conn)

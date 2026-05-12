@@ -75,7 +75,7 @@ class AddTagsHandler(BaseUDSHandler):
                 message=f"Agent '{agent_name}' from organization '{organization}' not found"
             ).model_dump()
         
-        current_tags = registry.get_tags(agent_name, organization) or []
+        current_tags = registry.get_agent_tags(agent_name, organization) or []
         merged_tags = list(set(current_tags + tags))
         
         if len(merged_tags) > 10:
@@ -99,8 +99,8 @@ class AddTagsHandler(BaseUDSHandler):
             ).model_dump()
         
         try:
-            registry.update_tags(agent_name, organization, tags)
-            updated_tags = registry.get_tags(agent_name, organization)
+            registry.update_agent_tags(agent_name, organization, merged_tags)
+            updated_tags = registry.get_agent_tags(agent_name, organization)
             
             details["updated_tags"] = updated_tags
             asyncio.run(audit_handle.handle({
