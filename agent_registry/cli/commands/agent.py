@@ -72,7 +72,7 @@ class UDSGetCommand(BaseCommand):
                 'tags': 'Tags',
                 'created_at': 'Created At',
                 'updated_at': 'Updated At',
-                'agentcard': 'AgentCard JSON',
+                'agentcard': 'Agent Card',
             }
         }
 
@@ -104,7 +104,7 @@ class UDSGetCommand(BaseCommand):
                 'agentcard': data.get('agentcard', {}),
             }
             
-            print(self.format_output(flattened_data, title=f"Agent: {args.agent_name}"))
+            print(self.format_output(flattened_data))
             return 0
         else:
             output.error(result.get("error", "Query failed"))
@@ -246,12 +246,11 @@ class SetTagsCommand(BaseCommand):
     @property
     def display_config(self) -> Dict:
         return {
-            'table_fields': ['agent_name', 'organization', 'tags_set', 'current_tags'],
+            'table_fields': ['agent_name', 'organization', 'tags_set'],
             'field_labels': {
                 'agent_name': 'Agent Name',
                 'organization': 'Organization',
-                'tags_set': 'Tags Set',
-                'current_tags': 'Current Tags',
+                'tags_set': 'Tags',
             }
         }
 
@@ -287,7 +286,6 @@ class SetTagsCommand(BaseCommand):
                 'agent_name': args.agent_name,
                 'organization': args.org,
                 'tags_set': ', '.join(tags),
-                'current_tags': ', '.join(data.get('tag', [])) or 'None',
             }
             
             print(self.format_output(flattened_data, title="Tags Set (Full Replacement)"))

@@ -826,7 +826,7 @@ jwk_kid = config.get("JWK_KID", None)
 jwk_rate_item = parse_rate_limit('jwk')
 
 
-@app.get("/.well-known/jwks.json")
+@app.get("/rest/v1/registry-center/keys")
 async def get_jwks(request: Request):
     """
     Download public key in PEM format for JWT signature verification.

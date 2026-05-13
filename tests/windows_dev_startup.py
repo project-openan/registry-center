@@ -258,7 +258,7 @@ def print_startup_info():
     print("\n  Endpoints:")
     print(f"    - Agent Cards:        http://127.0.0.1:{HTTP_PORT}/rest/v1/registry-center/agent-cards")
     print(f"    - Semantic Query:     http://127.0.0.1:{HTTP_PORT}/rest/v1/registry-center/agent-cards/semantic-query")
-    print(f"    - JWKS:               http://127.0.0.1:{HTTP_PORT}/.well-known/jwks.json")
+    print(f"    - JWKS:               http://127.0.0.1:{HTTP_PORT}/rest/v1/registry-center/keys")
     print("\n  IMPORTANT: To enable CLI commands, see file header for")
     print("  instructions on modifying agent_registry/cli/uds_client.py")
     print("=" * 70)

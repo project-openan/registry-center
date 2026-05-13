@@ -242,7 +242,7 @@ Agent状态分为两种：
 
 **接口路径：** `/rest/a2a-t/v1/agents/register`
 
-**请求体：** AgentCard JSON格式
+**请求体：** Agent Card格式
 
 **响应：**
 
