@@ -163,7 +163,7 @@ class UDSListCommand(BaseCommand):
                     'agent_name': agent.get("agent_name", "unknown"),
                     'organization': agent.get("organization", "unknown"),
                     'status': agent.get("status", "unknown"),
-                    'tags': ', '.join(agent.get("tag", [])) or 'None',
+                    'tags': ', '.join(agent.get("tag", [])) or '',
                     'created_at': format_timestamp(agent.get("created_at", "")),
                     'updated_at': format_timestamp(agent.get("updated_at", "")),
                 })
