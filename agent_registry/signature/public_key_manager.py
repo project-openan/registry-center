@@ -1,10 +1,9 @@
 import os
 import json
-import datetime
 from typing import Optional, List
 from loguru import logger
 
-from agent_registry.signature.models import JWK, JWKS, AgentKeysStorage
+from agent_registry.signature.models import JWK, JWKS
 from agent_registry.signature.storage import StoragePath
 
 
@@ -12,9 +11,6 @@ class PublicKeyManager:
     """Public key manager"""
 
     MAX_KEYS_PER_AGENT = 5
-
-    def __init__(self):
-        self._base_dir = StoragePath.BASE_DIR
 
     def add_public_keys(
         self,
@@ -36,41 +32,26 @@ class PublicKeyManager:
             List[str]: List of added public key IDs.
         """
         try:
-            # Validate key count
             if len(jwks.keys) > self.MAX_KEYS_PER_AGENT:
                 raise ValueError(f"At most {self.MAX_KEYS_PER_AGENT} public keys can be added at once")
 
-            # Validate each JWK key type
             for jwk in jwks.keys:
                 if jwk.kty not in ['EC', 'RSA']:
                     raise ValueError(f"Key type only supports EC or RSA, got: {jwk.kty}")
 
-            # Get storage path
             storage_path = StoragePath.get_storage_path(organization, agent_name, provider_url)
-
-            # Ensure directory exists
             StoragePath.ensure_directory_exists(storage_path)
 
-            # Read existing keys (if any)
-            existing_keys = self._load_keys(storage_path)
-            existing_keys_dict = {key.kid: key for key in existing_keys}
+            existing_jwks = self.load_jwks(storage_path)
+            existing_keys_dict = {key.kid: key for key in existing_jwks.keys}
 
-            # Add or update keys
             added_kids = []
             for jwk in jwks.keys:
                 existing_keys_dict[jwk.kid] = jwk
                 added_kids.append(jwk.kid)
 
-            # Build storage object
-            storage_obj = AgentKeysStorage(
-                organization=organization,
-                agent_name=agent_name,
-                keys=list(existing_keys_dict.values()),
-                updated_at=datetime.utcnow()
-            )
-
-            # Save to file
-            self._save_keys(storage_path, storage_obj)
+            new_jwks = JWKS(keys=list(existing_keys_dict.values()))
+            self.save_jwks(storage_path, new_jwks)
 
             logger.info(f"Successfully added {len(added_kids)} public keys to {storage_path}")
             return added_kids
@@ -105,12 +86,10 @@ class PublicKeyManager:
                 logger.warning(f"Public key config file does not exist: {storage_path}")
                 return False
 
-            # Read existing keys
-            storage_obj = self._load_storage_obj(storage_path)
+            jwks = self.load_jwks(storage_path)
 
-            # Find and remove key
             key_found = False
-            keys = storage_obj.keys
+            keys = jwks.keys
             for i, key in enumerate(keys):
                 if key.kid == kid:
                     keys.pop(i)
@@ -121,13 +100,7 @@ class PublicKeyManager:
                 logger.warning(f"Public key not found: {kid}")
                 return False
 
-            # Update storage object
-            storage_obj.keys = keys
-            storage_obj.updated_at = datetime.utcnow()
-
-            # Save to file
-            self._save_keys(storage_path, storage_obj)
-
+            self.save_jwks(storage_path, JWKS(keys=keys))
             logger.info(f"Successfully deleted public key: {kid}")
             return True
 
@@ -158,8 +131,7 @@ class PublicKeyManager:
                 logger.warning(f"Public key config file does not exist: {storage_path}")
                 return JWKS(keys=[])
 
-            storage_obj = self._load_storage_obj(storage_path)
-            return JWKS(keys=storage_obj.keys)
+            return self.load_jwks(storage_path)
 
         except Exception as e:
             logger.error(f"Failed to get public keys: {e}")
@@ -197,66 +169,48 @@ class PublicKeyManager:
             logger.error(f"Failed to get public key: {e}")
             return None
 
-    def _load_keys(self, storage_path: str) -> List[JWK]:
+    @staticmethod
+    def load_jwks(storage_path: str) -> JWKS:
         """
-        Load public keys from file.
+        Load JWKS from file.
 
         Args:
             storage_path: Storage file path.
 
         Returns:
-            List[JWK]: List of public keys.
+            JWKS: JWKS object.
         """
         try:
-            storage_obj = self._load_storage_obj(storage_path)
-            return storage_obj.keys
-        except Exception as e:
-            logger.error(f"Failed to load public keys: {e}")
-            return []
+            if not os.path.exists(storage_path):
+                return JWKS(keys=[])
 
-    def _load_storage_obj(self, storage_path: str) -> AgentKeysStorage:
-        """
-        Load storage object from file.
-
-        Args:
-            storage_path: Storage file path.
-
-        Returns:
-            AgentKeysStorage: Storage object.
-        """
-        try:
-            base_dir = os.getcwd()
-            file_path = os.path.join(base_dir, storage_path)
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(storage_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            return AgentKeysStorage(**data)
+            return JWKS(**data)
 
         except Exception as e:
-            logger.error(f"Failed to load storage object: {e}")
-            raise
+            logger.error(f"Failed to load JWKS: {e}")
+            return JWKS(keys=[])
 
-    def _save_keys(self, storage_path: str, storage_obj: AgentKeysStorage) -> None:
+    @staticmethod
+    def save_jwks(storage_path: str, jwks: JWKS) -> None:
         """
-        Save public keys to file.
+        Save JWKS to file (only keys array).
 
         Args:
             storage_path: Storage file path.
-            storage_obj: Storage object.
+            jwks: JWKS object.
         """
         try:
-            # Ensure directory exists
             StoragePath.ensure_directory_exists(storage_path)
 
-            # Save to file
             with open(storage_path, 'w', encoding='utf-8') as f:
-                json.dump(storage_obj.model_dump(), f, ensure_ascii=False, indent=2)
+                json.dump(jwks.model_dump(), f, ensure_ascii=False, indent=2)
 
-            # Set file permissions
             StoragePath.set_file_permissions(storage_path)
-
-            logger.info(f"Successfully saved public keys to {storage_path}")
+            logger.info(f"Successfully saved JWKS to {storage_path}")
 
         except Exception as e:
-            logger.error(f"Failed to save public keys: {e}")
+            logger.error(f"Failed to save JWKS: {e}")
             raise

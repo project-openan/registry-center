@@ -4,7 +4,7 @@ AgentCard Signature Test Script
 
 This script demonstrates how to:
 1. Generate ECDSA key pair
-2. Create backend public key file
+2. Create backend public key file (only stores keys array)
 3. Construct AgentCard data
 4. Sign AgentCard
 5. Test signature verification
@@ -15,7 +15,6 @@ Adapted for a2a-sdk 1.0.0+ (protobuf-based AgentCard)
 import json
 import base64
 import os
-from datetime import datetime, timezone
 from a2a.types import AgentCard
 from google.protobuf.json_format import ParseDict, MessageToDict
 from a2a.utils.signing import (
@@ -28,7 +27,6 @@ from a2a.utils.signing import (
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
-from datetime import datetime
 
 from agent_registry.signature.jwk_fetcher import JWKFetcher
 from agent_registry.signature.public_key_manager import PublicKeyManager
@@ -271,7 +269,7 @@ def sign_agent_card(private_key_pem: str, agent_card: AgentCard, protected_heade
 
 def create_backend_key_file(organization, agent_name, jwk):
     """
-    Create backend public key file
+    Create backend public key file (only stores keys array).
     
     Args:
         organization: Organization name
@@ -282,21 +280,19 @@ def create_backend_key_file(organization, agent_name, jwk):
     org_dir = f"{base_dir}/{organization}"
     file_path = f"{org_dir}/{agent_name}.json"
     
-    storage_obj = {
-        "organization": organization,
-        "agent_name": agent_name,
-        "keys": [jwk],
-        "updated_at": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    # Only store keys array, organization and agent_name are from file path
+    jwks_obj = {
+        "keys": [jwk]
     }
     
     os.makedirs(org_dir, exist_ok=True)
     
     with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(storage_obj, f, ensure_ascii=False, indent=2)
+        json.dump(jwks_obj, f, ensure_ascii=False, indent=2)
     
     print(f"[OK] Backend public key file created: {file_path}")
     print(f"   File content:")
-    print(json.dumps(storage_obj, indent=2, ensure_ascii=False))
+    print(json.dumps(jwks_obj, indent=2, ensure_ascii=False))
 
 
 def create_complete_agent_card_with_signature():

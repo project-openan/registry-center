@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
 
 
 class SignatureObject(BaseModel):
@@ -38,13 +37,5 @@ class JWK(BaseModel):
 
 
 class JWKS(BaseModel):
-    """JSON Web Key Set model"""
-    keys: List[JWK] = Field(..., description="List of public keys")
-
-
-class AgentKeysStorage(BaseModel):
-    """Agent public key storage model"""
-    organization: Optional[str] = Field(None, description="Organization name")
-    agent_name: str = Field(..., description="Agent name")
+    """JSON Web Key Set model (only contains keys array)"""
     keys: List[JWK] = Field(default_factory=list, description="List of public keys")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update time")

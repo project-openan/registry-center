@@ -69,10 +69,13 @@ class InitCommand:
             f"Enable signature validation (y/n, default: {default_signature}): ").strip()
         if signature_validation_input.lower() == 'n':
             config['signature_validation_enabled'] = 'false'
+            print("Signature validation disabled")
         elif signature_validation_input.lower() == 'y':
             config['signature_validation_enabled'] = 'true'
+            print("Signature validation enabled")
         else:
             config['signature_validation_enabled'] = default_signature
+            print(f"Signature validation set to default: {default_signature}")
 
         default_approval = self.existing_config.get('agent_approval_enabled', 'false')
         current_approval = default_approval

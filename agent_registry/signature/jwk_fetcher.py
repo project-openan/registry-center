@@ -9,7 +9,7 @@ from agent_registry.signature.public_key_manager import PublicKeyManager
 class JWKFetcher:
     """JWK fetcher"""
 
-    REQUEST_TIMEOUT = 10  # 10 second timeout
+    REQUEST_TIMEOUT = 10
 
     def __init__(self, public_key_manager: Optional[PublicKeyManager] = None):
         self.session = requests.Session()
@@ -51,7 +51,8 @@ class JWKFetcher:
             logger.error(f"Error while fetching JWKS: {e}")
             return None
 
-    def find_key_by_id(self, jwks: JWKS, kid: str) -> Optional[JWK]:
+    @staticmethod
+    def find_key_by_id(jwks: JWKS, kid: str) -> Optional[JWK]:
         """
         Find a public key from JWKS by kid.
 
@@ -64,7 +65,7 @@ class JWKFetcher:
         """
         try:
             for key in jwks.keys:
-                if (key.kid == kid):
+                if key.kid == kid:
                     logger.info(f"Found key by kid: {kid}")
                     return key
 
@@ -149,7 +150,8 @@ class JWKFetcher:
                 return self._convert_to_pyjwk(jwk)
         return None
 
-    def _convert_to_pyjwk(self, jwk: JWK):
+    @staticmethod
+    def _convert_to_pyjwk(jwk: JWK) -> PyJWK:
         """
         Convert custom JWK object to jwt.api_jwk.PyJWK object.
 
