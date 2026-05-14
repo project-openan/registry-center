@@ -34,7 +34,8 @@ class AgentCardSignatureValidator:
         self.jwk_fetcher = jwk_fetcher
         self._signature_validation_enabled = self._load_signature_config()
 
-    def _load_signature_config(self) -> bool:
+    @staticmethod
+    def _load_signature_config() -> bool:
         """
         Load signature validation toggle from configuration file.
 
@@ -135,7 +136,8 @@ class AgentCardSignatureValidator:
                 details={"error": str(e)}
             )
 
-    def _extract_signatures_from_protobuf(self, agent_card: AgentCard) -> List[SignatureObject]:
+    @staticmethod
+    def _extract_signatures_from_protobuf(agent_card: AgentCard) -> List[SignatureObject]:
         """Extract signatures from protobuf AgentCard"""
         try:
             signatures = agent_card.signatures
@@ -166,32 +168,8 @@ class AgentCardSignatureValidator:
             logger.error(f"Failed to extract signatures: {e}")
             return []
 
-    def _extract_signatures(self, agent_card_data: dict) -> List[SignatureObject]:
-        """Extract signatures field from dict"""
-        try:
-            signatures = agent_card_data.get("signatures")
-            if not signatures:
-                return []
-
-            signature_objects = []
-            for sig in signatures:
-                if not isinstance(sig, dict):
-                    logger.warning(f"Invalid signature format: {sig}")
-                    continue
-
-                if "protected" not in sig or "signature" not in sig:
-                    logger.warning("Missing required fields in signature")
-                    continue
-
-                signature_objects.append(SignatureObject(**sig))
-
-            return signature_objects
-
-        except Exception as e:
-            logger.error(f"Failed to extract signatures: {e}")
-            return []
-
-    def _decode_protected(self, protected: str) -> Optional[ProtectedHeader]:
+    @staticmethod
+    def _decode_protected(protected: str) -> Optional[ProtectedHeader]:
         """Decode protected header"""
         try:
             padding = 4 - len(protected) % 4

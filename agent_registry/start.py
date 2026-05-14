@@ -16,7 +16,6 @@
 # agent_registry/start.py
 import asyncio
 import os
-import platform
 import ssl
 import sys
 import threading
@@ -25,8 +24,8 @@ import uvicorn
 from loguru import logger
 from uvicorn import config
 
+from agent_registry.config import CONN_TIMEOUT, TLS_CIPHER, FORWARDED_ALLOW_IPS, IS_WINDOWS
 from agent_registry.cipher_converter import CipherConverter
-from agent_registry.config import CONN_TIMEOUT, TLS_CIPHER, FORWARDED_ALLOW_IPS
 from agent_registry.internal.registry_center_internal_service import RegistryCenterInternalService
 from agent_registry.server import app
 from common.cert.cert_validater import CertValidator
@@ -36,8 +35,6 @@ from common.log.audit_logger import LogLevel, OperationResult, OperatorObject, O
 from common.util.cipher_util import DEFAULT_ENCODING
 from common.util.conf_util import conf_singleton_obj, load_cert_password, set_ssl_folder_permissions
 from common.util.config_util import get_conf
-
-IS_WINDOWS = platform.system() == "Windows"
 
 audit_handle = HandlerRegistry.get_handler(InterfaceType.AUDIT)
 

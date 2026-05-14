@@ -15,7 +15,6 @@
 
 import json
 import os
-import platform
 import socket
 import threading
 from typing import Dict, Type, Optional
@@ -23,6 +22,7 @@ from typing import Dict, Type, Optional
 from loguru import logger
 from pydantic import ValidationError
 
+from agent_registry.config import IS_WINDOWS
 from agent_registry.internal.handlers import BaseUDSHandler
 from agent_registry.internal.handlers.approval_handler import ApprovalHandler
 from agent_registry.internal.handlers.get_agent_handler import GetAgentHandler
@@ -35,8 +35,6 @@ from agent_registry.internal.protocols.actions import Action
 from agent_registry.internal.protocols.request import InternalRequest
 from agent_registry.registry_instance import get_registry
 from common.util.config_util import get_conf
-
-IS_WINDOWS = platform.system() == 'Windows'
 
 
 class RequestDispatcher:

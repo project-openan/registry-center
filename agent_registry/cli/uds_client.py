@@ -23,13 +23,12 @@ Note: UDS (Unix Domain Socket) is only supported on Linux. Windows is not suppor
 """
 
 import json
-import platform
 import socket
 from typing import Dict, Any, Optional, List
 
 from loguru import logger
 
-IS_WINDOWS = platform.system() == "Windows"
+from agent_registry.config import IS_WINDOWS
 
 
 class UDSClient:

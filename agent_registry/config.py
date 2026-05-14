@@ -12,8 +12,14 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
+import platform
+
 from common.util.config_util import get_conf
 from common.util.conf_util import get_persistence_conf
+
+# Platform detection
+IS_WINDOWS = platform.system() == "Windows"
 
 PERSISTENCE_CONF = get_persistence_conf()
 PERSISTENCE_MODE = PERSISTENCE_CONF.get("persistence.mode", "file")
