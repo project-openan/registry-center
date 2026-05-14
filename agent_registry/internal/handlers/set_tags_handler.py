@@ -111,7 +111,7 @@ class SetTagsHandler(BaseUDSHandler):
             
             return InternalResponse(
                 success=True,
-                message="Tags set successfully (full replacement)",
+                message="Tags set successfully",
                 data={
                     "agent_name": agent_name,
                     "organization": organization,

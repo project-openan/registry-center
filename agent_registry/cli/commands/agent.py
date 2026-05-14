@@ -98,7 +98,7 @@ class UDSGetCommand(BaseCommand):
                 'agent_name': args.agent_name,
                 'organization': args.org,
                 'status': data.get('status', 'published'),
-                'tags': ', '.join(data.get('tag', [])) or 'None',
+                'tags': ', '.join(data.get('tag', [])) or '',
                 'created_at': format_timestamp(data.get('created_at', '')),
                 'updated_at': format_timestamp(data.get('updated_at', '')),
                 'agentcard': data.get('agentcard', {}),
@@ -163,7 +163,7 @@ class UDSListCommand(BaseCommand):
                     'agent_name': agent.get("agent_name", "unknown"),
                     'organization': agent.get("organization", "unknown"),
                     'status': agent.get("status", "unknown"),
-                    'tags': ', '.join(agent.get("tag", [])) or 'None',
+                    'tags': ', '.join(agent.get("tag", [])) or '',
                     'created_at': format_timestamp(agent.get("created_at", "")),
                     'updated_at': format_timestamp(agent.get("updated_at", "")),
                 })
@@ -288,7 +288,7 @@ class SetTagsCommand(BaseCommand):
                 'tags_set': ', '.join(tags),
             }
             
-            print(self.format_output(flattened_data, title="Tags Set (Full Replacement)"))
+            print(self.format_output(flattened_data, title="Tags set successfully"))
             return 0
         else:
             output.error(result.get("error", "Set tags failed"))
