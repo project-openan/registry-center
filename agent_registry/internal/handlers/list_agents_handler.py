@@ -15,7 +15,7 @@ class ListAgentsHandler(BaseUDSHandler):
         agent_list = []
         for agent in agents:
             status = registry.get_status(agent.name, agent.provider.organization)
-            tags = registry.get_tags(agent.name, agent.provider.organization)
+            tags = registry.get_agent_tags(agent.name, agent.provider.organization)
             created_at = registry.get_created_at(agent.name, agent.provider.organization)
             updated_at = registry.get_updated_at(agent.name, agent.provider.organization)
             agent_list.append({

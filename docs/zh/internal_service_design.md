@@ -450,7 +450,7 @@ async def list_agents(name: Optional[str] = None, organization: Optional[str] = 
 | `approval` | 审核Agent | agent_name, organization |
 | `get_agent` | 查询单个Agent元数据 | agent_name, organization |
 | `list_agents` | 查询全量Agent元数据 | 无参数 |
-| `add_tags` | 添加Agent标签 | agent_name, organization, tags(数组) |
+| `set_tag` | 设置Agent标签（全量覆盖） | agent_name, organization, tags(数组) |
 | `config` | 配置管理 | config_key, config_value |
 | `stats` | 统计查询 | type |
 | `query` | Agent查询 | agent_name, organization |
@@ -505,7 +505,7 @@ agent_registry/
 │   │   ├── approval_handler.py   # 审核处理器
 │   │   ├── get_agent_handler.py  # 单Agent查询处理器
 │   │   ├── list_agents_handler.py # 全量Agent查询处理器
-│   │   └── add_tags_handler.py   # 添加标签处理器
+│   │   └── set_tags_handler.py   # 设置标签处理器（全量覆盖）
 │   │
 │   └── protocols/                # 协议定义
 │       ├── __init__.py
@@ -827,7 +827,7 @@ agent_registry/
 │   │   ├── approval_handler.py   # 审核处理器
 │   │   ├── get_agent_handler.py  # 单Agent查询处理器
 │   │   ├── list_agents_handler.py # 全量Agent查询处理器
-│   │   └── add_tags_handler.py   # 添加标签处理器
+│   │   └── set_tags_handler.py   # 设置标签处理器（全量覆盖）
 │   │
 │   └── protocols/                # 协议定义
 │       ├── __init__.py

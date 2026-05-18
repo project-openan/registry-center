@@ -126,7 +126,7 @@ class BaseCommand(ABC):
                     'organization': 'Organization',
                     'status': 'Status',
                     'tags': 'Tags',
-                    'agentcard': 'AgentCard JSON',
+                    'agentcard': 'Agent Card',
                 }
             }
         

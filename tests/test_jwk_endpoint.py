@@ -31,7 +31,7 @@ def client(mock_jwk_provider):
 
 
 def test_get_jwks_success(client):
-    response = client.get("/.well-known/jwks.json")
+    response = client.get("/rest/v1/registry-center/keys")
     assert response.status_code == 200
     
     data = response.json()
@@ -49,11 +49,11 @@ def test_get_jwks_success(client):
 
 def test_get_jwks_rate_limit_exceeded(client):
     for i in range(10):
-        response = client.get("/.well-known/jwks.json")
+        response = client.get("/rest/v1/registry-center/keys")
         assert response.status_code == 200
     
     for i in range(5):
-        response = client.get("/.well-known/jwks.json")
+        response = client.get("/rest/v1/registry-center/keys")
         assert response.status_code == 429
         assert "Too Many Requests" in response.json()["detail"]
 
@@ -68,7 +68,7 @@ def test_get_jwks_internal_error():
         test_client = TestClient(server.app)
         
         with patch('loguru.logger.error') as mock_logger:
-            response = test_client.get("/.well-known/jwks.json")
+            response = test_client.get("/rest/v1/registry-center/keys")
             assert response.status_code == 500
             assert "Failed to load certificate" in response.json()["detail"]
             mock_logger.assert_called()

@@ -28,7 +28,7 @@ class GetAgentHandler(BaseUDSHandler):
             ).model_dump()
         
         status = registry.get_status(agent_name, organization)
-        tags = registry.get_tags(agent_name, organization)
+        tags = registry.get_agent_tags(agent_name, organization)
         created_at = registry.get_created_at(agent_name, organization)
         updated_at = registry.get_updated_at(agent_name, organization)
         agent_dict = MessageToDict(agent, preserving_proto_field_name=True)

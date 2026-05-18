@@ -18,6 +18,8 @@ CLI UDS Client
 
 Unified socket client for CLI commands to communicate with internal UDS service.
 All CLI commands that need internal service access should use this client.
+
+Note: UDS (Unix Domain Socket) is only supported on Linux. Windows is not supported.
 """
 
 import json
@@ -26,6 +28,8 @@ from typing import Dict, Any, Optional, List
 
 from loguru import logger
 
+from agent_registry.config import IS_WINDOWS
+
 
 class UDSClient:
     """
@@ -33,12 +37,15 @@ class UDSClient:
 
     Communicates with internal service via Unix Domain Socket.
     All CLI commands should use this client for internal operations.
+    
+    Note: Only works on Linux. Windows environment will return errors.
     """
 
     SOCKET_PATH = "run/registry-center/internal.sock"
 
     def __init__(self, socket_path: str = None):
         self.socket_path = socket_path or self.SOCKET_PATH
+        self.is_windows = IS_WINDOWS
 
     def send_request(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -51,6 +58,14 @@ class UDSClient:
         Returns:
             Response dict with success, error, message, data fields
         """
+        if self.is_windows:
+            logger.error("Registry center startup failed: Windows environment is not supported. Please run in a Linux environment.")
+            return {
+                "success": False,
+                "error": "Platform not supported",
+                "message": "Registry center startup failed: Windows environment is not supported. Please run in a Linux environment."
+            }
+        
         request = {
             "action": action,
             "params": params
@@ -120,9 +135,9 @@ class UDSClient:
         """Get all agents metadata"""
         return self.send_request("list_agents", {})
 
-    def add_tags(self, agent_name: str, organization: str, tags: List[str]) -> Dict[str, Any]:
-        """Add tags to agent"""
-        return self.send_request("add_tag", {
+    def set_tags(self, agent_name: str, organization: str, tags: List[str]) -> Dict[str, Any]:
+        """Set agent tags (full replacement)"""
+        return self.send_request("set_tag", {
             "agent_name": agent_name,
             "organization": organization,
             "tags": tags
@@ -165,4 +180,6 @@ def get_uds_client() -> UDSClient:
     global _client
     if _client is None:
         _client = UDSClient()
+        if IS_WINDOWS:
+            logger.error("Registry center startup failed: Windows environment is not supported. Please run in a Linux environment.")
     return _client

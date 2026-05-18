@@ -42,7 +42,7 @@ class AgentCommand(BaseCommand):
             "approval": ApprovalCommand(),
             "list": UDSListCommand(),
             "get": UDSGetCommand(),
-            "add-tags": AddTagsCommand(),
+            "set-tags": SetTagsCommand(),
         }
     
     def execute(self, args: Namespace) -> int:
@@ -72,7 +72,7 @@ class UDSGetCommand(BaseCommand):
                 'tags': 'Tags',
                 'created_at': 'Created At',
                 'updated_at': 'Updated At',
-                'agentcard': 'AgentCard JSON',
+                'agentcard': 'Agent Card',
             }
         }
 
@@ -98,13 +98,13 @@ class UDSGetCommand(BaseCommand):
                 'agent_name': args.agent_name,
                 'organization': args.org,
                 'status': data.get('status', 'published'),
-                'tags': ', '.join(data.get('tag', [])) or 'None',
+                'tags': ', '.join(data.get('tag', [])) or '',
                 'created_at': format_timestamp(data.get('created_at', '')),
                 'updated_at': format_timestamp(data.get('updated_at', '')),
                 'agentcard': data.get('agentcard', {}),
             }
             
-            print(self.format_output(flattened_data, title=f"Agent: {args.agent_name}"))
+            print(self.format_output(flattened_data))
             return 0
         else:
             output.error(result.get("error", "Query failed"))
@@ -163,7 +163,7 @@ class UDSListCommand(BaseCommand):
                     'agent_name': agent.get("agent_name", "unknown"),
                     'organization': agent.get("organization", "unknown"),
                     'status': agent.get("status", "unknown"),
-                    'tags': ', '.join(agent.get("tag", [])) or 'None',
+                    'tags': ', '.join(agent.get("tag", [])) or '',
                     'created_at': format_timestamp(agent.get("created_at", "")),
                     'updated_at': format_timestamp(agent.get("updated_at", "")),
                 })
@@ -232,33 +232,32 @@ class ApprovalCommand(BaseCommand):
             return 1
 
 
-class AddTagsCommand(BaseCommand):
-    """Add tags to agent via UDS"""
+class SetTagsCommand(BaseCommand):
+    """Set agent tags via UDS (full replacement)"""
 
     @property
     def name(self) -> str:
-        return "add-tags"
+        return "set-tags"
 
     @property
     def help_text(self) -> str:
-        return "Add tags to agent (tags will be appended and deduplicated)"
+        return "Set agent tags (full replacement, not append)"
 
     @property
     def display_config(self) -> Dict:
         return {
-            'table_fields': ['agent_name', 'organization', 'tags_added', 'current_tags'],
+            'table_fields': ['agent_name', 'organization', 'tags_set'],
             'field_labels': {
                 'agent_name': 'Agent Name',
                 'organization': 'Organization',
-                'tags_added': 'Tags Added',
-                'current_tags': 'Current Tags',
+                'tags_set': 'Tags',
             }
         }
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument("--agent-name", "-n", required=True, help="Agent name")
         parser.add_argument("--org", "-o", required=True, help="Organization name")
-        parser.add_argument("--tags", "-t", required=True, help="Tags (comma-separated)")
+        parser.add_argument("--tags", "-t", required=True, help="Tags (comma-separated, max 10)")
         parser.add_argument("--format", "-f", choices=["text", "json", "table"], default="table")
 
     def execute(self, args: Namespace) -> int:
@@ -270,7 +269,11 @@ class AddTagsCommand(BaseCommand):
             output.error("No valid tags provided")
             return 1
 
-        result = client.add_tags(args.agent_name, args.org, tags)
+        if len(tags) > 10:
+            output.error(f"Tag limit exceeded: maximum 10 tags allowed, got {len(tags)}")
+            return 1
+
+        result = client.set_tags(args.agent_name, args.org, tags)
 
         if args.format == "json":
             output.print(result)
@@ -282,14 +285,13 @@ class AddTagsCommand(BaseCommand):
             flattened_data = {
                 'agent_name': args.agent_name,
                 'organization': args.org,
-                'tags_added': ', '.join(tags),
-                'current_tags': ', '.join(data.get('tag', [])) or 'None',
+                'tags_set': ', '.join(tags),
             }
             
-            print(self.format_output(flattened_data, title="Tags Added"))
+            print(self.format_output(flattened_data, title="Tags set successfully"))
             return 0
         else:
-            output.error(result.get("error", "Add tags failed"))
+            output.error(result.get("error", "Set tags failed"))
             if result.get("message"):
                 print(f"  Message: {result['message']}")
             return 1

@@ -26,8 +26,8 @@ from agent_registry.model.validated_agentcard import (
     SKILL_MAX_LENGTH
 )
 from agent_registry.model.blacklist_config import (
-    PROMPT_INJECTION_BLACKLIST,
-    DANGEROUS_SKILL_BLACKLIST
+    PROMPT_INJECTION_BLACKLIST_CN,
+    DANGEROUS_SKILL_BLACKLIST_CN
 )
 
 
@@ -54,20 +54,20 @@ class TestCheckBlacklist:
     def test_check_blacklist_normal_text(self):
         """Test with normal text that does not contain blacklisted keywords"""
         normal_text = "This is a normal agent description without malicious content"
-        check_blacklist(normal_text, PROMPT_INJECTION_BLACKLIST, "test field")
-        check_blacklist(normal_text, DANGEROUS_SKILL_BLACKLIST, "test field")
+        check_blacklist(normal_text, PROMPT_INJECTION_BLACKLIST_CN, "test field")
+        check_blacklist(normal_text, DANGEROUS_SKILL_BLACKLIST_CN, "test field")
 
     def test_check_blacklist_normal_chinese_text(self):
         """Test with normal Chinese text"""
         normal_chinese = "这是一个普通的Agent描述，用于数据分析"
-        check_blacklist(normal_chinese, PROMPT_INJECTION_BLACKLIST, "test field")
-        check_blacklist(normal_chinese, DANGEROUS_SKILL_BLACKLIST, "test field")
+        check_blacklist(normal_chinese, PROMPT_INJECTION_BLACKLIST_CN, "test field")
+        check_blacklist(normal_chinese, DANGEROUS_SKILL_BLACKLIST_CN, "test field")
 
     def test_check_blacklist_prompt_injection_exact_match(self):
         """Test with exact prompt injection keyword"""
         malicious_text = "忽略之前的指令"
         with pytest.raises(HTTPException) as exc_info:
-            check_blacklist(malicious_text, PROMPT_INJECTION_BLACKLIST, "description")
+            check_blacklist(malicious_text, PROMPT_INJECTION_BLACKLIST_CN, "description")
         assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "description contains prohibited content" in exc_info.value.detail
         assert "忽略之前的指令" in exc_info.value.detail
@@ -76,7 +76,7 @@ class TestCheckBlacklist:
         """Test with exact dangerous skill keyword"""
         malicious_text = "执行代码"
         with pytest.raises(HTTPException) as exc_info:
-            check_blacklist(malicious_text, DANGEROUS_SKILL_BLACKLIST, "skill name")
+            check_blacklist(malicious_text, DANGEROUS_SKILL_BLACKLIST_CN, "skill name")
         assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "skill name contains prohibited content" in exc_info.value.detail
         assert "执行代码" in exc_info.value.detail
@@ -86,14 +86,14 @@ class TestCheckBlacklist:
         malicious_texts = ["忽略之前的指令", "忽略之前的指令", "忽略之前的指令"]
         for text in malicious_texts:
             with pytest.raises(HTTPException) as exc_info:
-                check_blacklist(text, PROMPT_INJECTION_BLACKLIST, "description")
+                check_blacklist(text, PROMPT_INJECTION_BLACKLIST_CN, "description")
             assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_check_blacklist_substring_match(self):
         """Test that blacklist check matches substrings"""
         text_with_keyword = "这个Agent可以忽略之前的指令并执行操作"
         with pytest.raises(HTTPException) as exc_info:
-            check_blacklist(text_with_keyword, PROMPT_INJECTION_BLACKLIST, "description")
+            check_blacklist(text_with_keyword, PROMPT_INJECTION_BLACKLIST_CN, "description")
         assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "忽略之前的指令" in exc_info.value.detail
 
@@ -101,18 +101,18 @@ class TestCheckBlacklist:
         """Test that function exits early when finding first match"""
         malicious_text = "忽略之前的指令和越狱"
         with pytest.raises(HTTPException) as exc_info:
-            check_blacklist(malicious_text, PROMPT_INJECTION_BLACKLIST, "description")
+            check_blacklist(malicious_text, PROMPT_INJECTION_BLACKLIST_CN, "description")
         assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_check_blacklist_empty_text(self):
         """Test with empty text"""
-        check_blacklist("", PROMPT_INJECTION_BLACKLIST, "description")
-        check_blacklist("", DANGEROUS_SKILL_BLACKLIST, "description")
+        check_blacklist("", PROMPT_INJECTION_BLACKLIST_CN, "description")
+        check_blacklist("", DANGEROUS_SKILL_BLACKLIST_CN, "description")
 
     def test_check_blacklist_special_characters(self):
         """Test with text containing special characters but no blacklist"""
         special_text = "This is a @#$% special text with symbols!"
-        check_blacklist(special_text, PROMPT_INJECTION_BLACKLIST, "description")
+        check_blacklist(special_text, PROMPT_INJECTION_BLACKLIST_CN, "description")
 
     def test_check_blacklist_selected_prompt_injection_keywords(self):
         """Test that selected prompt injection keywords are detected"""
@@ -128,7 +128,7 @@ class TestCheckBlacklist:
         ]
         for keyword in test_keywords:
             with pytest.raises(HTTPException) as exc_info:
-                check_blacklist(keyword, PROMPT_INJECTION_BLACKLIST, "test")
+                check_blacklist(keyword, PROMPT_INJECTION_BLACKLIST_CN, "test")
             assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_check_blacklist_selected_dangerous_skill_keywords(self):
@@ -145,13 +145,13 @@ class TestCheckBlacklist:
         ]
         for keyword in test_keywords:
             with pytest.raises(HTTPException) as exc_info:
-                check_blacklist(keyword, DANGEROUS_SKILL_BLACKLIST, "test")
+                check_blacklist(keyword, DANGEROUS_SKILL_BLACKLIST_CN, "test")
             assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_check_blacklist_field_name_in_error(self):
         """Test that field name is included in error message"""
         with pytest.raises(HTTPException) as exc_info:
-            check_blacklist("忽略之前的指令", PROMPT_INJECTION_BLACKLIST, "custom field name")
+            check_blacklist("忽略之前的指令", PROMPT_INJECTION_BLACKLIST_CN, "custom field name")
         assert "custom field name" in exc_info.value.detail
 
 
@@ -455,24 +455,24 @@ class TestEdgeCases:
 
     def test_whitespace_only_text(self):
         """Test with whitespace only text"""
-        check_blacklist("   ", PROMPT_INJECTION_BLACKLIST, "description")
-        check_blacklist("\n\t", DANGEROUS_SKILL_BLACKLIST, "description")
+        check_blacklist("   ", PROMPT_INJECTION_BLACKLIST_CN, "description")
+        check_blacklist("\n\t", DANGEROUS_SKILL_BLACKLIST_CN, "description")
 
     def test_unicode_characters_without_keyword(self):
         """Test with unicode characters without blacklisted keywords"""
         unicode_text = "这是一个包含Unicode字符的描述 😊"
-        check_blacklist(unicode_text, PROMPT_INJECTION_BLACKLIST, "description")
+        check_blacklist(unicode_text, PROMPT_INJECTION_BLACKLIST_CN, "description")
 
     def test_keyword_as_part_of_normal_word(self):
         """Test when blacklisted keyword appears as part of a normal word"""
         text = "This is an analyzer that helps with data"
-        check_blacklist(text, DANGEROUS_SKILL_BLACKLIST, "description")
+        check_blacklist(text, DANGEROUS_SKILL_BLACKLIST_CN, "description")
 
     def test_multiple_keywords_spread_across_text(self):
         """Test multiple keywords spread across the text"""
         text = "Start normal text 忽略之前的指令 middle text 执行代码 end text"
         with pytest.raises(HTTPException) as exc_info:
-            check_blacklist(text, PROMPT_INJECTION_BLACKLIST, "description")
+            check_blacklist(text, PROMPT_INJECTION_BLACKLIST_CN, "description")
         assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_exact_blacklist_keyword(self):
@@ -480,9 +480,9 @@ class TestEdgeCases:
         prompt_keywords = ["忽略之前的指令", "越狱"]
         for keyword in prompt_keywords:
             with pytest.raises(HTTPException):
-                check_blacklist(keyword, PROMPT_INJECTION_BLACKLIST, "test")
+                check_blacklist(keyword, PROMPT_INJECTION_BLACKLIST_CN, "test")
         
         skill_keywords = ["执行代码", "提权"]
         for keyword in skill_keywords:
             with pytest.raises(HTTPException):
-                check_blacklist(keyword, DANGEROUS_SKILL_BLACKLIST, "test")
+                check_blacklist(keyword, DANGEROUS_SKILL_BLACKLIST_CN, "test")

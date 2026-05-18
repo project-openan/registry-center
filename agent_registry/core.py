@@ -601,7 +601,7 @@ class RegistryCore:
             agent = self.storage.find_by_key(name, organization)
             if agent:
                 return getattr(agent, 'status', 'published')
-            return None
+            return ''
         else:
             key = self._make_key(name, organization)
             return self._status_map.get(key)
@@ -711,8 +711,8 @@ class RegistryCore:
         if self.persistence_mode == 'postgresql':
             return self.storage.get_agent_tags(name, organization)
         else:
-            agent_record = self.storage.find_by_key(name, organization)
-            return agent_record.tags if agent_record else []
+            key = self._make_key(name, organization)
+            return self._registry_tags_map.get(key, [])
 
     def update_agent_tags(self, name: str, organization: str, tags: List[str]) -> bool:
         """Update tags for an agent (full replacement)."""
@@ -720,11 +720,28 @@ class RegistryCore:
             if self.persistence_mode == 'postgresql':
                 return self.storage.update_agent_tags(name, organization, tags)
             else:
-                return self.storage.update_agent_tags(name, organization, tags)
+                key = self._make_key(name, organization)
+                if key not in self._agents:
+                    logger.warning(f"Agent not found: {name} ({organization})")
+                    return False
+                self._registry_tags_map[key] = tags
+                self._updated_at_map[key] = datetime.utcnow().isoformat()
+                self._save_registry()
+                logger.info(f"Agent tags updated: {name} -> {tags}")
+                return True
 
     def find_agents_by_tag(self, tag: str) -> List[AgentCard]:
         """Find agents that have a specific tag."""
-        return self.storage.find_by_tag(tag)
+        if self.persistence_mode == 'postgresql':
+            return self.storage.find_by_tag(tag)
+        else:
+            result = []
+            for key, agent_tags in self._registry_tags_map.items():
+                if tag in agent_tags:
+                    agent = self._agents.get(key)
+                    if agent:
+                        result.append(agent)
+            return result
 
     # Tag entity management methods
     def create_tag(self, name: str) -> Tag:

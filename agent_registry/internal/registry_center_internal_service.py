@@ -22,13 +22,12 @@ from typing import Dict, Type, Optional
 from loguru import logger
 from pydantic import ValidationError
 
+from agent_registry.config import IS_WINDOWS
 from agent_registry.internal.handlers import BaseUDSHandler
 from agent_registry.internal.handlers.approval_handler import ApprovalHandler
 from agent_registry.internal.handlers.get_agent_handler import GetAgentHandler
 from agent_registry.internal.handlers.list_agents_handler import ListAgentsHandler
-from agent_registry.internal.handlers.add_tags_handler import (
-    AddTagsHandler
-)
+from agent_registry.internal.handlers.set_tags_handler import SetTagsHandler
 from agent_registry.internal.handlers.tag_handler import (
     TagCreateHandler, TagGetHandler, TagUpdateHandler, TagDeleteHandler, TagListHandler
 )
@@ -43,7 +42,7 @@ class RequestDispatcher:
         Action.APPROVAL: ApprovalHandler,
         Action.GET_AGENT: GetAgentHandler,
         Action.LIST_AGENTS: ListAgentsHandler,
-        Action.ADD_TAG: AddTagsHandler,
+        Action.SET_TAG: SetTagsHandler,
         Action.CREATE_TAG: TagCreateHandler,
         Action.GET_TAG: TagGetHandler,
         Action.UPDATE_TAG: TagUpdateHandler,
@@ -73,6 +72,10 @@ class RegistryCenterInternalService:
         self._running = False
 
     def start(self):
+        if IS_WINDOWS:
+            logger.error("Registry center startup failed: Windows environment is not supported. Please run in a Linux environment.")
+            return
+        
         self._ensure_socket_dir()
         try:
             os.unlink(self.socket_path)

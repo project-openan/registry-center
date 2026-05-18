@@ -455,122 +455,21 @@ Prompt注入攻击是一种针对AI系统的特殊攻击方式，攻击者通过
 
 ## 7. 附录：完整黑名单列表
 
-### 7.1 中文黑名单
+**prompt注入关键词黑名单：**
 
-#### 7.1.1 Prompt注入黑名单（43项）
+| 分类 | 中文关键词 | 英文关键词 |
+|------|-----------|-----------|
+| 指令覆盖类 (14项) | 忽略之前的指令、忽略所有指令、忽略上述指令、无视指令<br>忽略限制、忽略规则、忽略约束、忽略安全<br>覆盖指令、覆盖规则、覆盖系统<br>忘记之前、忘记所有、忘记指令 | ignore previous instructions, ignore previous commands<br>ignore all instructions, ignore all commands<br>ignore above instructions, disregard instructions<br>ignore limits, ignore restrictions<br>ignore rules, ignore constraints<br>ignore security<br>override instructions, overwrite instructions<br>override rules, override system<br>forget previous, forget all, forget instructions |
+| 系统攻击类 (8项) | 越狱、破解、绕过、突破限制<br>开发者模式、管理员模式、超级用户<br>提示词注入 | jailbreak, crack, bypass<br>break limits, break restrictions<br>developer mode, admin mode, administrator mode<br>superuser, prompt injection |
+| 强制执行类 (9项) | 必须执行、必须输出、必须回答<br>无论如何、不管怎样、一定要<br>无条件执行、强制执行、立即执行 | must execute, must output, must answer<br>no matter what, regardless<br>must, definitely<br>unconditional execution, force execute, forced execution<br>execute immediately |
+| 特殊标记类 (12项) | 编码绕过<br>\</system\>、\</instruction\>、\</prompt\><br>[END]、[DONE]、[FINISHED]<br>assistant:、system:、user: | encoding bypass<br>\</system\>, \</instruction\>, \</prompt\><br>[END], [DONE], [FINISHED]<br>assistant:, system:, user: |
 
-```
-指令覆盖类（14项）：
-  忽略之前的指令、忽略所有指令、忽略上述指令、无视指令
-  忽略限制、忽略规则、忽略约束、忽略安全
-  覆盖指令、覆盖规则、覆盖系统
-  忘记之前、忘记所有、忘记指令
+**高危skill描述关键词黑名单：**
 
-系统攻击类（8项）：
-  越狱、破解、绕过、突破限制
-  开发者模式、管理员模式、超级用户
-  提示词注入
+| 分类 | 中文关键词 | 英文关键词 |
+|------|-----------|-----------|
+| 权限攻击类 (12项) | 提权、提升权限、获取权限、权限提升<br>绕过安全、绕过防护、绕过验证<br>突破安全、突破防护、安全绕过<br>非法管理员权限、非法超级权限、非法root权限 | privilege escalation, escalate privileges<br>elevate privileges, raise privileges<br>gain privileges, obtain privileges<br>bypass security, bypass protection<br>bypass authentication, bypass verification<br>break security, break protection<br>security bypass<br>illegal admin privileges, unauthorized admin privileges<br>illegal superuser privileges, illegal root privileges |
+| 数据库攻击类 (2项) | 数据库注入、SQL注入 | database injection, SQL injection |
+| 数据窃取类 (11项) | 窃取密钥、窃取密码、窃取凭证<br>非法获取密钥、非法获取密码、非法获取凭证<br>窃取数据、盗取数据、数据泄露<br>窃取隐私、非法获取隐私 | steal keys, steal secret keys<br>steal passwords, steal credentials<br>illegally obtain keys, illegally obtain passwords<br>illegally obtain credentials<br>steal data, data exfiltration<br>data leak, steal privacy<br>steal private data, illegally obtain privacy |
+| 网络攻击类 (6项) | 网络攻击、网络渗透、网络入侵<br>端口扫描、漏洞扫描、攻击扫描 | network attack, network penetration<br>network intrusion, port scan<br>port scanning, vulnerability scan<br>attack scan |
 
-强制执行类（9项）：
-  必须执行、必须输出、必须回答
-  无论如何、不管怎样、一定要
-  无条件执行、强制执行、立即执行
-
-特殊标记类（12项）：
-  编码绕过
-  </system>、</instruction>、</prompt>
-  [END]、[DONE]、[FINISHED]
-  assistant:、system:、user:
-```
-
-#### 7.1.2 高危Skill描述黑名单（33项）
-
-```
-权限攻击类（12项）：
-  提权、提升权限、获取权限、权限提升
-  绕过安全、绕过防护、绕过验证
-  突破安全、突破防护、安全绕过
-  非法管理员权限、非法超级权限、非法root权限
-
-数据库攻击类（2项）：
-  数据库注入、SQL注入
-
-数据窃取类（11项）：
-  窃取密钥、窃取密码、窃取凭证
-  非法获取密钥、非法获取密码、非法获取凭证
-  窃取数据、盗取数据、数据泄露
-  窃取隐私、非法获取隐私
-
-网络攻击类（6项）：
-  网络攻击、网络渗透、网络入侵
-  端口扫描、漏洞扫描、攻击扫描
-```
-
-### 7.2 英文黑名单
-
-#### 7.2.1 Prompt Injection Blacklist (43 items)
-
-```
-Instruction Override Category (14 items):
-  ignore previous instructions, ignore previous commands
-  ignore all instructions, ignore all commands
-  ignore above instructions, disregard instructions
-  ignore limits, ignore restrictions
-  ignore rules, ignore constraints
-  ignore security
-  override instructions, overwrite instructions
-  override rules, override system
-  forget previous, forget all, forget instructions
-
-System Attack Category (8 items):
-  jailbreak, crack, bypass
-  break limits, break restrictions
-  developer mode, admin mode, administrator mode
-  superuser, prompt injection
-
-Force Execution Category (9 items):
-  must execute, must output, must answer
-  no matter what, regardless
-  must, definitely
-  unconditional execution, force execute, forced execution
-  execute immediately
-
-Special Markers Category (12 items):
-  encoding bypass
-  </system>, </instruction>, </prompt>
-  [END], [DONE], [FINISHED]
-  assistant:, system:, user:
-```
-
-#### 7.2.2 High-Risk Skill Description Blacklist (33 items)
-
-```
-Privilege Attack Category (12 items):
-  privilege escalation, escalate privileges
-  elevate privileges, raise privileges
-  gain privileges, obtain privileges
-  bypass security, bypass protection
-  bypass authentication, bypass verification
-  break security, break protection
-  security bypass
-  illegal admin privileges, unauthorized admin privileges
-  illegal superuser privileges, illegal root privileges
-
-Database Attack Category (2 items):
-  database injection, SQL injection
-
-Data Theft Category (11 items):
-  steal keys, steal secret keys
-  steal passwords, steal credentials
-  illegally obtain keys, illegally obtain passwords
-  illegally obtain credentials
-  steal data, data exfiltration
-  data leak, steal privacy
-  steal private data, illegally obtain privacy
-
-Network Attack Category (6 items):
-  network attack, network penetration
-  network intrusion, port scan
-  port scanning, vulnerability scan
-  attack scan
-```

@@ -15,9 +15,7 @@
 
 from agent_registry.internal.handlers.base_handler import BaseUDSHandler
 from agent_registry.internal.handlers.approval_handler import ApprovalHandler
-from agent_registry.internal.handlers.add_tags_handler import (
-    AddTagsHandler
-)
+from agent_registry.internal.handlers.set_tags_handler import SetTagsHandler
 from agent_registry.internal.handlers.tag_handler import (
     TagCreateHandler, TagGetHandler, TagUpdateHandler, TagDeleteHandler, TagListHandler
 )
@@ -25,7 +23,7 @@ from agent_registry.internal.handlers.tag_handler import (
 __all__ = [
     'BaseUDSHandler',
     'ApprovalHandler',
-    'AddTagsHandler',
+    'SetTagsHandler',
     'TagCreateHandler', 'TagDeleteHandler', 'TagUpdateHandler',
     'TagGetHandler', 'TagListHandler',
 ]

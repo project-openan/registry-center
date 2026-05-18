@@ -16,7 +16,11 @@
 import time
 import statistics
 
-from agent_registry.model.blacklist_config import PROMPT_INJECTION_BLACKLIST, DANGEROUS_SKILL_BLACKLIST
+from agent_registry.model.blacklist_config import (
+    PROMPT_INJECTION_BLACKLIST_ALL,
+    DANGEROUS_SKILL_BLACKLIST_ALL,
+    MASTER_BLACKLIST_ALL
+)
 
 
 def check_blacklist_old(text: str, blacklist: list, field_name: str):
@@ -59,8 +63,8 @@ def test_blacklist_performance():
     print("=" * 80)
     print()
     
-    print(f"Blacklist size: Prompt injection = {len(PROMPT_INJECTION_BLACKLIST)} keywords")
-    print(f"Blacklist size: Dangerous skill = {len(DANGEROUS_SKILL_BLACKLIST)} keywords")
+    print(f"Blacklist size: Prompt injection = {len(PROMPT_INJECTION_BLACKLIST_ALL)} keywords (CN+EN combined)")
+    print(f"Blacklist size: Dangerous skill = {len(DANGEROUS_SKILL_BLACKLIST_ALL)} keywords (CN+EN combined)")
     print()
     
     print("-" * 80)
@@ -68,9 +72,9 @@ def test_blacklist_performance():
     print("-" * 80)
     
     for name, text in test_cases:
-        avg_old, _ = measure_time(check_blacklist_old, text, PROMPT_INJECTION_BLACKLIST, "test")
-        avg_new_prompt, _ = measure_time(check_blacklist_new, text, PROMPT_INJECTION_BLACKLIST, "test")
-        avg_new_skill, _ = measure_time(check_blacklist_new, text, DANGEROUS_SKILL_BLACKLIST, "test")
+        avg_old, _ = measure_time(check_blacklist_old, text, PROMPT_INJECTION_BLACKLIST_ALL, "test")
+        avg_new_prompt, _ = measure_time(check_blacklist_new, text, PROMPT_INJECTION_BLACKLIST_ALL, "test")
+        avg_new_skill, _ = measure_time(check_blacklist_new, text, DANGEROUS_SKILL_BLACKLIST_ALL, "test")
         
         overhead_prompt = avg_new_prompt - avg_old
         overhead_skill = avg_new_skill - avg_old
@@ -103,7 +107,7 @@ def test_field_validation_overhead():
     print(f"  Total blacklist checks: {total_checks} (Prompt + Skill = {total_checks * 2} actual scans)")
     print()
     
-    avg_single_check, _ = measure_time(check_blacklist_new, description_normal, PROMPT_INJECTION_BLACKLIST, "test")
+    avg_single_check, _ = measure_time(check_blacklist_new, description_normal, PROMPT_INJECTION_BLACKLIST_ALL, "test")
     
     estimated_overhead = avg_single_check * total_checks * 2
     
@@ -126,16 +130,13 @@ def test_real_world_scenario():
     ]
     
     def simulate_full_validation():
-        check_blacklist_new(description, PROMPT_INJECTION_BLACKLIST, "description")
-        check_blacklist_new(description, DANGEROUS_SKILL_BLACKLIST, "description")
+        check_blacklist_new(description, PROMPT_INJECTION_BLACKLIST_ALL, "description")
+        check_blacklist_new(description, DANGEROUS_SKILL_BLACKLIST_ALL, "description")
         for name, desc, tags in skills_data:
-            check_blacklist_new(name, PROMPT_INJECTION_BLACKLIST, "skill name")
-            check_blacklist_new(name, DANGEROUS_SKILL_BLACKLIST, "skill name")
-            check_blacklist_new(desc, PROMPT_INJECTION_BLACKLIST, "skill description")
-            check_blacklist_new(desc, DANGEROUS_SKILL_BLACKLIST, "skill description")
+            check_blacklist_new(name, MASTER_BLACKLIST_ALL, "skill name")
+            check_blacklist_new(desc, MASTER_BLACKLIST_ALL, "skill description")
             for tag in tags:
-                check_blacklist_new(tag, PROMPT_INJECTION_BLACKLIST, "skill tag")
-                check_blacklist_new(tag, DANGEROUS_SKILL_BLACKLIST, "skill tag")
+                check_blacklist_new(tag, MASTER_BLACKLIST_ALL, "skill tag")
     
     avg, std = measure_time(simulate_full_validation, iterations=1000)
     
@@ -154,10 +155,10 @@ def test_comparison_summary():
     print("=" * 80)
     print()
     
-    avg_normal, _ = measure_time(check_blacklist_new, "Normal text here", PROMPT_INJECTION_BLACKLIST, "test", iterations=100000)
+    avg_normal, _ = measure_time(check_blacklist_new, "Normal text here", PROMPT_INJECTION_BLACKLIST_ALL, "test", iterations=100000)
     
     print("Key Findings:")
-    print(f"  1. Single blacklist check: ~{avg_normal:.3f}ms (scanning ~100 keywords)")
+    print(f"  1. Single blacklist check: ~{avg_normal:.3f}ms (scanning ~{len(PROMPT_INJECTION_BLACKLIST_ALL)} keywords)")
     print(f"  2. Early exit on match: faster than full scan")
     print(f"  3. Typical AgentCard (1 desc + 5 skills): ~{avg_normal * 16:.3f}ms overhead")
     print()
