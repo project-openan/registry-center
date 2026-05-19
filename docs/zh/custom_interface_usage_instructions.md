@@ -9,30 +9,36 @@
 3. **自定义扩展**：支持用户注册自定义处理器
 
 ## 安装使用
-该模块是注册中心项目的组成部分。
+
+### 环境要求
+- Python 3.10+
+- 开发IDE（推荐 PyCharm / VS Code）
+
+### 安装流程图
+![photo](images/custom_interface_install.png)
 
 ## 使用方法
 
 ### 1. 默认处理器
 
-| 处理器类型 | 类名 | 功能说明        |
-|-----------|------|-------------|
-| DECRYPT | DecryptHandler | 处理解密操作      |
-| AUDIT | AuditHandler | 处理审计日志      |
-| AUTHENTICATE | AuthenticateHandler | 处理认证        |
-| INSERT | InsertHandler | 处理Agent数据保存 |
-| QUERY | QueryHandler | 处理Agent数据查询 |
-| UPDATE | UpdateHandler | 处理Agent数据修改 |
-| GET | GetHandler | 处理Agent精准查询 |
-| RETRIEVE | RetrieveHandler | 处理Agent检索   |
-| DEREGISTER | DeregisterHandler | 处理Agent删除   |
+| 处理器类型 | 类名 | 功能说明 | 参数说明 |
+|-----------|------|-------------|----------|
+| DECRYPT | DecryptHandler | 处理解密操作 | `ciphertext: str` 待解密的密文 |
+| AUDIT | AuditHandler | 处理审计日志 | `log_entry: Dict` 包含 operation_name, level, result, object_name, details, client_ip, user_name |
+| AUTHENTICATE | AuthenticateHandler | 处理认证 | `client_ip: str`, `request: Any`, `context: Dict` (可选) |
+| INSERT | InsertHandler | 处理Agent数据保存 | `agent: AgentCard`, `initial_status: str` (kwargs), `owner: str` (kwargs) |
+| QUERY | QueryHandler | 处理Agent数据查询 | `name: str` (可选), `organization: str` (可选) |
+| UPDATE | UpdateHandler | 处理Agent数据修改 | `name: str`, `organization: str`, `agent_data: Dict`, `owner: str` (kwargs) |
+| GET | GetHandler | 处理Agent精准查询 | `name: str`, `organization: str`, `owner: str` (kwargs) |
+| RETRIEVE | RetrieveHandler | 处理Agent检索 | `task: str`, `top_n: int` |
+| DEREGISTER | DeregisterHandler | 处理Agent删除 | `name: str`, `organization: str`, `owner: str` (kwargs) |
 
 ### 2. 自定义处理器
 **处理器调用流程图**:
 
 ![photo](images/custom_interface.png)
 
-** 核心组件说明**:
+**核心组件说明**:
 
 | 组件 | 说明 | 关键方法 |
 |-----|------|---------|
