@@ -32,7 +32,6 @@ from a2a.types import AgentCard
 from fastapi import FastAPI, HTTPException, Query, Request, Depends, status, Path
 from fastapi.responses import JSONResponse
 from google.protobuf.json_format import Parse, MessageToDict
-from jwt import PyJWK
 from loguru import logger
 from limits import strategies, storage, parse_many
 
@@ -821,7 +820,6 @@ def _make_agent_key(name: str, organization: str) -> Tuple[str, str]:
 
 # ---------- JWK Endpoint ----------
 jwk_provider = JWKProvider(cert_path=config.get("JWK_CERT_PATH", "cert.pem"))
-jwk_kid = config.get("JWK_KID", None)
 
 jwk_rate_item = parse_rate_limit('jwk')
 
@@ -829,7 +827,7 @@ jwk_rate_item = parse_rate_limit('jwk')
 @app.get("/rest/v1/registry-center/keys")
 async def get_jwks(request: Request):
     """
-    Download public key in PEM format for JWT signature verification.
+    Return public key in JWK Set format for JWT signature verification.
     This endpoint does not require authentication.
     """
     if jwk_rate_item and not await async_hit(jwk_rate_item, request.client.host):
@@ -842,14 +840,9 @@ async def get_jwks(request: Request):
     try:
         jwk_semaphore.acquire_nowait()
         acquired = True
-        public_key_pem = jwk_provider.get_public_key_pem()
-        return Response(
-            content=public_key_pem,
-            media_type="application/x-pem-file",
-            headers={
-                "Content-Disposition": "attachment; filename=public_key.pem"
-            }
-        )
+        jwk_set = jwk_provider.get_jwk_set()
+        keys = [jwk._jwk_data for jwk in jwk_set]
+        return JSONResponse(content={"keys": keys}, media_type="application/jwk-set+json")
     except CertLoadError as e:
         logger.error(f"Failed to load JWK: {e}")
         raise HTTPException(
@@ -865,12 +858,3 @@ async def get_jwks(request: Request):
     finally:
         if acquired:
             jwk_semaphore.release()
-
-
-def _enhance_jwk(jwk: PyJWK) -> Dict[str, Any]:
-    """Enhance JWK with kid and key_ops fields."""
-    jwk_dict = jwk._jwk_data.copy()
-    if jwk_kid:
-        jwk_dict["kid"] = jwk_kid
-    jwk_dict["key_ops"] = ["verify"]
-    return jwk_dict
