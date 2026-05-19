@@ -43,28 +43,25 @@ class JWKProvider:
 
             cert = x509.load_pem_x509_certificate(cert_data, default_backend())
             public_key = cert.public_key()
+            serial_number = cert.serial_number
+            kid = format(serial_number, 'x')
 
-            jwk_dict = self._public_key_to_jwk_dict(public_key)
+            jwk_dict = self._public_key_to_jwk_dict(public_key, kid)
             jwk = PyJWK(jwk_dict)
 
             return [jwk]
         except Exception as e:
             raise CertLoadError(f"Failed to load certificate: {e}")
 
-    def _public_key_to_jwk_dict(self, public_key) -> Dict[str, Any]:
-        public_bytes = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-
+    def _public_key_to_jwk_dict(self, public_key, kid: str) -> Dict[str, Any]:
         if public_key.__class__.__name__ == 'RSAPublicKey':
-            return self._rsa_to_jwk_dict(public_key)
+            return self._rsa_to_jwk_dict(public_key, kid)
         elif public_key.__class__.__name__ == 'EllipticCurvePublicKey':
-            return self._ec_to_jwk_dict(public_key)
+            return self._ec_to_jwk_dict(public_key, kid)
         else:
             raise CertLoadError(f"Unsupported key type: {public_key.__class__.__name__}")
 
-    def _rsa_to_jwk_dict(self, public_key) -> Dict[str, Any]:
+    def _rsa_to_jwk_dict(self, public_key, kid: str) -> Dict[str, Any]:
         from cryptography.hazmat.primitives.asymmetric import rsa
 
         if not isinstance(public_key, rsa.RSAPublicKey):
@@ -77,10 +74,12 @@ class JWKProvider:
             "n": self._base64url_encode(numbers.n.to_bytes((numbers.n.bit_length() + 7) // 8, 'big')),
             "e": self._base64url_encode(numbers.e.to_bytes((numbers.e.bit_length() + 7) // 8, 'big')),
             "alg": "RS256",
-            "use": "sig"
+            "use": "sig",
+            "kid": kid,
+            "key_ops": ["verify"]
         }
 
-    def _ec_to_jwk_dict(self, public_key) -> Dict[str, Any]:
+    def _ec_to_jwk_dict(self, public_key, kid: str) -> Dict[str, Any]:
         from cryptography.hazmat.primitives.asymmetric import ec
 
         if not isinstance(public_key, ec.EllipticCurvePublicKey):
@@ -106,7 +105,9 @@ class JWKProvider:
             "x": self._base64url_encode(numbers.x.to_bytes(coord_bytes, 'big')),
             "y": self._base64url_encode(numbers.y.to_bytes(coord_bytes, 'big')),
             "alg": "ES256",
-            "use": "sig"
+            "use": "sig",
+            "kid": kid,
+            "key_ops": ["verify"]
         }
 
     def _base64url_encode(self, data: bytes) -> str:
