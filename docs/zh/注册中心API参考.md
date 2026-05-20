@@ -38,23 +38,23 @@
 
   - body参数列表
 
-    | 参数名称       | 是否必选 | 类型              | 值域                                          | 默认值 | 描述 |
+    | 参数名称       | 是否必选 | 类型              | 值域                                            | 默认值 | 描述 |
     |------------|------|-----------------|-----------------------------------------------|-----|------|
-    | agentCards | 是    | array_reference | 当前只支持单个AgentCard的注册， 详细请参见表：AgentCard对象的参数列表 | -   | -    |
+    | agentCards | 是    | array_reference | 当前只支持单个AgentCard的注册， 详细请参见表：AgentCard对象的参数列表。 | -   | -    |
 
   - AgentCard对象的参数列表
 
-    | 参数名称                | 是否必选 | 类型              | 值域                                                              | 默认值 | 描述         |
-    |---------------------|------|-----------------|-------------------------------------------------------------------|-----|--------------|
-    | name                | 是    | string          | 1~100个字符。满足正则表达式`^[a-zA-Z0-9_]+(?:\s+[a-zA-Z0-9_]+)*$`            | -   | AgentCard名称  |
-    | description         | 是    | string          | 1~1000个字符。                                                        | -   | AgentCard描述  |
-    | version             | 是    | string          | 1~50个字符。                                                          | -   | AgentCard版本  |
-    | provider            | 是    | reference       | 详细请参见表：AgentProvider对象的参数列表                                       | -   | 提供商信息        |
-    | skills              | 是    | array_reference | 最大数量：100 个技能；每个技能的 JSON 序列化后最大长度：4096 字符；详细请参见表：AgentSkill对象的参数列表 | -   | 技能列表         |
-    | capabilities        | 是    | reference       | 详细请参见表：AgentCapabilities对象的参数列表                                   | -   | AgentCard能力项 |
-    | defaultInputModes   | 否    | array of string | 最大数量：100 个                                                        | -   | 输入模式         |
-    | defaultOutputModes  | 否    | array of string | 最大数量：100 个                                                        | -   | 输入模式         |
-    | supportedInterfaces | 是    | array_reference | 1~3个列表，详细请参见表：AgentInterface对象的参数列表                               | -   | 支持的协议        |
+    | 参数名称                | 是否必选 | 类型              | 值域                                                                 | 默认值 | 描述         |
+    |---------------------|------|-----------------|--------------------------------------------------------------------|-----|--------------|
+    | name                | 是    | string          | 1~100个字符。满足正则表达式`^[a-zA-Z0-9_]+(?:\s+[a-zA-Z0-9_]+)*$`。            | -   | AgentCard名称  |
+    | description         | 是    | string          | 1~1000个字符。                                                         | -   | AgentCard描述  |
+    | version             | 是    | string          | 1~50个字符。                                                           | -   | AgentCard版本  |
+    | provider            | 是    | reference       | 详细请参见表：AgentProvider对象的参数列表。                                       | -   | 提供商信息        |
+    | skills              | 是    | array_reference | 最大数量：100 个技能；每个技能的 JSON 序列化后最大长度：4096 字符；详细请参见表：AgentSkill对象的参数列表。 | -   | 技能列表         |
+    | capabilities        | 是    | reference       | 详细请参见表：AgentCapabilities对象的参数列表。                                   | -   | AgentCard能力项 |
+    | defaultInputModes   | 否    | array of string | 最大数量：100 个。                                                        | -   | 输入模式         |
+    | defaultOutputModes  | 否    | array of string | 最大数量：100 个。                                                        | -   | 输入模式         |
+    | supportedInterfaces | 是    | array_reference | 1~3个列表，详细请参见表：AgentInterface对象的参数列表。                               | -   | 支持的协议        |
 
   - AgentInterface对象的参数列表
 
@@ -113,8 +113,8 @@
           "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
           "version": "1.0.0",
           "provider": {
-            "organization": "Huawei",
-            "url": "https://www.huawei.com"
+            "organization": "Org",
+            "url": "https://www.org.com"
           },
           "skills": [
             {
@@ -250,7 +250,7 @@
   - 按组织机构精确查询
 
     ```json
-    GET /rest/v1/registry-center/agent-cards?organization=Huawei HTTP/1.1
+    GET /rest/v1/registry-center/agent-cards?organization=Org HTTP/1.1
     Host: your-domain.com
     Content-Type: application/json
     ```
@@ -258,16 +258,16 @@
   - 组合条件查询（AND）
 
     ```json
-    GET /rest/v1/registry-center/agent-cards?name=RAN%20Energy%20Saving%20Agent&organization=Huawei HTTP/1.1
+    GET /rest/v1/registry-center/agent-cards?name=RAN%20Energy%20Saving%20Agent&organization=Org HTTP/1.1
     Host: your-domain.com
     Content-Type: application/json
     ```
 
 - 响应参数
 
-  | 参数名称 | 类型     | 值域 | 默认值 | 描述         |
-  |------|--------|----|-----|--------------|
-  | -    | object | -  | -   | 符合要求的Agent列表 |
+  | 参数名称 | 类型    | 值域 | 默认值 | 描述         |
+  |------|-------|----|-----|--------------|
+  | agentCards | array | -  | -   | 符合要求的Agent列表 |
 
 - 响应样例
 
@@ -279,7 +279,7 @@
           "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
           "version": "1.0.0",
           "provider": {
-            "organization": "Huawei",
+            "organization": "Org",
             "url": ""
           },
           "skills": [
@@ -384,16 +384,16 @@
 - 请求示例
 
   ```json
-  GET /rest/v1/registry-center/agent-cards/Huawei/RAN%20Energy%20Saving%20Agent HTTP/1.1
+  GET /rest/v1/registry-center/agent-cards/Org/RAN%20Energy%20Saving%20Agent HTTP/1.1
   Host: your-domain.com
   Content-Type: application/json
   ```
 
 - 响应参数
 
-  | 参数名称 | 类型     | 值域   | 默认值 | 描述       |
-  |------|--------|--------|-----|------------|
-  | -    | object | object | -   | 符合要求的Agent |
+  | 参数名称 | 类型    | 值域 | 默认值 | 描述           |
+  |------|-------|----|-----|--------------|
+  | agentCards    | array | -  | -   | 符合要求的Agent列表 |
 
 - 响应样例
 
@@ -405,7 +405,7 @@
         "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
         "version": "1.0.0",
         "provider": {
-          "organization": "Huawei",
+          "organization": "Org",
           "url": ""
         },
         "skills": [
@@ -510,7 +510,7 @@
 - 请求示例
 
   ```json
-  PUT /rest/v1/registry-center/agent-cards/Huawei/RAN%20Energy%20Saving%20Agent HTTP/1.1
+  PUT /rest/v1/registry-center/agent-cards/Org/RAN%20Energy%20Saving%20Agent HTTP/1.1
   Host: your-domain.com
   Content-Type: application/json
   {
@@ -520,7 +520,7 @@
         "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
         "version": "1.0.0",
         "provider": {
-          "organization": "Huawei",
+          "organization": "Org",
           "url": ""
         },
         "skills": [
@@ -634,7 +634,7 @@
 - 请求示例
 
   ```json
-  DELETE /rest/v1/registry-center/agent-cards/Huawei/RAN%20Energy%20Saving%20Agent HTTP/1.1
+  DELETE /rest/v1/registry-center/agent-cards/Org/RAN%20Energy%20Saving%20Agent HTTP/1.1
   Host: your-domain.com
   Content-Type: application/json
   ```
@@ -698,9 +698,9 @@
 
 - 响应参数
 
-  | 参数名称 | 类型     | 值域 | 默认值 | 描述         |
-  |------|--------|------|-----|--------------|
-  | -    | object | {}   | -   | 符合要求的Agent列表 |
+  | 参数名称 | 类型    | 值域 | 默认值 | 描述         |
+  |------|-------|---|-----|--------------|
+  | agentCards    | array | - | -   | 符合要求的Agent列表 |
 
 - 响应样例
 
@@ -713,7 +713,7 @@
             "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
             "version": "1.0.0",
             "provider": {
-              "organization": "Huawei",
+              "organization": "Org",
               "url": ""
             },
             "skills": [
@@ -797,7 +797,7 @@
 - 接口约束
 
   - 接口流控：10次/秒；
-  - 接口认证：不需~~要客户端证书认证，不需要用户认证。
+  - 接口认证：不需要客户端证书认证，不需要用户认证。
 
 - 调用方法
 
