@@ -76,6 +76,31 @@ class SetTagsHandler(BaseUDSHandler):
                 message=f"Agent cannot have more than 10 tags. Attempted to set: {len(tags)}"
             ).model_dump()
         
+        # Validate tags existence in tag library
+        nonexistent_tags = []
+        for tag_name in tags:
+            tag_entity = registry.get_tag_by_name(tag_name)
+            if not tag_entity:
+                nonexistent_tags.append(tag_name)
+        
+        if nonexistent_tags:
+            details["nonexistent_tags"] = nonexistent_tags
+            asyncio.run(audit_handle.handle({
+                "operation_name": OperationName.UPDATE_TAGS,
+                "level": LogLevel.MINOR,
+                "result": OperationResult.FAILURE,
+                "object_name": OperatorObject.AGENT,
+                "details": details,
+                "client_ip": "internal",
+                "user_name": user_name
+            }))
+            logger.warning(f"Invalid tags: {agent_name} ({organization}) - nonexistent tags: {nonexistent_tags}")
+            return InternalResponse(
+                success=False,
+                error="Invalid tags",
+                message=f"Tags not found in tag library: {nonexistent_tags}. Only existing tags from tag library can be assigned to agents."
+            ).model_dump()
+        
         agent = registry.find_by_key(agent_name, organization)
         if not agent:
             asyncio.run(audit_handle.handle({

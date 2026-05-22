@@ -44,12 +44,18 @@ class OperationName:
     DEREGISTER_AGENT = "Deregister Agent"
     APPROVE_AGENT = "Approve Agent"
     UPDATE_TAGS = "Update Tags"
+    CREATE_TAG = "Create Tag"
+    GET_TAG = "Get Tag"
+    UPDATE_TAG = "Update Tag"
+    DELETE_TAG = "Delete Tag"
+    LIST_TAGS = "List Tags"
     GENERATE_CERTIFICATE = "Generate Certificate"
 
 
 class OperatorObject:
     SERVICE = "Service"
     AGENT = "Agent"
+    TAG = "Tag"
 
 
 class OperationResult:
