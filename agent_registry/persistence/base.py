@@ -48,7 +48,7 @@ class StorageBackend(ABC):
         pass
 
     @abstractmethod
-    def create(self, agent: AgentCard, owner: Optional[str] = None, status: Optional[str] = None) -> bool:
+    def create(self, agent: AgentCard, owner: Optional[str] = None, status: str = 'published') -> bool:
         pass
 
     @abstractmethod
@@ -72,7 +72,22 @@ class StorageBackend(ABC):
         pass
 
     @abstractmethod
+    def find_by_status(self, status: str) -> List[AgentCard]:
+        """Find agents by status."""
+        pass
+
+    @abstractmethod
+    def find_by_tag(self, tag: str) -> List[AgentCard]:
+        """Find agents by tag (from agent_tags_map)."""
+        pass
+
+    @abstractmethod
     def update(self, name: str, organization: str, agent_data: Dict[str, Any], owner: Optional[str] = None) -> bool:
+        pass
+
+    @abstractmethod
+    def update_status(self, name: str, organization: str, new_status: str) -> bool:
+        """Update agent status."""
         pass
 
     @abstractmethod
@@ -81,6 +96,16 @@ class StorageBackend(ABC):
 
     @abstractmethod
     def count(self) -> int:
+        pass
+
+    @abstractmethod
+    def get_created_at(self, name: str, organization: str) -> str:
+        """Get agent created_at timestamp."""
+        pass
+
+    @abstractmethod
+    def get_updated_at(self, name: str, organization: str) -> str:
+        """Get agent updated_at timestamp."""
         pass
 
     # Agent tags methods

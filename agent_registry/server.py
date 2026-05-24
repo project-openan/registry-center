@@ -376,7 +376,7 @@ async def _verify_owner_permission(
 
 async def _check_agent_limit(registry: RegistryCore, client_ip: str, details: dict) -> None:
     """Check if registration count exceeds the limit, log and raise an exception if so."""
-    if len(registry.get_agents()) >= int(config.get(AGENT_NUM_MAX, 40)):
+    if registry.count() >= int(config.get(AGENT_NUM_MAX, 40)):
         details["message"] = "Agent registration limit exceeded."
         await audit_handle.handle({
             "operation_name": OperationName.REGISTER_AGENT,
@@ -703,8 +703,6 @@ async def update_agent(
             if registry_signer and registry_signer.is_enabled():
                 agent_data = registry_signer.sign_agent_card(agent_data)
                 logger.info(f"Registry signature added for agent: {agent_data.name}")
-
-            await _check_agent_limit(registry, client_ip, details)
 
             data = MessageToDict(agent_data, preserving_proto_field_name=True)
             success = await _perform_update(client_ip, name, organization, data, details, owner=owner)

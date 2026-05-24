@@ -14,11 +14,11 @@
 #    under the License.
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Tuple
 
 import psycopg2
-from psycopg2 import pool
+from psycopg2 import pool, sql
 from a2a.types import AgentCard
 from google.protobuf.json_format import MessageToDict, Parse
 from loguru import logger
@@ -73,7 +73,7 @@ class PostgreSQLStorage(StorageBackend):
                 cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (database,))
                 exists = cur.fetchone()
                 if not exists:
-                    cur.execute(f'CREATE DATABASE "{database}"')
+                    cur.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(database)))
                     logger.info(f"Database '{database}' created successfully")
         finally:
             conn.close()
@@ -107,7 +107,7 @@ class PostgreSQLStorage(StorageBackend):
 
     def _get_agent_fields(self, agent: AgentCard, owner: Optional[str] = None, status: str = 'published') -> tuple:
         agent_dict = MessageToDict(agent, preserving_proto_field_name=True)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return (
             agent.name,
             agent.provider.organization,
@@ -139,6 +139,9 @@ class PostgreSQLStorage(StorageBackend):
             if affected > 0:
                 logger.info(f"Created agent in PostgreSQL: {agent.name} (org={agent.provider.organization}, owner={owner}, status={status})")
             return affected > 0
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
@@ -161,7 +164,19 @@ class PostgreSQLStorage(StorageBackend):
                 data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
                 agent = AgentCard(**data)
                 stored_owner = row[1] if len(row) > 1 else None
-                return AgentRecord(agent_card=agent, owner=stored_owner)
+                stored_status = row[2] if len(row) > 2 else 'published'
+                tags = row[3] if len(row) > 3 else []
+                if tags and isinstance(tags, str):
+                    tags = json.loads(tags)
+                if not tags:
+                    tags = []
+                created_at = row[4].isoformat() if len(row) > 4 and row[4] and hasattr(row[4], 'isoformat') else ''
+                updated_at = row[5].isoformat() if len(row) > 5 and row[5] and hasattr(row[5], 'isoformat') else ''
+                return AgentRecord(
+                    agent_card=agent, owner=stored_owner,
+                    status=stored_status, tags=tags,
+                    created_at=created_at, updated_at=updated_at
+                )
             return None
         finally:
             self.pool.putconn(conn)
@@ -214,28 +229,32 @@ class PostgreSQLStorage(StorageBackend):
             with conn.cursor() as cur:
                 agent = Parse(json.dumps(agent_data), AgentCard())
                 agent_dict = MessageToDict(agent, preserving_proto_field_name=True)
-                now = datetime.utcnow()
+                status_value = agent_data.get('status', 'published')
+                now = datetime.now(timezone.utc)
                 if owner is not None:
                     cur.execute(
                         PostgreSQLQueries.UPDATE_AGENT_WITH_OWNER.value,
-                        (json.dumps(agent_dict), now, name, organization, owner)
+                        (json.dumps(agent_dict), status_value, now, name, organization, owner)
                     )
                 else:
                     existing = self.find_by_key(name, organization)
                     if existing and existing.owner:
                         cur.execute(
                             PostgreSQLQueries.UPDATE_AGENT_WITH_OWNER.value,
-                            (json.dumps(agent_dict), now, name, organization, existing.owner)
+                            (json.dumps(agent_dict), status_value, now, name, organization, existing.owner)
                         )
                     else:
                         cur.execute(
                             PostgreSQLQueries.UPDATE_AGENT.value,
-                            (json.dumps(agent_dict), now, name, organization)
+                            (json.dumps(agent_dict), status_value, now, name, organization)
                         )
                 conn.commit()
                 affected = cur.rowcount
             logger.info(f"Updated agent in PostgreSQL: {name} (org={organization}, owner={owner}), affected={affected}")
             return affected > 0
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
@@ -264,6 +283,9 @@ class PostgreSQLStorage(StorageBackend):
                 affected = cur.rowcount
             logger.info(f"Deleted agent from PostgreSQL: {name} (org={organization}, owner={owner}), affected={affected}")
             return affected > 0
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
@@ -294,7 +316,7 @@ class PostgreSQLStorage(StorageBackend):
         conn = self.pool.getconn()
         try:
             with conn.cursor() as cur:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 cur.execute(
                     PostgreSQLQueries.UPDATE_STATUS.value,
                     (new_status, now, name, organization)
@@ -302,6 +324,9 @@ class PostgreSQLStorage(StorageBackend):
                 conn.commit()
                 affected = cur.rowcount
             return affected > 0
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
@@ -340,7 +365,7 @@ class PostgreSQLStorage(StorageBackend):
         conn = self.pool.getconn()
         try:
             with conn.cursor() as cur:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 cur.execute(
                     PostgreSQLQueries.UPDATE_AGENT_TAGS.value,
                     (json.dumps(new_tags), now, name, organization)
@@ -348,6 +373,9 @@ class PostgreSQLStorage(StorageBackend):
                 conn.commit()
                 affected = cur.rowcount
             return affected > 0
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
@@ -431,8 +459,12 @@ class PostgreSQLStorage(StorageBackend):
             logger.info(f"Tag created in PostgreSQL: {tag.name} (ID: {tag.tag_id})")
             return True
         except psycopg2.IntegrityError as e:
+            conn.rollback()
             logger.warning(f"Tag already exists: {tag.name} - {e}")
             return False
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
@@ -483,7 +515,7 @@ class PostgreSQLStorage(StorageBackend):
         conn = self.pool.getconn()
         try:
             with conn.cursor() as cur:
-                now = datetime.utcnow().isoformat()
+                now = datetime.now(timezone.utc).isoformat()
                 cur.execute(
                     PostgreSQLQueries.UPDATE_TAG.value,
                     (tag.name, now, tag_id)
@@ -493,8 +525,12 @@ class PostgreSQLStorage(StorageBackend):
             logger.info(f"Tag updated in PostgreSQL: {tag.name} (ID: {tag_id})")
             return affected > 0
         except psycopg2.IntegrityError as e:
+            conn.rollback()
             logger.warning(f"Tag name already exists: {tag.name} - {e}")
             return False
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
@@ -511,6 +547,9 @@ class PostgreSQLStorage(StorageBackend):
                 affected = cur.rowcount
             logger.info(f"Tag deleted in PostgreSQL: ID {tag_id}")
             return affected > 0
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 

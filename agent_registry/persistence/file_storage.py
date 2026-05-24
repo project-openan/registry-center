@@ -15,7 +15,7 @@
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
@@ -63,13 +63,10 @@ class FileStorage(StorageBackend):
             logger.warning(f"Agent already exists: {agent.name} (org={agent.provider.organization})")
             return False
         self._agents[key] = agent
-        if hasattr(agent, 'status'):
-            self._status_map[key] = agent.status
-        else:
-            self._status_map[key] = 'published'
+        self._status_map[key] = status
         self._agent_tags_map[key] = []
         self._owner_map[key] = owner
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         self._created_at_map[key] = now
         self._updated_at_map[key] = now
         self._save()
@@ -98,8 +95,6 @@ class FileStorage(StorageBackend):
         result = []
         for key, agent in self._agents.items():
             if name and agent.name == name:
-                if key in self._status_map:
-                    agent.status = self._status_map[key]
                 result.append(agent)
         return result
 
@@ -107,24 +102,16 @@ class FileStorage(StorageBackend):
         result = []
         for key, agent in self._agents.items():
             if organization and agent.provider.organization == organization:
-                if key in self._status_map:
-                    agent.status = self._status_map[key]
                 result.append(agent)
         return result
 
     def find_all(self) -> List[AgentCard]:
-        result = []
-        for key, agent in self._agents.items():
-            if key in self._status_map:
-                agent.status = self._status_map[key]
-            result.append(agent)
-        return result
+        return list(self._agents.values())
 
     def find_by_status(self, status: str) -> List[AgentCard]:
         result = []
         for key, agent in self._agents.items():
             if key in self._status_map and self._status_map[key] == status:
-                agent.status = self._status_map[key]
                 result.append(agent)
         return result
 
@@ -164,7 +151,7 @@ class FileStorage(StorageBackend):
         self._agents[key] = new_agent
         if 'status' in agent_data:
             self._status_map[key] = agent_data['status']
-        self._updated_at_map[key] = datetime.utcnow().isoformat()
+        self._updated_at_map[key] = datetime.now(timezone.utc).isoformat()
         self._save()
         logger.info(f"Updated agent: {new_agent.name}(org={new_agent.provider.organization}, owner={owner})")
         return True
@@ -346,7 +333,7 @@ class FileStorage(StorageBackend):
             return False
 
         self._agent_tags_map[key] = tags
-        self._updated_at_map[key] = datetime.utcnow().isoformat()
+        self._updated_at_map[key] = datetime.now(timezone.utc).isoformat()
         self._save_registry()
         logger.info(f"Agent tags updated: {name} -> {tags}")
         return True

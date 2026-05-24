@@ -18,7 +18,7 @@ import json
 import os
 from pathlib import Path
 from threading import Lock
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Tuple, Optional, Any
 
 from a2a.types import AgentCard
@@ -107,34 +107,7 @@ class RegistryCore:
         Register a new agent. Returns True if successful, False if duplicate.
         Raises ValueError if agent lacks required fields (name, provider.organization).
         """
-        with self._lock:
-            if use_vectordb:
-                entity_str = json.dumps(MessageToDict(agent, preserving_proto_field_name=True))
-                embedding = self.embedding_tool.embed(agent.description)
-                id = self._make_id(agent.name, agent.provider.organization)
-                insert_entity = {"embedding": embedding, "id": id, "name": agent.name, "description": agent.description,
-                                 "organization": agent.provider.organization, "agent_card": entity_str, "owner": owner}
-                insert_data = {"collection_name": COLLECTION_NAME, "entity": insert_entity}
-                result = self.vectordb.insert_entity(insert_data)
-                logger.info(
-                    f"Registered agent in vectordb: {agent.name} (org={agent.provider.organization}, owner={owner})")
-                return result
-            elif self.persistence_mode == 'postgresql':
-                result = self.storage.create(agent, owner=owner)
-                logger.info(
-                    f"Registered agent in postgresql: {agent.name} (org={agent.provider.organization}, owner={owner})")
-                return result
-            else:
-                key = self._make_key(agent.name, agent.provider.organization)
-                self._agents[key] = agent
-                self._status_map[key] = 'published'
-                self._owner_map[key] = owner
-                now = datetime.utcnow().isoformat()
-                self._created_at_map[key] = now
-                self._updated_at_map[key] = now
-                self._save()
-                logger.info(f"Registered agent: {agent.name} (org={agent.provider.organization}, owner={owner})")
-                return True
+        return self.register_with_status(agent, initial_status='published', use_vectordb=use_vectordb, owner=owner)
 
     def register_with_status(self, agent: AgentCard, initial_status: str = 'published',
                              use_vectordb: bool = USE_VECTORDB, owner: Optional[str] = None) -> bool:
@@ -168,7 +141,7 @@ class RegistryCore:
                 self._agents[key] = agent
                 self._status_map[key] = initial_status
                 self._owner_map[key] = owner
-                now = datetime.utcnow().isoformat()
+                now = datetime.now(timezone.utc).isoformat()
                 self._created_at_map[key] = now
                 self._updated_at_map[key] = now
                 self._save()
@@ -212,7 +185,12 @@ class RegistryCore:
 
     def get_agents(self, use_vectordb: bool = USE_VECTORDB):
         if use_vectordb:
-            return self.vectordb.get_all_entities({"collection_name": COLLECTION_NAME})
+            entities = self.vectordb.get_all_entities({"collection_name": COLLECTION_NAME})
+            result = {}
+            for agent_dict in entities:
+                key = make_agent_key(agent_dict.get("name", ""), agent_dict.get("organization", ""))
+                result[key] = True
+            return result
         elif self.persistence_mode == 'postgresql':
             agents = self.storage.find_all()
             result = {}
@@ -272,7 +250,7 @@ class RegistryCore:
                     raise ValueError(f"Invalid agent data: {e}") from e
 
                 self._agents[key] = new_agent
-                self._updated_at_map[key] = datetime.utcnow().isoformat()
+                self._updated_at_map[key] = datetime.now(timezone.utc).isoformat()
                 self._save()
                 logger.info(f"Updated agent: {new_agent.name}(org={new_agent.provider.organization}, owner={owner})")
                 return True
@@ -575,7 +553,7 @@ class RegistryCore:
         logger.info(f"Saved {len(self._tags)} tags to {self.tags_file}")
 
     def _make_id(self, name: str, organization: str):
-        return name + organization
+        return f"{name}::{organization}"
 
     def find_by_key(self, name: str, organization: str) -> Optional[AgentCard]:
         """Search a single agent by exact name and organization."""
@@ -592,13 +570,13 @@ class RegistryCore:
         else:
             return list(self._agents.values())
 
-    def get_status(self, name: str, organization: str) -> str:
-        """Get agent status from status map."""
+    def get_status(self, name: str, organization: str) -> Optional[str]:
+        """Get agent status from status map, or None if not found."""
         if self.persistence_mode == 'postgresql':
             agent = self.storage.find_by_key(name, organization)
             if agent:
                 return getattr(agent, 'status', 'published')
-            return ''
+            return None
         else:
             key = self._make_key(name, organization)
             return self._status_map.get(key)
@@ -671,7 +649,7 @@ class RegistryCore:
                     return False
 
                 self._status_map[key] = new_status
-                self._updated_at_map[key] = datetime.utcnow().isoformat()
+                self._updated_at_map[key] = datetime.now(timezone.utc).isoformat()
                 self._save_registry()
                 logger.info(f"Agent status updated: {name} -> {new_status}")
                 return True
@@ -697,6 +675,9 @@ class RegistryCore:
 
     def count(self) -> int:
         """Get total number of agents."""
+        if self.use_vectordb:
+            entities = self.vectordb.get_all_entities({"collection_name": COLLECTION_NAME})
+            return len(entities)
         if self.persistence_mode == 'postgresql':
             return self.storage.count()
         else:
@@ -722,7 +703,7 @@ class RegistryCore:
                     logger.warning(f"Agent not found: {name} ({organization})")
                     return False
                 self._registry_tags_map[key] = tags
-                self._updated_at_map[key] = datetime.utcnow().isoformat()
+                self._updated_at_map[key] = datetime.now(timezone.utc).isoformat()
                 self._save_registry()
                 logger.info(f"Agent tags updated: {name} -> {tags}")
                 return True

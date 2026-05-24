@@ -54,14 +54,6 @@ class PostgreSQLQueries(str, Enum):
         END $$;
     """
 
-    CREATE_AGENT = """
-        INSERT INTO agent_card (name, organization, description, url, version, status, provider_json,
-                                capabilities_json, skills_json, default_input_modes, default_output_modes,
-                                agent_card_json, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (name, organization) DO NOTHING
-    """
-
     FIND_BY_KEY = """
         SELECT agent_card_json FROM agent_card
         WHERE name = %s AND organization = %s
@@ -82,7 +74,7 @@ class PostgreSQLQueries(str, Enum):
     FIND_ALL = "SELECT agent_card_json FROM agent_card"
 
     UPDATE_AGENT = """
-        UPDATE agent_card SET agent_card_json = %s, updated_at = %s
+        UPDATE agent_card SET agent_card_json = %s, status = %s, updated_at = %s
         WHERE name = %s AND organization = %s
     """
 
@@ -98,15 +90,6 @@ class PostgreSQLQueries(str, Enum):
     COUNT = "SELECT COUNT(*) FROM agent_card"
 
     COUNT_BY_STATUS = "SELECT COUNT(*) FROM agent_card WHERE status = %s"
-
-    GET_METADATA = """
-        SELECT name, organization, status, tags FROM agent_card
-        WHERE name = %s AND organization = %s
-    """
-
-    GET_ALL_METADATA = """
-        SELECT name, organization, status, tags FROM agent_card
-    """
 
     GET_CREATED_AT = """
         SELECT created_at FROM agent_card
@@ -152,12 +135,12 @@ class PostgreSQLQueries(str, Enum):
     """
 
     FIND_BY_KEY_WITH_OWNER = """
-        SELECT agent_card_json, owner FROM agent_card
+        SELECT agent_card_json, owner, status, tags, created_at, updated_at FROM agent_card
         WHERE name = %s AND organization = %s AND owner = %s
     """
 
     FIND_BY_KEY_ANY_OWNER = """
-        SELECT agent_card_json, owner FROM agent_card
+        SELECT agent_card_json, owner, status, tags, created_at, updated_at FROM agent_card
         WHERE name = %s AND organization = %s
         ORDER BY owner NULLS LAST
         LIMIT 1
@@ -168,7 +151,7 @@ class PostgreSQLQueries(str, Enum):
     """
 
     UPDATE_AGENT_WITH_OWNER = """
-        UPDATE agent_card SET agent_card_json = %s, updated_at = %s
+        UPDATE agent_card SET agent_card_json = %s, status = %s, updated_at = %s
         WHERE name = %s AND organization = %s AND (owner = %s OR owner IS NULL)
     """
 

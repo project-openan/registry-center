@@ -117,10 +117,15 @@ class MilvusDBClient(VectorDBClient):
                 data=insert_entity
             )
 
-            # 3. Get inserted primary key
+            # 3. Verify insert count
+            insert_count = result.get("insert_count", 0)
+            if insert_count == 0:
+                logger.error(f"Insert returned zero insert count: collection={collection_name}")
+                return False
+
             insert_id = result.get("ids", [None])[0] if isinstance(result.get("ids"), list) else result.get("ids")
 
-            logger.info(f"Insert success! insert_id:{insert_id}")
+            logger.info(f"Insert success! insert_id:{insert_id}, insert_count:{insert_count}")
             return True
 
         except Exception as e:
@@ -166,9 +171,20 @@ class MilvusDBClient(VectorDBClient):
 
     def update_entity(self, data):
         try:
-            delete_data = {"collection_name":data.get("collection_name"),"id":data.get("entity").get("id")}
-            self.delete_entity(delete_data)
-            return self.insert_entity(data)
+            collection_name = data.get("collection_name")
+            entity = data.get("entity", {})
+
+            if not self.client.has_collection(collection_name):
+                self.create_collection(data)
+                logger.info("Collection does not exist in database, created it")
+                return self.insert_entity(data)
+
+            self.client.upsert(
+                collection_name=collection_name,
+                data=entity
+            )
+            logger.info(f"Upsert successful: collection={collection_name}, id={entity.get('id')}")
+            return True
         except MilvusException as e1:
             logger.error(f"Error: There is MilvusException in update method: {e1}")
             return False
@@ -194,6 +210,8 @@ class MilvusDBClient(VectorDBClient):
                 search_params={"metric_type": "L2", "param": {"nprobe": 10}}
             )
             formatted_results = []
+            if len(results) == 0 or len(results[0]) == 0:
+                return formatted_results
             for result in results[0]:
                 formatted_results.append(json.loads(result["entity"]["agent_card"]))
             return formatted_results
@@ -223,6 +241,8 @@ class MilvusDBClient(VectorDBClient):
                 output_fields=output_fields
             )
             output = []
+            if len(results) == 0:
+                return output
             if len(results) > 1:
                 for result in results:
                     output.append(json.loads(result["agent_card"]))
@@ -244,7 +264,7 @@ class MilvusDBClient(VectorDBClient):
             self.client.load_collection(collection_name=collection_name)
             results = self.client.query(
                 collection_name=collection_name,
-                filter="id != \" \"",
+                filter="id != \"\"",
                 output_fields=output_fields,
                 limit=int(get_conf().get(AGENT_NUM_MAX, 40))  # Max query count per request
             )

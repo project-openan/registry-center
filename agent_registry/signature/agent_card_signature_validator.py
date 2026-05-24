@@ -182,9 +182,7 @@ class AgentCardSignatureValidator:
     def _decode_protected(protected: str) -> Optional[ProtectedHeader]:
         """Decode protected header"""
         try:
-            padding = 4 - len(protected) % 4
-            if padding != 4:
-                protected += '=' * padding
+            protected += '=' * (-len(protected) % 4)
             decoded_bytes = base64.urlsafe_b64decode(protected)
 
             protected_json = decoded_bytes.decode('utf-8')
