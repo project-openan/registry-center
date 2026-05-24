@@ -294,10 +294,9 @@ agent-registry agent list -h   # list 子命令的帮助
 
 | 模块 | 文件 | 职责 |
 |------|------|------|
-| CLI Engine | `cli/core.py` | 参数解析、命令路由、执行调度 |
+| CLI Engine | `cli/core.py` | 参数解析、命令路由、执行调度（parser 逻辑已集成在 core.py 中） |
 | BaseCommand | `cli/base.py` | 抽象基类，定义命令接口 |
 | Registry | `cli/registry.py` | 命令注册表，管理命令层级 |
-| Parser | `cli/parser.py` | 构建 argparse 解析器 |
 | Exceptions | `cli/exceptions.py` | 定义 CLI 异常类型 |
 | Context | `cli/context.py` | 运行时上下文（debug、config等） |
 | Output | `cli/output.py` | 输出格式化 |
@@ -310,18 +309,17 @@ agent_registry/
 ├── cli/                    # CLI框架模块（新增）
 │   ├── __init__.py         # 导出公共接口
 │   ├── __main__.py         # 入口点
-│   ├── core.py             # CLI引擎
+│   ├── core.py             # CLI引擎（含参数解析）
 │   ├── base.py             # BaseCommand抽象基类
 │   ├── registry.py         # 命令注册表
-│   ├── parser.py           # 参数解析器
 │   ├── exceptions.py       # 异常定义
 │   ├── context.py          # 运行上下文
 │   ├── output.py           # 输出格式化
 │   ├── logger.py           # CLI日志系统（新增）
-│   └── commands/           # 示例命令（可删除）
+│   └── commands/           # 命令实现
 │       ├── __init__.py
-│       ├── start.py        # 示例：start命令
-│       └── agent.py        # 示例：agent命令组
+│       ├── agent.py        # Agent管理命令组
+│       └── tag.py           # 标签管理命令组
 └── ...                     # 现有模块
 ```
 
@@ -1304,9 +1302,9 @@ __all__ = [
 
 ## 六、命令分类建议
 
-框架支持以下命令类别，具体实现由其他开发者负责：
+> **注**：以下为设计阶段的命令规划建议。当前版本实现中，仅 `agent` 和 `tag` 两大类命令可用，其余（`start`/`stop`/`restart`/`status`、`config`、`cert`、`key`）尚未实现。
 
-### 6.1 服务管理类
+### 6.1 服务管理类（未实现）
 
 | 命令 | 说明 | 预期参数 |
 |------|------|----------|
@@ -1315,25 +1313,11 @@ __all__ = [
 | `restart` | 重启服务 | - |
 | `status` | 查看状态 | `-o json/table` |
 
-### 6.2 配置管理类
+### 6.2 配置管理类（未实现）
 
-| 命令 | 说明 | 预期参数 |
-|------|------|----------|
-| `config show` | 显示配置 | `--mask-secrets` |
-| `config get <key>` | 获取配置项 | - |
-| `config set <key> <value>` | 设置配置项 | - |
-| `config validate` | 验证配置 | - |
+### 6.3 证书管理类（未实现）
 
-### 6.3 证书管理类
-
-| 命令 | 说明 | 预期参数 |
-|------|------|----------|
-| `cert generate` | 生成证书 | `--type`, `--output`, `--days` |
-| `cert validate` | 验证证书 | `--cert-file`, `--key-file` |
-| `cert info` | 证书信息 | `<cert_path>` |
-| `cert export-jwk` | 导出JWK | `--kid` |
-
-### 6.4 公钥管理类
+### 6.4 公钥管理类（未实现）
 
 | 命令 | 说明 | 预期参数 |
 |------|------|----------|

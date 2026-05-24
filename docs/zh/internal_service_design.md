@@ -240,7 +240,7 @@ Agent状态分为两种：
 
 #### 2.3.1 接口定义
 
-**接口路径：** `/rest/a2a-t/v1/agents/register`
+**接口路径：** `/rest/v1/registry-center/agent-cards`
 
 **请求体：** AgentCard JSON格式
 
@@ -450,10 +450,14 @@ async def list_agents(name: Optional[str] = None, organization: Optional[str] = 
 | `approval` | 审核Agent | agent_name, organization |
 | `get_agent` | 查询单个Agent元数据 | agent_name, organization |
 | `list_agents` | 查询全量Agent元数据 | 无参数 |
-| `set_tag` | 设置Agent标签（全量覆盖） | agent_name, organization, tags(数组) |
-| `config` | 配置管理 | config_key, config_value |
-| `stats` | 统计查询 | type |
-| `query` | Agent查询 | agent_name, organization |
+| `set_tags` | 设置Agent标签 | agent_name, organization, tags(数组) |
+| `tag_create` | 创建标签 | name |
+| `tag_get` | 查询标签 | tag_id |
+| `tag_update` | 更新标签 | tag_id, name |
+| `tag_delete` | 删除标签 | tag_id |
+| `tag_list` | 列表所有标签 | 无参数 |
+
+> **注**：早期设计中的 `config`、`stats`、`query` action 尚未在当前版本中实现。
 
 #### 2.4.3 进程架构
 
@@ -466,8 +470,8 @@ async def list_agents(name: Optional[str] = None, organization: Optional[str] = 
 │                                         │
 │ 主线程：HTTP服务                         │
 │ ├─ uvicorn.run()                        │
-│ ├─ 监听：127.0.0.1:9301                  │
-│ ├─ /rest/a2a-t/v1/agents/register       │
+│ ├─ 监听：127.0.0.1:5000                  │
+│ ├─ /rest/v1/registry-center/agent-cards       │
 │ ├─ /rest/a2a-t/v1/agents/query          │
 │ └─ ...其他HTTP接口                       │
 │                                         │
@@ -906,7 +910,7 @@ else:
 修改`register_agent`接口，添加状态设置逻辑：
 
 ```python
-@app.post("/rest/a2a-t/v1/agents/register")
+@app.post("/rest/v1/registry-center/agent-cards")
 async def register_agent(agent: ValidatedAgentCard, request: Request):
     # 验签逻辑（如果开启）...
     
@@ -1437,7 +1441,7 @@ def test_approval_uds_interface():
    # 输入：y
    
    # 步骤2：注册Agent
-   curl -X POST http://localhost:5000/rest/a2a-t/v1/agents/register \
+   curl -X POST http://localhost:5000/rest/v1/registry-center/agent-cards \
      -H "Content-Type: application/json" \
      -d '{"name":"TestAgent", ...}'
    
@@ -1463,7 +1467,7 @@ def test_approval_uds_interface():
    # 输入：n
    
    # 步骤2：注册Agent
-   curl -X POST http://localhost:5000/rest/a2a-t/v1/agents/register \
+   curl -X POST http://localhost:5000/rest/v1/registry-center/agent-cards \
      -H "Content-Type: application/json" \
      -d '{"name":"TestAgent", ...}'
    

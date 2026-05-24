@@ -21,27 +21,29 @@
 - `query`: 处理Agent数据查询
 - `update`: 处理Agent数据修改
 - `get`: 处理Agent精准查询
-- `retrieve`: 处理Agent检索
+- `retrieve`: 处理Agent语义检索
 - `deregister`: 处理Agent注销
 
 ### 2.自定义处理器
 创建并注册自定义处理器
 ```python
-from custom_handle import BaseHandle, HandlerRegistry, InterfaceType
+from common.custom.custom_handle import BaseHandler, HandlerRegistry
+from common.custom.interface_type import InterfaceType
 
-class MyCustomHandle(BaseHandle):
+class MyCustomHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
         # 自定义实现
         return "自定义结果"
 
 # 注册自定义处理器
-HandlerRegistry.register(InterfaceType.QUERY, MyCustomHandle)
+HandlerRegistry.register(InterfaceType.QUERY, MyCustomHandler)
 ```
 
 ### 3.使用处理器
 使用处理器（默认或自定义）：
 ```python
-from custom_handle import HandlerRegistry, InterfaceType
+from common.custom.custom_handle import HandlerRegistry
+from common.custom.interface_type import InterfaceType
 
 # 获取处理器实例
 handle = HandlerRegistry.get_handler(InterfaceType.QUERY)
@@ -51,7 +53,7 @@ result = await handle.handle(...)
 ```
 
 API参考
-BaseHandle
+BaseHandler
 所有处理器必须继承的抽象基类
 
 方法：
@@ -61,7 +63,7 @@ HandlerRegistry
 处理器注册表
 
 方法：
-registry(interface_type, handler_class):
+register(interface_type, handler_class):
 
 interface_type:InterfaceType枚举值
 handler_class： BaseHandler的子类
@@ -90,7 +92,7 @@ GetHandler
 处理Agent精准查询。
 
 RetrieveHandler
-处理Agent精准查询。
+处理Agent语义检索。
 
 DeregisterHandler
 处理Agent注销。
