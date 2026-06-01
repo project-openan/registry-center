@@ -27,7 +27,7 @@ All Rights Reserved.
 2. 默认所注册的Agent会作为公共资源，暂无Agent所有者设计。
 3. 本项目仅用作功能模块，非完整系统，模块自身不提供登录认证、鉴权、用户管理、日志审计、加解密、秘钥管理、数据库等能力，需由客户系统提供如上安全基础设施；源码中已预留相关方法函数，供二次定制实现。
 4. 本项目对注册的AgentCard信息默认使用文件存储：data/agentcard.json，测试场景下可以手动修改文件，重启服务生效。
-5. ![photo](docs/images/集成交互关系.png)
+5. ![photo](docs/zh/images/integrated_interactive_relationship.png)
 
 ## 设计约束
 1. 本项目需要运行在linux系统上，支持ipv4环境
@@ -107,10 +107,10 @@ revocationlist.crl:可选，吊销列表，仅支持pem编码格式，仅支持.
 ### windows启动方式
 #### 1. 创建虚拟环境
 下载本项目代码后，使用pycharm打开，在pycharm中创建一个虚拟环境
-![photo](docs/images/create_virtual_environment.png)
+![photo](docs/zh/images/create_virtual_environment.png)
 
 点击`Add new Interpreter`, 再点击`Add Local Interpreter...`
-![photo](docs/images/create_virtual_environment_1.png)
+![photo](docs/zh/images/create_virtual_environment_1.png)
    
 选择python版本和路径，点击`ok`即可
 
@@ -127,7 +127,7 @@ python -m agent_registry.start
 或者打开{安装目录}/agent_registry/start.py文件，右键`Run start`即可。
 #### 4.查看是否启动成功
 如下图，表示启动成功，如果没有看到该提示，则按照报错信息提示修改后重新尝试启动。
-![photo](docs/images/run_success.png)
+![photo](docs/zh/images/run_success.png)
 
 ### linux启动方式
 #### 1. 创建虚拟环境
