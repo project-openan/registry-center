@@ -15,86 +15,20 @@ All Rights Reserved.
    under the License.
 -->
 
-# A2A-T AgentCard Registry Center
-
-[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-
-> A centralized AgentCard registry service for unified multi-vendor Agent management. / 面向多厂商智能体的 AgentCard 统一注册与管理服务。
-
-[English](#english) | [中文](#chinese)
-
----
-
-## English
-
-### Overview
-
-The Registry Center is a service for unified Agent management, enabling centralized registration and management of Agents from different vendors for controlled, multi-source Agent integration and maintenance.
-
-<img src="docs/zh/images/integrated_interactive_relationship.png" width="600" alt="System Integration Architecture" />
-
-### Features
-
-- **AgentCard Registration** — Register AgentCards from different vendors into a centralized registry.
-- **AgentCard Query** — Query AgentCards by name, organization, or semantic search.
-- **AgentCard Lifecycle** — Update and deregister AgentCards with owner-based access control.
-- **Security** — TLS communication, signature verification, prompt-injection defense, and audit logging.
-- **CLI Management** — Command-line interface for agent and tag administration.
-
-### Constraints
-
-- Production deployment requires Linux (IPv4). Windows is supported for development/debugging only.
-- Single-instance deployment for internal systems only; must not be exposed to the public internet.
-- AgentCards must not contain personal data (e.g., phone numbers) or sensitive information (e.g., passwords, credentials).
-
-### Quick Start
-
-**Prerequisites:** Python 3.10+
-
-```bash
-# Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate   # Linux
-# .venv\Scripts\activate    # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Initialize configuration (interactive)
-python -m agent_registry.init
-
-# Start the service
-python -m agent_registry.start
-```
-
-### Documentation
-
-| Document | Description |
-|----------|-------------|
-| [User Guide](docs/zh/注册中心用户指南.md) | Features, deployment, CLI usage, and FAQ |
-| [Development Guide](docs/zh/注册中心开发指南.md) | Architecture, registration workflow, custom extensions |
-| [API Reference](docs/zh/注册中心API参考.md) | REST API specifications |
-| [Security Guide](docs/zh/注册中心安全能力指南.md) | TLS, access control, audit logging, content safety |
-
----
-
-## 中文
+# A2A-T A2A-T智能体AgentCard注册中心
 
 ## 项目简介
 
 注册中心是一个专注于Agent统一管理的服务，支持用户将来自不同厂商的Agent进行集中注册与管理，实现多源Agent的可控接入与维护。
-
-<img src="docs/zh/images/integrated_interactive_relationship.png" width="600" alt="系统集成交互关系" />
-
 ## 交付形式
 首次开源仅交付源码（托管在github），不提供安装包，交付内容不包括构建工程。
-
 ## 功能说明
 1. 本项目提供Agent注册中心模块供客户系统集成，用于管理客户系统内部的Agent，提供Agent注册、Agent查询能力。
 2. 默认所注册的Agent会作为公共资源，暂无Agent所有者设计。
 3. 本项目仅用作功能模块，非完整系统，模块自身不提供登录认证、鉴权、用户管理、日志审计、加解密、秘钥管理、数据库等能力，需由客户系统提供如上安全基础设施；源码中已预留相关方法函数，供二次定制实现。
 4. 本项目对注册的AgentCard信息默认使用文件存储：data/agentcard.json，测试场景下可以手动修改文件，重启服务生效。
+
+<img src="docs/zh/images/integrated_interactive_relationship.png" width="600" alt="系统集成交互关系" />
 
 ## 设计约束
 1. 本项目生产环境需要运行在Linux系统上，支持IPv4环境。Windows环境下可启动用于开发调试。
@@ -221,12 +155,3 @@ nohup python -m agent_registry.start > agent_registry.log 2>&1 &
 tail -f agent_registry.log
 ```
 如果可以看到`Uvicorn running on http://127.0.0.1:5000`则表示启动成功，如果没有看到该提示，则按照报错信息提示修改后重新尝试启动。
-
-## 文档导航
-
-| 文档 | 说明 |
-|------|------|
-| [注册中心用户指南](docs/zh/注册中心用户指南.md) | 特性介绍、安装部署、CLI管理、接口能力、FAQ |
-| [注册中心开发指南](docs/zh/注册中心开发指南.md) | 系统架构、注册流程、语义检索、自定义扩展 |
-| [注册中心API参考](docs/zh/注册中心API参考.md) | REST接口规范 |
-| [注册中心安全能力指南](docs/zh/注册中心安全能力指南.md) | TLS通信、访问控制、日志审计、内容安全 |
