@@ -12,7 +12,7 @@ The Registry Center security capabilities are as follows:
 
 ## Secure Communication (Inter-System TLS Communication)
 
-The Registry Center provides REST interfaces such as AgentCard registration, modification, and deletion (refer to the [Registry Center User Guide "API Capabilities" section](./Registry%20Center%20User%20Guide.md#api-capabilities)). These interfaces use the HTTPS protocol by default to ensure communication channel security, with secure TLS protocol versions and cipher suites.<br>
+The Registry Center provides REST interfaces such as AgentCard registration, modification, and deletion (refer to the [Registry Center User Guide "API Capabilities" section](https://gitcode.com/OpenAN/registry-center/blob/main/docs/en/Registry%20Center%20User%20Guide.md#api-capabilities)). These interfaces use the HTTPS protocol by default to ensure communication channel security, with secure TLS protocol versions and cipher suites.<br>
 - TLS protocol versions: TLSv1.3, TLSv1.2<br>
 - Cipher suites: TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,TLS_DHE_DSS_WITH_AES_256_GCM_SHA384,TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,TLS_DHE_DSS_WITH_AES_128_GCM_SHA256<br>
 > **Note**: Protocol versions and cipher suites do not support modification<br>
