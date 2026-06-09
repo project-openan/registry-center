@@ -104,63 +104,64 @@ $CLOUDSQL_CONN   = $env:GCP_PROJECT_ID + ":" + $env:GCP_REGION + ":" + $CLOUDSQL
 
 # Enable APIs
 Write-Host "  Enabling GCP APIs..."
-gcloud services enable artifactregistry.googleapis.com sqladmin.googleapis.com run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com --project="$env:GCP_PROJECT_ID" 2>$null
+gcloud services enable artifactregistry.googleapis.com sqladmin.googleapis.com run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 
 # Artifact Registry
 Write-Host "  Setting up Artifact Registry..."
-$repoExists = gcloud artifacts repositories list --location="$env:GCP_REGION" --project="$env:GCP_PROJECT_ID" --format="value(name)" 2>$null | Select-String -Pattern "^${ARTIFACT_REPO}$" -SimpleMatch
+$repoExists = gcloud artifacts repositories describe "${ARTIFACT_REPO}" --location="$env:GCP_REGION" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null; $repoExists = ($LASTEXITCODE -eq 0)
 if (-not $repoExists) {
-    gcloud artifacts repositories create "${ARTIFACT_REPO}" --repository-format=docker --location="$env:GCP_REGION" --project="$env:GCP_PROJECT_ID"
+    gcloud artifacts repositories create "${ARTIFACT_REPO}" --repository-format=docker --location="$env:GCP_REGION" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 } else {
     Write-Host "    Already exists, skipping."
 }
 
 # Cloud SQL
 Write-Host "  Setting up Cloud SQL PostgreSQL..."
-$sqlExists = gcloud sql instances describe "${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" 2>$null
+$sqlExists = gcloud sql instances describe "${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null; $sqlExists = ($LASTEXITCODE -eq 0)
 if (-not $sqlExists) {
-    gcloud sql instances create "${CLOUDSQL_INST}" --database-version=POSTGRES_15 --tier="${DB_TIER}" --region="$env:GCP_REGION" --storage-size=10 --storage-type=SSD --project="$env:GCP_PROJECT_ID"
+    gcloud sql instances create "${CLOUDSQL_INST}" --database-version=POSTGRES_15 --tier="${DB_TIER}" --region="$env:GCP_REGION" --storage-size=10 --storage-type=SSD --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 } else {
     Write-Host "    Already exists, skipping."
 }
 
 # Database
-$dbExists = gcloud sql databases describe "${DB_NAME}" --instance="${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" 2>$null
+$dbExists = gcloud sql databases describe "${DB_NAME}" --instance="${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null; $dbExists = ($LASTEXITCODE -eq 0)
 if (-not $dbExists) {
-    gcloud sql databases create "${DB_NAME}" --instance="${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID"
+    gcloud sql databases create "${DB_NAME}" --instance="${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 } else {
     Write-Host "    Database already exists, skipping."
 }
 
 # DB User
-$userExists = gcloud sql users list --instance="${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" --format="value(name)" 2>$null | Select-String -Pattern "^${DB_USER}$" -SimpleMatch
+$userExists = gcloud sql users list --instance="${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" --format="value(name)" 2>&1 | Out-Null; $userExists = ($LASTEXITCODE -eq 0) -and ((gcloud sql users list --instance="${CLOUDSQL_INST}" --project="$env:GCP_PROJECT_ID" --format="value(name)" 2>&1) -match "^${DB_USER}$")
 if (-not $userExists) {
-    gcloud sql users create "${DB_USER}" --instance="${CLOUDSQL_INST}" --password="$env:DB_PASSWORD" --project="$env:GCP_PROJECT_ID"
+    gcloud sql users create "${DB_USER}" --instance="${CLOUDSQL_INST}" --password="$env:DB_PASSWORD" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 } else {
     Write-Host "    DB user already exists, updating password..."
-    gcloud sql users set-password "${DB_USER}" --instance="${CLOUDSQL_INST}" --password="$env:DB_PASSWORD" --project="$env:GCP_PROJECT_ID"
+    gcloud sql users set-password "${DB_USER}" --instance="${CLOUDSQL_INST}" --password="$env:DB_PASSWORD" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 }
 
 # Secret Manager
 Write-Host "  Storing DB password in Secret Manager..."
-$secretCheck = gcloud secrets describe "${SECRET_ID}" --project="$env:GCP_PROJECT_ID" 2>$null
-if (-not $secretCheck) {
-    [System.Text.Encoding]::UTF8.GetBytes($env:DB_PASSWORD) | gcloud secrets create "${SECRET_ID}" --data-file=- --replication-policy="automatic" --project="$env:GCP_PROJECT_ID"
+$secretExists = gcloud secrets describe "${SECRET_ID}" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null; $secretExists = ($LASTEXITCODE -eq 0)
+if (-not $secretExists) {
+    [System.Text.Encoding]::UTF8.GetBytes($env:DB_PASSWORD) | gcloud secrets create "${SECRET_ID}" --data-file=- --replication-policy="automatic" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 } else {
     Write-Host "    Secret already exists, skipping."
 }
 
 # Service Account
 Write-Host "  Setting up service account..."
-$saCheck = gcloud iam service-accounts describe "${SA_EMAIL}" --project="$env:GCP_PROJECT_ID" 2>$null
-if (-not $saCheck) {
-    gcloud iam service-accounts create "${SA_NAME}" --display-name="Registry Center Service Account" --project="$env:GCP_PROJECT_ID"
+$saExists = gcloud iam service-accounts describe "${SA_EMAIL}" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null; $saExists = ($LASTEXITCODE -eq 0)
+if (-not $saExists) {
+    gcloud iam service-accounts create "${SA_NAME}" --display-name="Registry Center Service Account" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 } else {
     Write-Host "    Service account already exists, skipping."
 }
 
-gcloud projects add-iam-policy-binding "$env:GCP_PROJECT_ID" --member="serviceAccount:${SA_EMAIL}" --role="roles/cloudsql.client" --condition=None 2>$null
-gcloud secrets add-iam-policy-binding "${SECRET_ID}" --member="serviceAccount:${SA_EMAIL}" --role="roles/secretmanager.secretAccessor" --project="$env:GCP_PROJECT_ID" 2>$null
+# IAM bindings (idempotent, gcloud handles duplicates silently)
+gcloud projects add-iam-policy-binding "$env:GCP_PROJECT_ID" --member="serviceAccount:${SA_EMAIL}" --role="roles/cloudsql.client" --condition=None 2>&1 | Out-Null
+gcloud secrets add-iam-policy-binding "${SECRET_ID}" --member="serviceAccount:${SA_EMAIL}" --role="roles/secretmanager.secretAccessor" --project="$env:GCP_PROJECT_ID" 2>&1 | Out-Null
 
 Write-Host "  Setup done!"
 Write-Host ""
@@ -225,7 +226,7 @@ Write-Host ""
 Write-Host "  Service URL: ${SERVICE_URL}"
 Write-Host ""
 Write-Host "  Verify it works:"
-Write-Host "    curl ${SERVICE_URL}/health"
+Write-Host "    curl ${SERVICE_URL}/rest/v1/registry-center/agent-cards"
 Write-Host ""
 Write-Host "  API endpoints:"
 Write-Host "    POST   ${SERVICE_URL}/rest/v1/registry-center/agent-cards"
@@ -233,7 +234,6 @@ Write-Host "    GET    ${SERVICE_URL}/rest/v1/registry-center/agent-cards"
 Write-Host "    GET    ${SERVICE_URL}/rest/v1/registry-center/agent-cards/{org}/{name}"
 Write-Host "    PUT    ${SERVICE_URL}/rest/v1/registry-center/agent-cards/{org}/{name}"
 Write-Host "    DELETE ${SERVICE_URL}/rest/v1/registry-center/agent-cards/{org}/{name}"
-Write-Host "    GET    ${SERVICE_URL}/health"
 Write-Host ""
 Write-Host "  To update the service later, just run:"
 Write-Host "    .\deploy-all.ps1"

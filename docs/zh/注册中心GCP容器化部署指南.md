@@ -1,4 +1,4 @@
-# Registry Center - Google Cloud 部署指南（小白版）
+# Registry Center - Google Cloud Platform 容器化部署指南
 
 本指南帮你**一步一步**把这个注册中心服务部署到 Google Cloud Platform，无需任何技术背景。
 
@@ -17,7 +17,7 @@
 3. 顶部点 **"选择项目"** → **"新建项目"**
 4. 项目名称随便填（比如 `registry-center`），点 **"创建"**
 5. 创建完成后，在左侧菜单 **"结算"** → 关联结算账号（需要绑定信用卡或 PayPal）
-6. **记下你的项目 ID**（格式类似 `my-project-123456`）
+6. **记下你的项目 ID**（GCP 会自动在名称后追加数字，格式类似 `registry-center-123456`）
 
 ---
 
@@ -75,20 +75,25 @@ cd 项目目录路径
 - ✓ 构建 Docker 镜像
 - ✓ 部署到 Cloud Run
 
+
+**提示**：如果非首次部署，在运行到第4步时出现ALREADY_EXISTS的报错时，这是正常的，不用进行任何操作。
+![alt text](./images/db_already_exists_fig.png)
+
 **全程大约 10-15 分钟**，看到 `DEPLOYMENT SUCCESSFUL!` 就成功了。
 
+![alt text](./images/deploy_success_fig.png)
 ---
 
 ## 验证部署
 
 脚本最后会输出一个 `https://xxxxx.run.app` 的地址，这是你的服务 URL。
 
-在浏览器打开 `https://xxxxx.run.app/health`，如果看到 JSON 响应就说明服务正常运行。
+在浏览器打开 `https://xxxxx.run.app/rest/v1/registry-center/agent-cards`，如果看到 `{"agentCards":[]}` 就说明服务正常运行（空列表表示还没注册过 Agent）。
 
 或者用 PowerShell 测试：
 
 ```powershell
-Invoke-RestMethod -Uri "https://xxxxx.run.app/health"
+Invoke-RestMethod -Uri "https://xxxxx.run.app/rest/v1/registry-center/agent-cards"
 ```
 
 ---
@@ -104,7 +109,6 @@ Invoke-RestMethod -Uri "https://xxxxx.run.app/health"
 | `GET` | `/rest/v1/registry-center/agent-cards/{org}/{name}` | 获取单个 Agent |
 | `PUT` | `/rest/v1/registry-center/agent-cards/{org}/{name}` | 更新 Agent |
 | `DELETE` | `/rest/v1/registry-center/agent-cards/{org}/{name}` | 注销 Agent |
-| `GET` | `/health` | 健康检查 |
 
 示例（注册一个 Agent）：
 
@@ -137,7 +141,7 @@ Invoke-RestMethod -Uri "https://xxxxx.run.app/rest/v1/registry-center/agent-card
 
 修改代码后，再跑一次 `.\deploy-all.ps1` 即可更新。
 
-**Q: 如何关掉服务（省钱）？**
+**Q: 如何关掉服务？**
 
 ```powershell
 gcloud run services delete registry-center --region=asia-east1
@@ -146,7 +150,7 @@ gcloud sql instances delete registry-center-db
 
 **Q: 费用大概多少？**
 
-- Cloud Run：无请求时不收费。按请求计费，非常便宜。
-- Cloud SQL（db-f1-micro）：约 $0.015/小时。*这是主要开销。*
+- Cloud Run：无请求时不收费。按请求计费。
+- Cloud SQL（db-f1-micro）：约 $0.015/小时。
 
 不使用时删除 Cloud SQL 实例即可节省费用，数据需要提前备份。
