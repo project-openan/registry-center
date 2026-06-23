@@ -1,3 +1,21 @@
+﻿<!--
+Copyright (c) 2026 Huawei Technologies Co., Ltd.
+All Rights Reserved.
+
+SPDX-License-Identifier: Apache-2.0
+
+   Licensed under the Apache License, Version 2.0 (the "License"); you may
+   not use this file except in compliance with the License. You may obtain
+   a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+   License for the specific language governing permissions and limitations
+   under the License.
+-->
 # Registry Center API Reference
 
 ## Before You Begin
@@ -117,7 +135,7 @@
       "agentCards": [
         {
           "name": "RAN Energy Saving Agent",
-          "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
+          "description": "RAN Energy Saving Agent for autonomous closed-loop energy efficiency optimization, including intent exploration, fulfillment, effect evaluation and reporting.",
           "version": "1.0.0",
           "provider": {
             "organization": "Org",
@@ -127,7 +145,7 @@
             {
               "id": "ran-es-intent-exploration",
               "name": "RAN ES Intent Exploration",
-              "description": "评估并确定指定RAN ES意图目标的最佳可能性，考虑当前资源状况和系统能力。",
+              "description": "Evaluate and determine best possible values for RAN ES intent targets, considering current resource conditions and system capabilities.",
               "tags": [
                 "wireless",
                 "energy-saving",
@@ -137,7 +155,7 @@
             {
               "id": "ran-es-intent-lifecycle-management",
               "name": "RAN ES Intent Lifecycle Management",
-              "description": "管理RAN节能意图的生命周期，包括创建、修改、删除、激活、去激活意图，并执行数据采集、分析、解决方案制定与配置。",
+              "description": "Manage RAN ES intent lifecycle including creation, modification, deletion, activation, deactivation, and perform data collection, analysis, solution formulation and configuration.",
               "tags": [
                 "wireless",
                 "energy-saving",
@@ -147,7 +165,7 @@
             {
               "id": "ran-es-intent-reporting",
               "name": "RAN ES Intent Reporting",
-              "description": "提供意图报告查询、订阅、通知功能，报告意图实现状态、达成值、推荐值及配置修改信息。",
+              "description": "Provide intent report query, subscription and notification capabilities, reporting intent fulfillment status, achieved values, recommended values and configuration changes.",
               "tags": [
                 "wireless",
                 "energy-saving",
@@ -288,7 +306,7 @@
       "agentCards": [
         {
           "name": "RAN Energy Saving Agent",
-          "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
+          "description": "RAN Energy Saving Agent for autonomous closed-loop energy efficiency optimization, including intent exploration, fulfillment, effect evaluation and reporting.",
           "version": "1.0.0",
           "provider": {
             "organization": "Org",
@@ -298,7 +316,7 @@
             {
               "id": "ran-es-intent-exploration",
               "name": "RAN ES Intent Exploration",
-              "description": "评估并确定指定RAN ES意图目标的最佳可能性，考虑当前资源状况和系统能力。",
+              "description": "Evaluate and determine best possible values for RAN ES intent targets, considering current resource conditions and system capabilities.",
               "tags": [
                 "wireless",
                 "energy-saving",
@@ -308,7 +326,7 @@
             {
               "id": "ran-es-intent-lifecycle-management",
               "name": "RAN ES Intent Lifecycle Management",
-              "description": "管理RAN节能意图的生命周期，包括创建、修改、删除、激活、去激活意图，并执行数据采集、分析、解决方案制定与配置。",
+              "description": "Manage RAN ES intent lifecycle including creation, modification, deletion, activation, deactivation, and perform data collection, analysis, solution formulation and configuration.",
               "tags": [
                 "wireless",
                 "energy-saving",
@@ -318,7 +336,7 @@
             {
               "id": "ran-es-intent-reporting",
               "name": "RAN ES Intent Reporting",
-              "description": "提供意图报告查询、订阅、通知功能，报告意图实现状态、达成值、推荐值及配置修改信息。",
+              "description": "Provide intent report query, subscription and notification capabilities, reporting intent fulfillment status, achieved values, recommended values and configuration changes.",
               "tags": [
                 "wireless",
                 "energy-saving",
@@ -360,8 +378,8 @@
 
   | Status Code | Description               |
   |--------|----------------------|
-  | 200 | Query successful.         |
-  | 404 | Query failed, Agent not found. |
+  | 200 | Query successful, returns matching agents (empty list if none found). |
+  | 404 | Update failed, Agent not found.      |
   | 500 | Query failed, internal service error. |
   | 503 | Service busy.             |
 
@@ -373,7 +391,7 @@
 
 - Description
 
-    Based on the unique combination of Agent name and organization, precisely query and return the complete details of a single Agent. Returns null if not found.
+    Based on the unique combination of Agent name and organization, precisely query and return the complete details of a single Agent. Returns 404 status code with error message if not found.
 
 - Interface Constraints
 
@@ -419,7 +437,7 @@
      "agentCards": [
        {
          "name": "RAN Energy Saving Agent",
-        "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
+        "description": "RAN Energy Saving Agent for autonomous closed-loop energy efficiency optimization, including intent exploration, fulfillment, effect evaluation and reporting.",
         "version": "1.0.0",
         "provider": {
           "organization": "Org",
@@ -429,7 +447,7 @@
           {
             "id": "ran-es-intent-exploration",
             "name": "RAN ES Intent Exploration",
-            "description": "评估并确定指定RAN ES意图目标的最佳可能性，考虑当前资源状况和系统能力。",
+            "description": "Evaluate and determine best possible values for RAN ES intent targets, considering current resource conditions and system capabilities.",
             "tags": [
               "wireless",
               "energy-saving",
@@ -439,7 +457,7 @@
           {
             "id": "ran-es-intent-lifecycle-management",
             "name": "RAN ES Intent Lifecycle Management",
-            "description": "管理RAN节能意图的生命周期，包括创建、修改、删除、激活、去激活意图，并执行数据采集、分析、解决方案制定与配置。",
+            "description": "Manage RAN ES intent lifecycle including creation, modification, deletion, activation, deactivation, and perform data collection, analysis, solution formulation and configuration.",
             "tags": [
               "wireless",
               "energy-saving",
@@ -449,7 +467,7 @@
           {
             "id": "ran-es-intent-reporting",
             "name": "RAN ES Intent Reporting",
-            "description": "提供意图报告查询、订阅、通知功能，报告意图实现状态、达成值、推荐值及配置修改信息。",
+            "description": "Provide intent report query, subscription and notification capabilities, reporting intent fulfillment status, achieved values, recommended values and configuration changes.",
             "tags": [
               "wireless",
               "energy-saving",
@@ -537,7 +555,7 @@
     "agentCards": [
       {
         "name": "RAN Energy Saving Agent",
-        "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
+        "description": "RAN Energy Saving Agent for autonomous closed-loop energy efficiency optimization, including intent exploration, fulfillment, effect evaluation and reporting.",
         "version": "1.0.0",
         "provider": {
           "organization": "Org",
@@ -547,7 +565,7 @@
           {
             "id": "ran-es-intent-exploration",
             "name": "RAN ES Intent Exploration",
-            "description": "评估并确定指定RAN ES意图目标的最佳可能性，考虑当前资源状况和系统能力。",
+            "description": "Evaluate and determine best possible values for RAN ES intent targets, considering current resource conditions and system capabilities.",
             "tags": [
               "wireless",
               "energy-saving",
@@ -557,7 +575,7 @@
           {
             "id": "ran-es-intent-lifecycle-management",
             "name": "RAN ES Intent Lifecycle Management",
-            "description": "管理RAN节能意图的生命周期，包括创建、修改、删除、激活、去激活意图，并执行数据采集、分析、解决方案制定与配置。",
+            "description": "Manage RAN ES intent lifecycle including creation, modification, deletion, activation, deactivation, and perform data collection, analysis, solution formulation and configuration.",
             "tags": [
               "wireless",
               "energy-saving",
@@ -567,7 +585,7 @@
           {
             "id": "ran-es-intent-reporting",
             "name": "RAN ES Intent Reporting",
-            "description": "提供意图报告查询、订阅、通知功能，报告意图实现状态、达成值、推荐值及配置修改信息。",
+            "description": "Provide intent report query, subscription and notification capabilities, reporting intent fulfillment status, achieved values, recommended values and configuration changes.",
             "tags": [
               "wireless",
               "energy-saving",
@@ -621,7 +639,7 @@
     | 400 | Parameter validation failed.         |
     | 401 | Signature verification failed.       |
     | 403 | Permission denied.                   |
-    | 404 | Update failed, Agent not found.      |
+| 404 | Query failed, Agent not found.      |
     | 422 | Update failed, AgentCard parameter validation failed. |
     | 503 | Service busy.                        |
 
@@ -720,7 +738,7 @@
     Host: your-domain.com
     Content-Type: application/json
     {
-      "task": "需要查询意图报告"
+      "task": "Need to query intent report"
     }
     ```
 
@@ -740,7 +758,7 @@
         "agentCards": [
           {
             "name": "RAN Energy Saving Agent",
-            "description": "负责RAN能效优化的自主闭环运行，包括意图探索、意图实现、效果评估与报告。",
+            "description": "RAN Energy Saving Agent for autonomous closed-loop energy efficiency optimization, including intent exploration, fulfillment, effect evaluation and reporting.",
             "version": "1.0.0",
             "provider": {
               "organization": "Org",
@@ -750,7 +768,7 @@
               {
                 "id": "ran-es-intent-exploration",
                 "name": "RAN ES Intent Exploration",
-                "description": "评估并确定指定RAN ES意图目标的最佳可能性，考虑当前资源状况和系统能力。",
+                "description": "Evaluate and determine best possible values for RAN ES intent targets, considering current resource conditions and system capabilities.",
                 "tags": [
                   "wireless",
                   "energy-saving",
@@ -760,7 +778,7 @@
               {
                 "id": "ran-es-intent-lifecycle-management",
                 "name": "RAN ES Intent Lifecycle Management",
-                "description": "管理RAN节能意图的生命周期，包括创建、修改、删除、激活、去激活意图，并执行数据采集、分析、解决方案制定与配置。",
+                "description": "Manage RAN ES intent lifecycle including creation, modification, deletion, activation, deactivation, and perform data collection, analysis, solution formulation and configuration.",
                 "tags": [
                   "wireless",
                   "energy-saving",
@@ -770,7 +788,7 @@
               {
                 "id": "ran-es-intent-reporting",
                 "name": "RAN ES Intent Reporting",
-                "description": "提供意图报告查询、订阅、通知功能，报告意图实现状态、达成值、推荐值及配置修改信息。",
+                "description": "Provide intent report query, subscription and notification capabilities, reporting intent fulfillment status, achieved values, recommended values and configuration changes.",
                 "tags": [
                   "wireless",
                   "energy-saving",

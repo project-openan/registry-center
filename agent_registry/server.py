@@ -568,7 +568,7 @@ async def register_agent(
 @app.get(
     "/rest/v1/registry-center/agent-cards",
     response_model=None,
-    summary="Exact search",
+    summary="Query agent cards",
 )
 async def list_agents_exact(
         request: Request,

@@ -1,3 +1,22 @@
+<!--
+Copyright (c) 2026 Huawei Technologies Co., Ltd.
+All Rights Reserved.
+
+SPDX-License-Identifier: Apache-2.0
+
+   Licensed under the Apache License, Version 2.0 (the "License"); you may
+   not use this file except in compliance with the License. You may obtain
+   a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+   License for the specific language governing permissions and limitations
+   under the License.
+-->
+
 # Registry Center - Google Cloud Platform 容器化部署指南
 
 本指南帮你**一步一步**把这个注册中心服务部署到 Google Cloud Platform，无需任何技术背景。
@@ -8,7 +27,7 @@
 
 你需要一个 **Google Cloud 账号**（用 Gmail 注册即可），并且开通一个 **GCP 项目**并启用结算。
 
-> 新用户有 $300 免费额度，运行这个服务每天大约 $1-2（最便宜配置 <gongliangbi title="$0.06/小时">~¥0.4/小时</gongliangbi>）。
+> 新用户有 $300 免费额度，运行这个服务每天大约 $1-2（最便宜配置 (~$0.06/小时)）。
 
 ### 如何创建 GCP 项目？（如果还没有）
 
@@ -63,7 +82,7 @@ cd 项目目录路径
 
 > 把 `项目目录路径` 替换为你解压后 `registry-center` 文件夹的实际路径。例如：
 > ```powershell
-> cd C:\Users\你的用户名\Desktop\registry-center
+> cd C:\Users\<YourUsername>\Desktop\registry-center
 > ```
 
 运行后会提示你输入：
@@ -76,7 +95,7 @@ cd 项目目录路径
 - ✓ 部署到 Cloud Run
 
 
-**提示**：如果非首次部署，在运行到第4步时出现ALREADY_EXISTS的报错时，这是正常的，不用进行任何操作。
+**提示**：如果非首次部署，在创建数据库阶段出现ALREADY_EXISTS的报错时，这是正常的，不用进行任何操作。
 ![alt text](./images/db_already_exists_fig.png)
 
 **全程大约 10-15 分钟**，看到 `DEPLOYMENT SUCCESSFUL!` 就成功了。

@@ -1,3 +1,22 @@
+<!--
+Copyright (c) 2026 Huawei Technologies Co., Ltd.
+All Rights Reserved.
+
+SPDX-License-Identifier: Apache-2.0
+
+   Licensed under the Apache License, Version 2.0 (the "License"); you may
+   not use this file except in compliance with the License. You may obtain
+   a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+   License for the specific language governing permissions and limitations
+   under the License.
+-->
+
 # Registry Center - Google Cloud Platform Containerized Deployment Guide
 
 This guide walks you through deploying the Registry Center service to Google Cloud Platform **step by step** — no technical background required.
@@ -75,7 +94,7 @@ The script will then automatically:
 - ✓ Build the Docker image
 - ✓ Deploy to Cloud Run
 
-**Note**: If this is not your first deployment, you may see `ALREADY_EXISTS` errors during Step 4. This is normal — no action is needed.
+**Note**: If this is not your first deployment, you may see `ALREADY_EXISTS` errors during the database creation phase. This is normal — no action is needed.
 ![alt text](./images/db_already_exists_fig.png)
 
 **The entire process takes approximately 10–15 minutes**. Once you see `DEPLOYMENT SUCCESSFUL!`, you're done.

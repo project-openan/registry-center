@@ -1,3 +1,21 @@
+﻿<!--
+Copyright (c) 2026 Huawei Technologies Co., Ltd.
+All Rights Reserved.
+
+SPDX-License-Identifier: Apache-2.0
+
+   Licensed under the Apache License, Version 2.0 (the "License"); you may
+   not use this file except in compliance with the License. You may obtain
+   a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+   License for the specific language governing permissions and limitations
+   under the License.
+-->
 # Registry Center Development Guide
 
 ## Feature Overview
@@ -532,29 +550,29 @@ The Registry Center provides a CLI command-line tool for local management of Age
 
     ```bash
     # Query Agent list
-    registry agent list
+    agent list
 
     # Query Agent details
-    registry agent get --name "RAN Energy Saving Agent" --org "Huawei"
+    agent get --agent-name "RAN Energy Saving Agent" --org "Huawei"
 
     # Approve an Agent (requires approval feature to be enabled)
-    registry agent approve --name "RAN Energy Saving Agent" --org "Huawei"
+    agent approval -n "RAN Energy Saving Agent" --org "Huawei"
     ```
 
 3. Tag management commands
 
     ```bash
     # Create a tag
-    registry tag create --name "wireless"
+    tag create --name "wireless"
 
     # Query tag list
-    registry tag list
+    tag list
 
     # Set tags for an Agent
-    registry agent set-tags -n "RAN Energy Saving Agent" -o "Huawei" -t "wireless,energy-saving"
+    agent set-tags -n "RAN Energy Saving Agent" -o "Huawei" -t "wireless,energy-saving"
 
     # Delete a tag
-    registry tag delete --id "tag-uuid"
+    tag delete --id "tag-uuid"
     ```
 
     Notes:
@@ -690,18 +708,16 @@ flowchart TD
 
 **Custom LLM Architecture:**
 
-The system adopts the registry pattern and decorator pattern, with core components shown in Table 3:
+The system adopts a configuration-driven, single generic HTTP client architecture, with core components shown in Table 3:
 
 **Table 3** LLM Architecture Core Components
 
 | Component | Responsibility |
 |-----------|----------------|
-| BaseLLM | Defines the abstract base class for all LLMs, provides a unified invocation interface |
-| LLMProviderRegistry | Manages LLM provider registration, supports decorator-based registration |
-| LLMType | Defines supported LLM type enumerations |
-| LLMConfig/LLMConfigItem | Manages LLM configuration information (model, API, keys, etc.) |
-| Default LLM Implementations | OpenAIStyleLLM, AOCChatLLM, and other built-in implementations |
-| Custom LLMs | User-extended implementations, supporting integration of any vendor |
+| GenericLLM | The only concrete LLM implementation class, all behavior driven by JSON config |
+| ModelConfig | Dataclass mapping each capability section of llm_config.json to a structured config |
+| AUTH_STRATEGIES | Pluggable authentication strategy registry (dict), add custom sign/auth functions as needed |
+| llm_config.json | Single configuration file, keyed by "chat"/"embed"/"rerank" for each capability |
 
 ```
 ┌─────────────────────┐
@@ -710,25 +726,19 @@ The system adopts the registry pattern and decorator pattern, with core componen
            │
            ▼
 ┌─────────────────────┐
-│   get_llm_instance  │
+│ _get_instance(key)  │◄── Singleton cache _instances dict
+│ (private factory)   │
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│ LLMProviderRegistry │◄──── @registry_provider register custom LLM
+│    GenericLLM       │◄── Single implementation, no inheritance
+│ (config-driven HTTP)│
 └──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│      BaseLLM        │
-│  (Abstract Base)    │
-└──────────┬──────────┘
-     ┌──────┴──────┬───────────────┐
-     ▼             ▼               ▼
-┌─────────┐ ┌──────────┐  ┌─────────────┐
-│OpenAI   │ │  AOC     │  │  Custom     │
-│StyleLLM │ │ ChatLLM  │  │  MyLLM      │
-└─────────┘ └──────────┘  └─────────────┘
+           ├─── Reads llm_config.json (ModelConfig)
+           ├─── Selects auth strategy (AUTH_STRATEGIES)
+           ├─── Renders body template ($VARIABLE substitution)
+           └─── Parses response (dot/bracket path navigation)
 ```
 
 **Directory Structure:**
@@ -736,26 +746,22 @@ The system adopts the registry pattern and decorator pattern, with core componen
 {install_dir}/registry-center/
 ├── common/
 │   ├── config/
-│   │      └── llm_config.json      # LLM configuration file
-│   ├── llm/
-│   │   ├── config/
-│   │   │      ├── __init__.py
-│   │   │      ├── config_reader.py # Reads configuration file
-│   │   │      └── llm_config.py    # LLMType and LLMConfig class file
-│   │   ├── provider/
-│   │   │      ├── __init__.py
-│   │   │      ├── base_llm.py              # Base class
-│   │   │      ├── llm_provider_registry.py # Registry
-│   │   │      ├── llm_openai.py            # OpenAI style LLM implementation
-│   │   │      ├── aoc_base_llm.py          # AOC base class
-│   │   │      ├── aoc_chat_llm.py          # AOC chat model
-│   │   │      ├── aoc_embedding_llm.py     # AOC embedding model
-│   │   │      └── aoc_reranker_llm.py      # AOC reranker model
-│   │   ├── __init__.py    # Module export file
-│   │   └── llm.py         # Get LLM instance
-│   └── custom/
-│          ├── interface_type.py    # Interface type enumeration
-│          └── custom_handle.py     # Handler base class and registry
+│   │      └── llm_config.json           # LLM configuration file
+│   ├── custom/
+│   │      ├── __init__.py               # Custom handler registration file (create by user)
+│   │      ├── interface_type.py         # Interface type enumeration
+│   │      └── custom_handle.py          # Handler base class and registry
+│   └── llm/
+│       ├── __init__.py                  # Exports get_llm_instance etc.
+│       ├── llm.py                       # Factory functions + singleton cache
+│       ├── config/
+│       │      ├── __init__.py
+│       │      ├── config_reader.py      # JSON file reader utility
+│       │      └── llm_config.py         # ModelConfig dataclass
+│       └── provider/
+│              ├── __init__.py
+│              ├── generic_llm.py        # GenericLLM implementation
+│              └── auth_strategies.py    # AUTH_STRATEGIES registry
 ```
 
 ### Custom Handler Usage
@@ -912,203 +918,343 @@ print("Verification passed")
 #### Feature Description
 
 **Core Capabilities:**
-- **Abstract Base Class**: Defines a unified interface for all LLM implementations (`BaseLLM`)
-- **Registry Mechanism**: Manages LLM provider registration and retrieval via the decorator pattern
-- **Configuration-Driven**: Manages connection parameters for different LLMs based on JSON configuration files
-- **Instance Caching**: Singleton pattern manages LLM instances to avoid redundant creation
+- **Configuration-Driven**: All LLM behavior (URL, model, auth, request body, response parsing) is defined via `llm_config.json` — no code required
+- **Single Implementation Class**: `GenericLLM` is the only concrete class for all LLM capabilities; switch capabilities via config, no inheritance needed
+- **Pluggable Authentication**: Register custom auth functions via the `AUTH_STRATEGIES` dict, supporting any sign/auth scheme
+- **Instance Caching**: Singleton pattern manages LLM instances (cached by capability), avoiding redundant creation
 
-#### When to Use Custom LLMs
+#### When to Customize LLM Configuration
 
-The following scenarios require users to implement their own custom LLMs:
+The following scenarios require modifying `llm_config.json` or extending auth strategies:
 
-**Table 6** Custom LLM Scenario Description
+**Table 6** Custom LLM Configuration Scenarios
 
 | Scenario | Description | Example |
 |----------|-------------|---------|
-| Non-OpenAI style API | When using vendor models that do not support the OpenAI API format, customize the LLM implementation for corresponding request and response parsing logic | Baidu Wenxin Yiyan, iFlytek Spark, and other domestic vendor models |
-| Special authentication method | When the LLM API requires non-standard API Key authentication (e.g., OAuth, custom signatures, multi-layer authentication), customize the LLM to handle the authentication flow | A private deployment platform requiring OAuth 2.0 authentication |
-| Privately deployed LLM | When using a privately deployed LLM whose API interface format is incompatible with OpenAI, customize the LLM to adapt to the private interface | An internally deployed LLaMA model service within an enterprise |
-| Special request format | When the LLM API requires special request parameter structures or response formats, customize the LLM to handle request construction and response parsing | Model requiring custom prompt templates or special parameters |
+| Switching model vendors | When integrating a new LLM API, simply add a new capability section in the config file | Add a "vision" section for a vision model |
+| Non-standard authentication | When the LLM API requires special signing/auth (e.g., HMAC, OAuth), add a new strategy to `auth_strategies.py` | A private deployment platform requiring custom HMAC signing |
+| Non-standard request/response format | When the API body structure differs or the response JSON paths don't match, adjust `body` and `response` fields | A model returning `output.text` instead of `choices[0].message.content` |
+| Adding new capability types | When you need LLM capabilities beyond embedding/rerank (e.g., vision, speech) | Add a "vision" section with corresponding body/response templates |
 
 **Decision Criteria:**
 
-- If the LLM API is compatible with the OpenAI API format (e.g., DeepSeek, GPT-4, Claude, etc.), directly use the default `OpenAIStyleLLM` without customization
-- If the LLM API is not compatible with the OpenAI API format, implement a custom LLM
+- Most LLM APIs can be integrated by modifying `llm_config.json` alone — no Python code required
+- Only write auth functions in `auth_strategies.py` when a non-standard authentication method is needed
 
-#### Development Steps
-
-**Step 1**: Modify the configuration file `llm_config.json`
+#### Configuration File Format (llm_config.json)
 
 Configuration file path: `common/config/llm_config.json`
 
-Add a new LLM configuration entry in the configuration file:
 ```json
 {
-  "openai_style_llm": {
-    "description": "Large language model in OpenAI style",
-    "model": "your-model-name",
+  "chat": {
+    "description": "Chat/LLM model for PSOP generation and execution",
+    "model": "deepseek-chat",
+    "url": "https://api.deepseek.com/v1/chat/completions",
+    "api_key": "<YOUR_API_KEY>",
     "enable_thinking": true,
-    "api": "https://your-openai-style-api-endpoint.com",
-    "api_key": "<YOUR_API_KEY>"
+    "verify_ssl": true,
+    "headers": {},
+    "body": {
+      "model": "$MODEL",
+      "messages": [{"role": "user", "content": "$PROMPT"}]
+    },
+    "response": {
+      "answer": "choices[0].message.content",
+      "reasoning": "choices[0].message.reasoning_content"
+    }
   },
-  "my_custom_llm": {
-    "description": "My custom LLM",
-    "model": "custom-model-name",
-    "enable_thinking": true,
-    "api": "https://your-api-endpoint.com/v1",
-    "api_key": "your-custom-api-key",
-    "extra": {
-      "custom_param1": "value1",
-      "custom_param2": "value2"
+  "embed": {
+    "description": "Embedding model for vector similarity",
+    "model": "bge-m3",
+    "url": "http://127.0.0.1:3021/aoc/openapi/YOUR_ENDPOINT",
+    "api_key": "dummy",
+    "auth": {
+      "type": "aoc_signed",
+      "app_key": "YOUR_APP_KEY",
+      "app_secret": "YOUR_APP_SECRET",
+      "authorization": "Bearer YOUR_BEARER_TOKEN",
+      "api_code": "YOUR_API_CODE",
+      "api_version": "1.0",
+      "scenario_code": "YOUR_SCENARIO_CODE",
+      "scenario_version": "V1",
+      "ability_code": "YOUR_ABILITY_CODE",
+      "test_flag": "1"
+    },
+    "body": {
+      "model": "$MODEL",
+      "input": "$PROMPT"
+    },
+    "response": {
+      "embedding": "data[0].embedding"
+    }
+  },
+  "rerank": {
+    "description": "Reranker model for result reordering",
+    "model": "bge-reranker-v2-m3",
+    "url": "http://127.0.0.1:3021/aoc/openapi/interface/bge-reranker-v2-m3",
+    "auth": {
+      "type": "aoc_signed",
+      "app_key": "YOUR_APP_KEY",
+      "app_secret": "YOUR_APP_SECRET",
+      "authorization": "Bearer YOUR_BEARER_TOKEN",
+      "api_code": "YOUR_API_CODE",
+      "api_version": "1.0",
+      "scenario_code": "YOUR_SCENARIO_CODE",
+      "scenario_version": "V1",
+      "ability_code": "YOUR_ABILITY_CODE",
+      "test_flag": "1"
+    },
+    "body": {
+      "model": "$MODEL",
+      "query": "$QUERY",
+      "documents": "$DOCUMENTS"
+    },
+    "response": {
+      "results": "results"
     }
   }
 }
 ```
 
-**Step 2**: Add the new type to the LLMType enumeration
+**Configuration Fields:**
 
-Edit `common/llm/config/llm_config.py`:
-```python
-from enum import Enum
+| Field | Type | Description |
+|-------|------|-------------|
+| `description` | string | Capability description (for logging/debug only) |
+| `model` | string | Model name, injectable into body via `$MODEL` |
+| `url` | string | LLM API endpoint URL |
+| `api_key` | string | API Key, auto-added as `Authorization: Bearer <api_key>` (auth strategy takes priority) |
+| `enable_thinking` | bool | Enable chain-of-thought, injectable via `$ENABLE_THINKING` |
+| `verify_ssl` | bool | Verify SSL certificates (default: true) |
+| `headers` | dict | Additional static HTTP request headers |
+| `body` | dict | Request body template, supports `$VARIABLE` substitution |
+| `response` | dict | Response extraction path mapping (dot/bracket path navigation) |
+| `auth` | dict/string | Auth config: string = strategy name, dict must include `type` field for strategy name |
 
-class LLMType(Enum):
-    OPENAI_STYLE_LLM = "openai_style_llm"
-    AOC_CHAT_LLM = "aoc_chat_llm"
-    AOC_EMBEDDING_LLM = "aoc_embedding_llm"
-    AOC_RERANKER_LLM = "aoc_reranker_llm"
-    MY_CUSTOM_LLM = "my_custom_llm"  # New custom type
+**Body Template Variables:**
+
+| Variable | Source | Description |
+|----------|--------|-------------|
+| `$MODEL` | Config `model` field | Model name |
+| `$API_KEY` | Config `api_key` field | API key |
+| `$ENABLE_THINKING` | Config `enable_thinking` field | Enable chain-of-thought |
+| `$PROMPT` | Runtime `prompt` parameter | User input for ask_llm/embed |
+| `$QUERY` | Runtime `query` parameter | Query text for rerank |
+| `$DOCUMENTS` | Runtime `documents` parameter | Candidate document list for rerank |
+
+**Response Path Syntax:**
+
+- Dot-separated nested objects: `choices[0].message.content` → access `data["choices"][0]["message"]["content"]`
+- Bracket index: `choices[0]` → access array element 0
+- Mixed: `data[0].embedding` → access `data["data"][0]["embedding"]`
+
+#### Development Steps
+
+##### Step 1: Add a New LLM Capability
+
+Add a new capability section in `llm_config.json`. For example, integrating a vision model:
+
+```json
+{
+  "chat": { ... },
+  "embed": { ... },
+  "rerank": { ... },
+  "vision": {
+    "description": "Vision model for image understanding",
+    "model": "gpt-4-vision",
+    "url": "https://api.example.com/v1/vision",
+    "api_key": "<YOUR_API_KEY>",
+    "enable_thinking": false,
+    "verify_ssl": true,
+    "headers": {
+      "X-Custom-Header": "value"
+    },
+    "body": {
+      "model": "$MODEL",
+      "messages": [
+        {
+          "role": "user",
+          "content": "$PROMPT"
+        }
+      ]
+    },
+    "response": {
+      "answer": "choices[0].message.content",
+      "reasoning": "choices[0].message.reasoning_content"
+    }
+  }
+}
 ```
 
-**Step 3**: Create the custom LLM implementation file
+Then retrieve the instance by capability name:
 
-Create `my_custom_llm.py` in the `common/llm/provider/` directory:
-```python
-from typing import Union, Tuple
-from common.llm.config.llm_config import LLMType, LLMConfig
-from common.llm.provider.base_llm import BaseLLM
-from common.llm.provider.llm_provider_registry import registry_provider
-
-@registry_provider(LLMType.MY_CUSTOM_LLM)
-class MyCustomLLM(BaseLLM):
-    
-    def __init__(self, llm_config: LLMConfig):
-        super().__init__(llm_config)
-        # Initialize custom client
-        self.client = {}  # Implement based on actual situation
-    
-    def _ask_llm(self, prompt: str) -> Union[str, Tuple[str, str]]:
-        """
-        Call custom API
-        
-        Args:
-            prompt: Input prompt text
-            
-        Returns:
-            If enable_thinking is True, returns (reasoning, answer) tuple
-            Otherwise returns answer string
-        """
-        # Call custom API, example only, modify implementation based on actual situation
-        response = self.client.generate(
-            model=self.model,
-            prompt=prompt,
-            enable_thinking=self.enable_thinking
-        )
-        
-        # Handle based on API response format
-        if self.enable_thinking and hasattr(response, 'reasoning'):
-            reasoning = response.reasoning
-            answer = response.content
-            return reasoning, answer
-        else:
-            return response.content
-```
-
-**Step 4**: Export the new class in `common/llm/__init__.py`
-
-```python
-from .llm import get_llm_instance
-from .provider.llm_openai import OpenAIStyleLLM
-from .provider.aoc_chat_llm import AOCChatLLM
-from .provider.aoc_embedding_llm import AOCEmbeddingLLM
-from .provider.aoc_reranker_llm import AOCRerankerLLM
-from .provider.my_custom_llm import MyCustomLLM  # New export
-
-__all__ = ["OpenAIStyleLLM",
-           "get_llm_instance",
-           "AOCChatLLM",
-           "AOCEmbeddingLLM",
-           "AOCRerankerLLM",
-           "MyCustomLLM"
-           ]
-```
-
-#### Default LLM Description
-
-If no custom LLM is registered, the system provides the following default implementations:
-
-**Table 7** Default LLM Description
-
-| LLM Implementation | Corresponding Type | Description |
-|--------------------|-------------------|-------------|
-| OpenAIStyleLLM | OPENAI_STYLE_LLM | Supports LLM invocation via OpenAI-style API |
-| AOCChatLLM | AOC_CHAT_LLM | AOC platform chat model (e.g., Qwen3_32B) |
-| AOCEmbeddingLLM | AOC_EMBEDDING_LLM | AOC platform embedding model (e.g., BGE-M3) |
-| AOCRerankerLLM | AOC_RERANKER_LLM | AOC platform reranker model (e.g., BGE-Reranker-v2-m3) |
-
-#### Using a Custom LLM
-
-**Method 1**: Modify the default parameter
-
-Modify the default parameter of the `get_llm_instance` function in `common/llm/llm.py`:
-```python
-from common.llm.config.llm_config import get_llm_config_by_type, LLMType
-from common.llm.provider.llm_provider_registry import get_or_create_llm_instance
-
-def get_llm_instance(llm_type: LLMType = LLMType.MY_CUSTOM_LLM):
-    return get_or_create_llm_instance(get_llm_config_by_type(llm_type))
-```
-
-**Method 2**: Explicitly pass the type
 ```python
 from common.llm import get_llm_instance
-from common.llm.config.llm_config import LLMType
 
-# Use custom LLM
-llm = get_llm_instance(LLMType.MY_CUSTOM_LLM)
-result = llm.ask_llm("Hello, please introduce yourself")
-print(result)
+vision_llm = get_llm_instance("vision")
+reasoning, answer = vision_llm.ask_llm("Describe this image")
 ```
+
+> **Note**: No Python code changes are needed. `_get_instance("vision")` automatically reads the `"vision"` section from `llm_config.json` and creates a `GenericLLM` instance.
+
+##### Step 2: Add a New Auth Strategy
+
+If the new LLM API requires non-standard authentication, add an auth function in `common/llm/provider/auth_strategies.py`:
+
+```python
+# In auth_strategies.py
+def _build_my_custom_auth(params: Dict[str, str]) -> Dict[str, str]:
+    """
+    Custom authentication strategy
+
+    Args:
+        params: Parameters from the auth field (excluding "type" key)
+
+    Returns:
+        Dict of HTTP headers to add to the request
+    """
+    # Implement custom signing logic
+    token = params['access_token']
+    return {
+        'Authorization': f'CustomScheme {token}',
+        'X-Client-ID': params.get('client_id', ''),
+    }
+
+AUTH_STRATEGIES["my_custom_auth"] = _build_my_custom_auth
+```
+
+Then reference the strategy in `llm_config.json`:
+
+```json
+"chat": {
+  ...
+  "auth": {
+    "type": "my_custom_auth",
+    "access_token": "your-token",
+    "client_id": "your-client-id"
+  }
+}
+```
+
+##### Step 3: Adjust Request Body Template
+
+If the API has a different request format, modify the `body` field. For example, a model requiring an embedded `stream` parameter:
+
+```json
+"body": {
+  "model": "$MODEL",
+  "messages": [{"role": "user", "content": "$PROMPT"}],
+  "stream": false,
+  "temperature": 0.7,
+  "max_tokens": 4096
+}
+```
+
+##### Step 4: Adjust Response Extraction Path
+
+If the API response structure differs, modify the `response` field. For example:
+
+```json
+"response": {
+  "answer": "output.text",
+  "reasoning": "output.reasoning"
+}
+```
+
+> The above paths correspond to response `{"output": {"text": "Answer content", "reasoning": "Thinking process"}}`
+
+#### API Reference
+
+##### Public Functions
+
+```python
+from common.llm import get_llm_instance, get_embed_instance, get_rerank_instance
+
+# Get chat model instance (default capability="chat")
+llm = get_llm_instance()
+# Or specify another capability
+llm = get_llm_instance("vision")
+
+# Get embedding model instance
+emb = get_embed_instance()      # Equivalent to _get_instance("embed")
+
+# Get reranker model instance
+rerank = get_rerank_instance()   # Equivalent to _get_instance("rerank")
+```
+
+##### GenericLLM Methods
+
+```python
+# ask_llm: Chat/text generation
+reasoning, answer = llm.ask_llm(prompt="Hello, introduce yourself")
+# Returns: (reasoning: str, answer: str)
+
+# embed: Text vectorization
+vector = emb.embed(prompt="This is text to vectorize")
+# Returns: List[float]
+
+# rerank: Document reranking
+results = rerank.rerank(query="search query", documents=["doc1", "doc2", "doc3"])
+# Returns: List[Dict[str, Any]]
+```
+
+##### Default Capabilities
+
+**Table 7** Default LLM Capabilities
+
+| Capability Key | Public Function | Description |
+|----------------|-----------------|-------------|
+| `"chat"` | `get_llm_instance()` | Chat/text generation model, default capability |
+| `"embed"` | `get_embed_instance()` | Embedding/vectorization model |
+| `"rerank"` | `get_rerank_instance()` | Reranker model |
 
 #### Testing and Verification
 
-Verify default LLM:
+Verify default capabilities:
 ```python
-from common.llm import get_llm_instance
-from common.llm.config.llm_config import LLMType
+from common.llm import get_llm_instance, get_embed_instance, get_rerank_instance
 
-# Verify default LLM availability
-llm = get_llm_instance(LLMType.AOC_CHAT_LLM)
+# Verify chat model
+llm = get_llm_instance()
 assert llm is not None, "Failed to get LLM instance"
-print(f"Currently used LLM: {llm.to_dict()}")
+print(f"Current chat model: {llm.to_dict()}")
+reasoning, answer = llm.ask_llm("What's the weather today?")
+print(f"Answer: {answer}")
+
+# Verify embedding model
+emb = get_embed_instance()
+print(f"Current embedding model: {emb.to_dict()}")
+vector = emb.embed("Test text")
+print(f"Vector dimension: {len(vector)}")
+
+# Verify reranker model
+rerank = get_rerank_instance()
+print(f"Current reranker model: {rerank.to_dict()}")
+results = rerank.rerank("ABC", ["ABCD", "BCDE"])
+print(f"Rerank result count: {len(results)}")
 ```
 
-Verify custom LLM registration:
+Verify custom capability:
 ```python
 from common.llm import get_llm_instance
-from common.llm.config.llm_config import LLMType, LLMConfig
-from common.llm.provider.base_llm import BaseLLM
-from common.llm.provider.llm_provider_registry import registry_provider
 
-@registry_provider(LLMType.MY_CUSTOM_LLM)
-class TestLLM(BaseLLM):
-    def _ask_llm(self, prompt: str):
-        return "test_response"
+# Verify new capability (assuming "vision" section added to llm_config.json)
+vision_llm = get_llm_instance("vision")
+assert vision_llm is not None, "Failed to get Vision instance"
+print(f"Vision model: {vision_llm.to_dict()}")
+reasoning, answer = vision_llm.ask_llm("Describe this image")
+print(f"Answer: {answer}")
+```
 
-# Use custom LLM
-llm = get_llm_instance(LLMType.MY_CUSTOM_LLM)
-result = llm.ask_llm("Test question")
-assert "test_response" in result, "Custom LLM did not take effect"
-print("Verification passed")
+Verify custom auth strategy:
+```python
+from common.llm.provider.auth_strategies import AUTH_STRATEGIES
+
+# Check if strategy is registered
+assert "my_custom_auth" in AUTH_STRATEGIES, "Auth strategy not registered"
+print(f"Available auth strategies: {list(AUTH_STRATEGIES.keys())}")
+```
 ```
 
 ## Appendix

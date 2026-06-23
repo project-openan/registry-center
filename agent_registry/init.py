@@ -134,7 +134,7 @@ class InitCommand:
         self.save_persistence_config_to_file(persistence_config)
 
         print(f"\nConfiguration complete, saved to {self.config_file}")
-        print("You can use './start.sh' to start the service")
+        print("You can use 'python -m agent_registry.start' to start the service")
 
     def config_tls_cert(self) -> dict:
         config = {}
@@ -176,14 +176,14 @@ class InitCommand:
         else:
             config['ssl_keyfile_password'] = self.existing_config.get('ssl_keyfile_password', '')
 
-        default_verify_client = self.existing_config.get('ssl_verify_client', 'true')
+        default_verify_client = self.existing_config.get('verify_client', 'true')
         verify_client = input(f"Enable client certificate verification verify_client (y/n, default: {default_verify_client}): ").strip().lower()
         if verify_client == 'n':
-            config['ssl_verify_client'] = 'false'
+            config['verify_client'] = 'false'
         elif verify_client == 'y':
-            config['ssl_verify_client'] = 'true'
+            config['verify_client'] = 'true'
         else:
-            config['ssl_verify_client'] = default_verify_client
+            config['verify_client'] = default_verify_client
 
         return config
 

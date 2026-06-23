@@ -1,3 +1,22 @@
+<!--
+Copyright (c) 2026 Huawei Technologies Co., Ltd.
+All Rights Reserved.
+
+SPDX-License-Identifier: Apache-2.0
+
+   Licensed under the Apache License, Version 2.0 (the "License"); you may
+   not use this file except in compliance with the License. You may obtain
+   a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+   License for the specific language governing permissions and limitations
+   under the License.
+-->
+
 # Registry Center Security Guide
 
 The Registry Center security capabilities are as follows:
@@ -149,7 +168,7 @@ audit_log_backup_count=4
 The recording format is a JSON string, with examples as follows:<br>
 - Service start operation:
 ```json
-{"time": "2026-05-11T13:03:54Z", "clientIP": "", "userName": "root", "level": "Critical", "operationName": "Start Service", "object": "Service", "result": "Success", "details": {"ip": "10.244.183.56", "port": "1107"}}
+{"time": "2026-05-11T13:03:54Z", "clientIP": "", "userName": "root", "level": "Critical", "operationName": "Start Service", "object": "Service", "result": "Success", "details": {"ip": "10.244.183.56", "port": "1108"}}
 ```
 - AgentCard registration operation:<br>
 Success scenario:
@@ -186,6 +205,7 @@ AgentCard only supports Chinese and English. AgentCard must not carry sensitive/
 ### Blocking AgentCard Registration with Malicious Intent
 
 In the AgentCard registration REST interface, the following fields in the AgentCard are subject to prompt injection validation and high-risk skill checks:<br>
+- name
 - description
 - skill.name
 - skill.description
