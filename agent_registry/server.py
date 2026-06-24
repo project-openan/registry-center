@@ -64,6 +64,9 @@ from common.log.audit_logger import OperationResult, LogLevel, OperatorObject, O
 from common.util.app_config import get_conf
 from common.cert.cert_cn_parser import validate_cn
 
+# Import knowledge graph router
+from agent_registry.knowledge_graph_api import knowledge_graph_router, close_neo4j_driver
+
 # ---------- Rate Limiter Setup (In-Memory) ----------
 # Use in-memory storage for single-node deployments. Counts reset on restart.
 sync_storage = storage.MemoryStorage()
@@ -757,6 +760,14 @@ def close_registry():
 
 app.add_event_handler("startup", initialize_registry)
 app.add_event_handler("shutdown", close_registry)
+
+# Include knowledge graph router
+app.include_router(knowledge_graph_router)
+
+# Add shutdown handler for Neo4j driver
+@app.on_event("shutdown")
+async def shutdown_neo4j():
+    close_neo4j_driver()
 
 
 # ---------- JWK Endpoint ----------

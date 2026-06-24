@@ -1,0 +1,1205 @@
+openapi: 3.0.3
+info:
+  title: 知识图谱API
+  description: '知识图谱操作的综合性HTTP API。
+
+
+    ## 架构
+
+    本API作为图数据管理的通用RESTful接口，
+
+    提供RESTful的图操作端点，同时通过参数化查询和高效的连接池
+
+    保证安全性和性能。
+
+    '
+  version: 1.0.0
+tags:
+- name: Nodes
+  description: 图节点的操作（CRUD操作）
+- name: Relationships
+  description: 图关系的操作（CRUD操作）
+- name: Graph
+  description: 全图操作（整个图的快照）
+- name: Bulk
+  description: 批量操作，用于高性能批处理
+- name: Import/Export
+  description: 图数据导入导出功能
+paths:
+  /nodes:
+    get:
+      tags:
+      - Nodes
+      summary: 列出所有节点
+      description: '检索图中的所有节点，支持可选的分页和标签过滤。
+
+
+        **使用场景**：
+
+        - 浏览图中的所有实体
+
+        - 按标签类型查找节点
+
+        - 大数据集的分页
+
+        '
+      operationId: listNodes
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - name: label
+        in: query
+        description: 按特定标签过滤节点
+        required: false
+        schema:
+          type: string
+        example: Person
+      responses:
+        '200':
+          description: 成功响应，返回分页的节点列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeListResponse'
+        '400':
+          description: 请求错误（参数无效）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - Nodes
+      summary: 创建节点
+      description: '创建具有指定标签和属性的新节点。
+
+
+        **重要说明**：
+
+        - 至少需要一个标签
+
+        - 属性可以是任何有效的JSON对象
+
+        - 返回创建的节点及其系统生成的elementId
+
+        '
+      operationId: createNode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNodeRequest'
+            examples:
+              person:
+                summary: 创建人物节点
+                value:
+                  labels:
+                  - Person
+                  properties:
+                    name: 张三
+                    age: 30
+                    email: zhangsan@example.com
+              company:
+                summary: 创建公司节点（多标签）
+                value:
+                  labels:
+                  - Company
+                  - Organization
+                  - Technology
+                  properties:
+                    name: 某某科技公司
+                    founded: 1990
+                    industry: 软件
+                    employees: 500
+      responses:
+        '201':
+          description: 节点创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeResponse'
+        '400':
+          description: 输入无效（缺少标签或JSON格式错误）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /nodes/{id}:
+    get:
+      tags:
+      - Nodes
+      summary: 通过ID获取节点
+      description: '通过其element ID检索特定节点。
+
+
+        **注意**：elementId是系统生成的唯一标识符，
+
+        在节点生命周期内保持稳定。
+
+        '
+      operationId: getNodeById
+      parameters:
+      - $ref: '#/components/parameters/NodeIdParam'
+      responses:
+        '200':
+          description: 成功响应，返回节点详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeResponse'
+        '404':
+          description: 节点不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+      - Nodes
+      summary: 更新节点
+      description: '更新现有节点的属性。
+
+
+        **重要**：
+
+        - 标签不能更改（如需要请使用删除+创建）
+
+        - 只更新提供的属性
+
+        - 要移除属性，请将其设置为null
+
+        '
+      operationId: updateNode
+      parameters:
+      - $ref: '#/components/parameters/NodeIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNodeRequest'
+            examples:
+              updateAgeAndCity:
+                summary: 更新年龄并添加城市
+                value:
+                  properties:
+                    age: 31
+                    city: 北京
+              removeProperty:
+                summary: 移除属性
+                value:
+                  properties:
+                    email: null
+      responses:
+        '200':
+          description: 节点更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeResponse'
+        '404':
+          description: 节点不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - Nodes
+      summary: 删除节点
+      description: '从图中删除节点。
+
+
+        **安全特性**：
+
+        - 默认情况下，无法删除具有关系的节点
+
+        - 使用`force=true`可删除节点及其所有关系
+
+        - 这防止了意外删除关联数据
+
+        '
+      operationId: deleteNode
+      parameters:
+      - $ref: '#/components/parameters/NodeIdParam'
+      - name: force
+        in: query
+        description: 强制删除，即使节点有关系
+        required: false
+        schema:
+          type: boolean
+          default: false
+        example: true
+      responses:
+        '204':
+          description: 节点删除成功
+        '404':
+          description: 节点不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 无法删除有关联的节点（force=false）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /relationships:
+    get:
+      tags:
+      - Relationships
+      summary: 列出所有关系
+      description: '检索图中的所有关系，支持可选的分页和类型过滤。
+
+        '
+      operationId: listRelationships
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - name: type
+        in: query
+        description: 按类型过滤关系
+        required: false
+        schema:
+          type: string
+        example: KNOWS
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipListResponse'
+        '400':
+          description: 请求错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - Relationships
+      summary: 创建关系
+      description: '在两个现有节点之间创建新关系。
+
+
+        **要求**：
+
+        - 起始节点和结束节点都必须存在
+
+        - 关系类型不能为空
+
+        - 属性是可选的
+
+        '
+      operationId: createRelationship
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRelationshipRequest'
+            examples:
+              knows:
+                summary: 创建认识关系
+                value:
+                  type: KNOWS
+                  startNodeId: 4:e0513cb5-9e54-4416-93bf-e452ae9b18aa:22
+                  endNodeId: 4:e0513cb5-9e54-4416-93bf-e452ae9b18aa:23
+                  properties:
+                    since: 2020
+                    closeness: close
+              worksFor:
+                summary: 创建工作关系
+                value:
+                  type: WORKS_FOR
+                  startNodeId: person-node-id
+                  endNodeId: company-node-id
+                  properties:
+                    startDate: '2023-01-15'
+                    position: 软件工程师
+                    salary: 80000
+      responses:
+        '201':
+          description: 关系创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+        '400':
+          description: 输入无效（节点ID不存在或缺少类型）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /relationships/{id}:
+    get:
+      tags:
+      - Relationships
+      summary: 通过ID获取关系
+      description: 通过其element ID检索特定关系。
+      operationId: getRelationshipById
+      parameters:
+      - $ref: '#/components/parameters/RelationshipIdParam'
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+        '404':
+          description: 关系不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+      - Relationships
+      summary: 更新关系
+      description: 更新现有关系的属性。
+      operationId: updateRelationship
+      parameters:
+      - $ref: '#/components/parameters/RelationshipIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRelationshipRequest'
+            examples:
+              updateProperties:
+                summary: 更新关系属性
+                value:
+                  properties:
+                    since: 2021
+                    closeness: 非常亲密
+      responses:
+        '200':
+          description: 关系更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+        '404':
+          description: 关系不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - Relationships
+      summary: 删除关系
+      description: 通过其element ID删除关系。
+      operationId: deleteRelationship
+      parameters:
+      - $ref: '#/components/parameters/RelationshipIdParam'
+      responses:
+        '204':
+          description: 关系删除成功
+        '404':
+          description: 关系不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /graph:
+    get:
+      tags:
+      - Graph
+      summary: 获取整个图
+      description: '检索图中的所有节点和关系。
+
+
+        **使用场景**：
+
+        - 图可视化的初始加载
+
+        - 完整备份/导出
+
+        - 全局分析
+
+
+        **性能提示**：对于大型图，使用`limit`参数
+
+        或使用filter参数进行过滤查询。
+
+        '
+      operationId: getGraph
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: 成功响应，返回完整图数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphDataResponse'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /bulk/nodes:
+    post:
+      tags:
+      - Bulk
+      summary: 批量创建节点
+      description: '在单个事务中创建多个节点。
+
+
+        **性能优势**：
+
+        - 单次网络往返
+
+        - 单个数据库事务
+
+        - 比单独调用快10-50倍
+
+
+        **原子性**：所有节点在一个事务中创建。
+
+        如果任何一个失败，所有节点都会回滚。
+
+        '
+      operationId: batchCreateNodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchCreateNodesRequest'
+            examples:
+              batchPersons:
+                summary: 创建多个人物节点
+                value:
+                  nodes:
+                  - labels:
+                    - Person
+                    properties:
+                      name: 张三
+                      age: 25
+                  - labels:
+                    - Person
+                    properties:
+                      name: 李四
+                      age: 30
+                  - labels:
+                    - Person
+                    properties:
+                      name: 王五
+                      age: 35
+      responses:
+        '201':
+          description: 节点批量创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchCreateNodesResponse'
+        '400':
+          description: 输入无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /bulk/relationships:
+    post:
+      tags:
+      - Bulk
+      summary: 批量创建关系
+      description: '在单个事务中创建多个关系。
+
+
+        **要求**：
+
+        - 所有引用的节点必须存在
+
+        - 原子性：全有或全无语义
+
+        '
+      operationId: batchCreateRelationships
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchCreateRelationshipsRequest'
+            examples:
+              batchKnows:
+                summary: 创建多个KNOWS关系
+                value:
+                  relationships:
+                  - type: KNOWS
+                    startNodeId: zhangsan-id
+                    endNodeId: lisi-id
+                    properties:
+                      since: 2020
+                  - type: KNOWS
+                    startNodeId: lisi-id
+                    endNodeId: wangwu-id
+                    properties:
+                      since: 2021
+      responses:
+        '201':
+          description: 关系批量创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchCreateRelationshipsResponse'
+        '400':
+          description: 输入无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /import:
+    post:
+      tags:
+      - Import/Export
+      summary: 导入图数据
+      description: '从JSON格式导入图数据。
+
+        支持包含节点和关系的完整图结构。
+
+
+        **使用场景**：
+
+        - 数据迁移
+
+        - 从备份恢复
+
+        - 初始化测试环境
+
+        '
+      operationId: importGraph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportGraphRequest'
+            examples:
+              fullGraph:
+                summary: 导入完整图
+                value:
+                  nodes:
+                  - labels:
+                    - Person
+                    properties:
+                      name: 张三
+                      id: 1
+                  - labels:
+                    - Person
+                    properties:
+                      name: 李四
+                      id: 2
+                  relationships:
+                  - type: KNOWS
+                    startNodeId: zhangsan-temp-id
+                    endNodeId: lisi-temp-id
+                    properties:
+                      since: 2020
+      responses:
+        '201':
+          description: 图导入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportGraphResponse'
+        '400':
+          description: 输入格式无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /export:
+    get:
+      tags:
+      - Import/Export
+      summary: 导出图数据
+      description: '将整个图或子图导出为JSON格式。
+
+
+        **选项**：
+
+        - 完整图导出（默认）
+
+        - 按标签过滤导出
+
+        - 按属性过滤导出
+
+        - JSON格式
+
+        '
+      operationId: exportGraph
+      parameters:
+      - name: filter
+        in: query
+        description: 可选的过滤条件，支持label和property参数
+        required: false
+        schema:
+          type: string
+        example: label=Person&property=name:张三
+      - name: format
+        in: query
+        description: 导出格式
+        required: false
+        schema:
+          type: string
+          enum:
+          - json
+          default: json
+        example: json
+      responses:
+        '200':
+          description: 导出成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportGraphResponse'
+
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: 页码（从1开始）
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: 每页项目数
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 10000
+        default: 100
+      example: 100
+    NodeIdParam:
+      name: id
+      in: path
+      description: 节点element ID（系统生成的唯一标识符）
+      required: true
+      schema:
+        type: string
+      example: 4:e0513cb5-9e54-4416-93bf-e452ae9b18aa:22
+    RelationshipIdParam:
+      name: id
+      in: path
+      description: 关系element ID（系统生成的唯一标识符）
+      required: true
+      schema:
+        type: string
+      example: 5:e0513cb5-9e54-4416-93bf-e452ae9b18aa:6
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          description: 机器可读的错误代码
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: 人类可读的错误消息
+          example: 节点ID格式无效
+        details:
+          type: object
+          description: 附加错误详情（可选）
+          additionalProperties: true
+          example:
+            field: labels
+            issue: 空数组
+    Node:
+      type: object
+      required:
+      - id
+      - labels
+      - properties
+      properties:
+        id:
+          type: string
+          description: 节点的element ID（系统生成，不可变）
+          example: 4:e0513cb5-9e54-4416-93bf-e452ae9b18aa:22
+        labels:
+          type: array
+          items:
+            type: string
+          description: 与节点关联的标签（至少需要一个）
+          example:
+          - Person
+          - Employee
+          minItems: 1
+        properties:
+          type: object
+          description: 节点的键值属性
+          additionalProperties: true
+          example:
+            name: 张三
+            age: 30
+            email: zhangsan@example.com
+    CreateNodeRequest:
+      type: object
+      required:
+      - labels
+      - properties
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+          description: 新节点的标签（至少需要一个）
+          minItems: 1
+          example:
+          - Person
+        properties:
+          type: object
+          description: 节点的属性
+          additionalProperties: true
+          example:
+            name: 张三
+            age: 30
+    UpdateNodeRequest:
+      type: object
+      required:
+      - properties
+      properties:
+        properties:
+          type: object
+          description: '要更新的属性。
+
+            - 新属性将被添加
+
+            - 现有属性将被更新
+
+            - 设置为null以移除
+
+            '
+          additionalProperties: true
+          example:
+            age: 31
+            city: 北京
+    NodeResponse:
+      type: object
+      required:
+      - success
+      - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Node'
+    NodeListResponse:
+      type: object
+      required:
+      - success
+      - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    Relationship:
+      type: object
+      required:
+      - id
+      - type
+      - startNodeId
+      - endNodeId
+      - properties
+      properties:
+        id:
+          type: string
+          description: 关系的element ID
+          example: 5:e0513cb5-9e54-4416-93bf-e452ae9b18aa:6
+        type:
+          type: string
+          description: 关系类型（如KNOWS、WORKS_FOR）
+          example: KNOWS
+        startNodeId:
+          type: string
+          description: 起始节点的element ID
+          example: 4:e0513cb5-9e54-4416-93bf-e452ae9b18aa:22
+        endNodeId:
+          type: string
+          description: 结束节点的element ID
+          example: 4:e0513cb5-9e54-4416-93bf-e452ae9b18aa:23
+        properties:
+          type: object
+          description: 关系的键值属性
+          additionalProperties: true
+          example:
+            since: 2020
+            closeness: close
+    CreateRelationshipRequest:
+      type: object
+      required:
+      - type
+      - startNodeId
+      - endNodeId
+      properties:
+        type:
+          type: string
+          description: 关系类型
+          minLength: 1
+          example: KNOWS
+        startNodeId:
+          type: string
+          description: 起始节点的element ID（必须存在）
+          example: node-start-id
+        endNodeId:
+          type: string
+          description: 结束节点的element ID（必须存在）
+          example: node-end-id
+        properties:
+          type: object
+          description: 关系的属性（可选）
+          additionalProperties: true
+          example:
+            since: 2020
+    UpdateRelationshipRequest:
+      type: object
+      required:
+      - properties
+      properties:
+        properties:
+          type: object
+          description: 要更新的属性
+          additionalProperties: true
+          example:
+            since: 2021
+            closeness: 非常亲密
+    RelationshipResponse:
+      type: object
+      required:
+      - success
+      - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Relationship'
+    RelationshipListResponse:
+      type: object
+      required:
+      - success
+      - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    GraphData:
+      type: object
+      required:
+      - nodes
+      - relationships
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+    GraphDataResponse:
+      type: object
+      required:
+      - success
+      - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/GraphData'
+    BatchCreateNodesRequest:
+      type: object
+      required:
+      - nodes
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateNodeRequest'
+          minItems: 1
+          maxItems: 1000
+          description: 要创建的节点数组（每个请求最多1000个）
+    BatchCreateNodesResponse:
+      type: object
+      required:
+      - success
+      - data
+      - count
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+          description: 创建的节点数组
+        count:
+          type: integer
+          description: 成功创建的节点数量
+          example: 10
+    BatchCreateRelationshipsRequest:
+      type: object
+      required:
+      - relationships
+      properties:
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateRelationshipRequest'
+          minItems: 1
+          maxItems: 1000
+          description: 要创建的关系数组（每个请求最多1000个）
+    BatchCreateRelationshipsResponse:
+      type: object
+      required:
+      - success
+      - data
+      - count
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+          description: 创建的关系数组
+        count:
+          type: integer
+          description: 成功创建的关系数量
+          example: 5
+    ImportGraphRequest:
+      type: object
+      required:
+      - nodes
+      - relationships
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateNodeRequest'
+          description: 要导入的节点
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateRelationshipRequest'
+          description: 要导入的关系
+    ImportGraphResponse:
+      type: object
+      required:
+      - success
+      - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            nodesCreated:
+              type: integer
+              description: 成功创建的节点数量
+              example: 100
+            relationshipsCreated:
+              type: integer
+              description: 成功创建的关系数量
+              example: 250
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  index:
+                    type: integer
+                    description: 输入数组中失败项目的索引
+                  message:
+                    type: string
+                    description: 描述错误的消息
+              description: 导入过程中遇到的错误列表（如果有）
+    ExportGraphResponse:
+      type: object
+      required:
+      - success
+      - data
+      - metadata
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/GraphData'
+        metadata:
+          type: object
+          properties:
+            exportedAt:
+              type: string
+              format: date-time
+              description: 执行导出的时间戳
+              example: '2024-01-15T10:30:00Z'
+            nodeCount:
+              type: integer
+              description: 导出的节点总数
+              example: 1000
+            relationshipCount:
+              type: integer
+              description: 导出的关系总数
+              example: 5000
+            format:
+              type: string
+              enum:
+              - json
+
+              description: 使用的导出格式
+              example: json
+    Pagination:
+      type: object
+      required:
+      - page
+      - limit
+      - total
+      - totalPages
+      - hasNext
+      - hasPrev
+      properties:
+        page:
+          type: integer
+          description: 当前页码（从1开始）
+          example: 1
+        limit:
+          type: integer
+          description: 每页项目数
+          example: 100
+        total:
+          type: integer
+          description: 所有页面的项目总数
+          example: 523
+        totalPages:
+          type: integer
+          description: 总页数
+          example: 6
+        hasNext:
+          type: boolean
+          description: 是否有下一页
+          example: true
+        hasPrev:
+          type: boolean
+          description: 是否有上一页
+          example: false
