@@ -75,6 +75,8 @@ If not, run `gcloud auth login` — a browser window will open for you to sign i
 
 ### Step 3: Navigate to the Project Directory and Deploy
 
+Open PowerShell (right-click Start → "Windows PowerShell" or "Terminal"), then run:
+
 ```powershell
 cd <project-directory-path>
 .\deploy-all.ps1
@@ -84,6 +86,17 @@ cd <project-directory-path>
 > ```powershell
 > cd C:\Users\YourUsername\Desktop\registry-center
 > ```
+
+> **If running `.\deploy-all.ps1` fails with the error** "File ... cannot be loaded. The file ... is not digitally signed. You cannot run this script on the current system." / "UnauthorizedAccess", this is caused by PowerShell's Execution Policy, which by default blocks unsigned scripts. Choose one of the following solutions:
+> - **Option 1 (Recommended, permanent)**: Loosen the execution policy for your user account. Local scripts can run directly; only scripts downloaded from the internet require a signature.
+>   ```powershell
+>   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+>   ```
+>   Then run `.\deploy-all.ps1` again.
+> - **Option 2 (one-time only)**: Bypass the execution policy for a single run without changing system settings.
+>   ```powershell
+>   powershell -ExecutionPolicy Bypass -File .\deploy-all.ps1
+>   ```
 
 You will be prompted to enter:
 1. **GCP Project ID** — the ID you noted down when creating your project
