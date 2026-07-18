@@ -75,6 +75,8 @@ gcloud auth list
 
 ### 第 3 步：进入项目目录并一键部署
 
+打开 PowerShell（右键开始菜单 → "Windows PowerShell" 或 "终端"），然后执行：
+
 ```powershell
 cd 项目目录路径
 .\deploy-all.ps1
@@ -84,6 +86,17 @@ cd 项目目录路径
 > ```powershell
 > cd C:\Users\<YourUsername>\Desktop\registry-center
 > ```
+
+> **如果运行 `.\deploy-all.ps1` 报错** "File ... cannot be loaded. The file ... is not digitally signed. You cannot run this script on the current system." / "UnauthorizedAccess"，这是 PowerShell 执行策略（Execution Policy）默认禁止运行未签名脚本导致的。两种解决方法任选其一：
+> - **方法一（推荐，永久生效）**：为当前用户放开执行策略，本地脚本可直接运行，仅网络下载的脚本才需要签名。
+>   ```powershell
+>   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+>   ```
+>   执行后再运行 `.\deploy-all.ps1` 即可。
+> - **方法二（仅本次运行生效）**：不修改系统设置，单次绕过执行策略。
+>   ```powershell
+>   powershell -ExecutionPolicy Bypass -File .\deploy-all.ps1
+>   ```
 
 运行后会提示你输入：
 1. **GCP Project ID** — 就是前面创建项目时记下的那个 ID
