@@ -15,21 +15,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-a2a-sdk[signing]>=1.0.0a1
-loguru>=0.7.3
-uvicorn>=0.34.0
-fastapi>=0.115.11
-cryptography~=46.0.5
-limits~=4.0.0
-starlette~=0.50.0
-openai>=2.26.0
-pymilvus~=2.6.12
-environs~=15.0.1
-psycopg2-binary>=2.9.10
-PyJWT~=2.10.1
-requests~=2.32.3
-httpx~=0.28.1
-pyyaml>=6.0
-pytest>=8.0
-pytest-asyncio>=0.24
-neo4j>=5.0.0
+"""
+Knowledge Graph API - RESTful endpoints for Neo4j graph operations.
+
+This module provides FastAPI endpoints for:
+- Node CRUD operations
+- Relationship CRUD operations  
+- Full graph queries
+- Cypher query execution
+- Bulk operations
+- Import/Export functionality
+"""
+
+from agent_registry.knowledge_graph_api.router import knowledge_graph_router, close_neo4j_driver
+
+__all__ = ['knowledge_graph_router', 'close_neo4j_driver']
