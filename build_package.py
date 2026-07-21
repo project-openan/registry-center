@@ -99,12 +99,14 @@ NC='\033[0m'
 TARGET_DIR="/opt/registry-center"
 INSTALL_SERVICE=false
 SKIP_INIT=false
+LOCAL_MODE=false
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
     echo "  --target DIR          Installation directory (default: /opt/registry-center)"
+    echo "  --local               Install to ./registry-center (for testing without root)"
     echo "  --install-service     Install systemd service after setup"
     echo "  --skip-init           Skip interactive initialization"
     echo "  --help                Show this help message"
@@ -117,6 +119,11 @@ while [ $# -gt 0 ]; do
         --target)
             TARGET_DIR="$2"
             shift 2
+            ;;
+        --local)
+            LOCAL_MODE=true
+            TARGET_DIR="$(pwd)/registry-center"
+            shift
             ;;
         --install-service)
             INSTALL_SERVICE=true
@@ -182,27 +189,25 @@ if [ -z "$PYTHON_CMD" ]; then
 fi
 echo -e "${GREEN}  Python: $PYTHON_CMD ($($PYTHON_CMD --version))${NC}"
 
-# --- Step 3: Extract files ---
-echo -e "${CYAN}[3/7] Extracting files to $TARGET_DIR ...${NC}"
-
-# Check write permission to target directory
+# --- Pre-check: verify write permission to target parent directory ---
 TARGET_PARENT=$(dirname "$TARGET_DIR")
-if [ -d "$TARGET_DIR" ]; then
-    if [ ! -w "$TARGET_DIR" ]; then
-        echo -e "${RED}Error: Permission denied to write to $TARGET_DIR${NC}"
-        echo "  Please run with sudo or specify a writable directory:"
-        echo "    sudo $0 $*"
-        echo "    $0 --target ~/registry-center"
-        exit 1
-    fi
-elif [ ! -d "$TARGET_PARENT" ] || [ ! -w "$TARGET_PARENT" ]; then
-    echo -e "${RED}Error: Permission denied to create $TARGET_DIR${NC}"
-    echo "  Please run with sudo or specify a writable directory:"
-    echo "    sudo $0 $*"
-    echo "    $0 --target ~/registry-center"
+if [ ! -d "$TARGET_PARENT" ]; then
+    echo -e "${RED}Error: Parent directory '$TARGET_PARENT' does not exist.${NC}"
+    exit 1
+fi
+if [ ! -w "$TARGET_PARENT" ] && [ ! -w "$TARGET_DIR" ]; then
+    echo -e "${RED}Error: Permission denied - cannot write to '$TARGET_DIR'${NC}"
+    echo ""
+    echo "  Solutions:"
+    echo "    1) Run with sudo:    sudo $0 $*"
+    echo "    2) Use --local:      $0 --local    (installs to ./registry-center)"
+    echo "    3) Specify a path:   $0 --target ~/registry-center"
+    echo ""
     exit 1
 fi
 
+# --- Step 3: Extract files ---
+echo -e "${CYAN}[3/7] Extracting files to $TARGET_DIR ...${NC}"
 if [ -d "$TARGET_DIR" ] && [ "$(ls -A "$TARGET_DIR" 2>/dev/null)" ]; then
     echo -e "${YELLOW}  Warning: Target directory is not empty.${NC}"
     read -p "  Overwrite? (y/n): " choice
