@@ -138,4 +138,8 @@ def get_persistence_conf() -> dict:
         from common.util.cipher_util import decrypt
         decrypted = decrypt(conf['postgresql.password'])
         conf['postgresql.password'] = decrypted.decode('utf-8') if isinstance(decrypted, bytes) else decrypted
+    if 'gauss.password' in conf and conf['gauss.password']:
+        from common.util.cipher_util import decrypt
+        decrypted = decrypt(conf['gauss.password'])
+        conf['gauss.password'] = decrypted.decode('utf-8') if isinstance(decrypted, bytes) else decrypted
     return conf

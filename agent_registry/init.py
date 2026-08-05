@@ -394,7 +394,7 @@ class InitCommand:
     def config_persistence(self) -> dict:
         config = {}
 
-        allowed_modes = ['file', 'postgresql']
+        allowed_modes = ['file', 'postgresql', 'sqlite', 'gauss']
         default_mode = self.existing_persistence_config.get('persistence.mode', 'file')
         
         while True:
@@ -433,6 +433,36 @@ class InitCommand:
                 config['postgresql.password'] = encrypt(password_input)
             else:
                 config['postgresql.password'] = self.existing_persistence_config.get('postgresql.password', '')
+
+        if config['persistence.mode'] == 'sqlite':
+            print("\nConfigure SQLite database:")
+            default_path = self.existing_persistence_config.get('sqlite.path', 'data/agents.db')
+            path_input = input(f"Enter database file path sqlite.path (default: {default_path}): ").strip()
+            config['sqlite.path'] = path_input or default_path
+
+        if config['persistence.mode'] == 'gauss':
+            print("\nConfigure GaussDB database connection:")
+            default_host = self.existing_persistence_config.get('gauss.host', 'localhost')
+            host_input = input(f"Enter database host gauss.host (default: {default_host}): ").strip()
+            config['gauss.host'] = host_input or default_host
+
+            default_port = self.existing_persistence_config.get('gauss.port', '5432')
+            port_input = input(f"Enter database port gauss.port (default: {default_port}): ").strip()
+            config['gauss.port'] = port_input or default_port
+
+            default_database = self.existing_persistence_config.get('gauss.database', 'a2a_registry')
+            database_input = input(f"Enter database name gauss.database (default: {default_database}): ").strip()
+            config['gauss.database'] = database_input or default_database
+
+            default_username = self.existing_persistence_config.get('gauss.username', 'a2a_user')
+            username_input = input(f"Enter database user gauss.username (default: {default_username}): ").strip()
+            config['gauss.username'] = username_input or default_username
+
+            password_input = getpass.getpass(f"Enter database password gauss.password: ").strip()
+            if password_input:
+                config['gauss.password'] = encrypt(password_input)
+            else:
+                config['gauss.password'] = self.existing_persistence_config.get('gauss.password', '')
 
         return config
 

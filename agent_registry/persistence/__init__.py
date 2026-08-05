@@ -80,4 +80,10 @@ class StorageRegistry:
         if mode == "postgresql":
             from .postgresql_storage import PostgreSQLStorage
             return PostgreSQLStorage.init(config)
+        if mode == "sqlite":
+            from .sqlite_storage import SQLiteStorage
+            return SQLiteStorage.init(config)
+        if mode == "gauss":
+            from .gaussdb_storage import GaussDBStorage
+            return GaussDBStorage.init(config)
         raise ValueError(f"Unknown storage mode: {mode}")
