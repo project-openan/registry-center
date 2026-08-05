@@ -15,6 +15,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+"""
+GaussDB storage backend.
+
+GaussDB is PG-protocol compatible, so this backend uses psycopg2 just like
+PostgreSQLStorage. The key difference is JSON columns are stored as TEXT
+(not JSONB) for maximum portability across GaussDB versions. Casts to jsonb
+happen at query time where JSON operators are needed.
+"""
+
 import json
 
 import psycopg2
@@ -22,27 +31,27 @@ from psycopg2 import pool, sql
 from loguru import logger
 
 from .sql_backend import SqlStorageBackend
-from .sql_queries import PostgreSQLQueries
+from .sql_queries import GaussDBQueries
 
 
-class PostgreSQLStorage(SqlStorageBackend):
-    """PostgreSQL storage backend using psycopg2 connection pool."""
+class GaussDBStorage(SqlStorageBackend):
+    """GaussDB storage backend using psycopg2 connection pool."""
 
-    queries = PostgreSQLQueries
+    queries = GaussDBQueries
     _integrity_error = psycopg2.IntegrityError
 
     def __init__(self, conn_pool: pool.ThreadedConnectionPool):
         self.pool = conn_pool
 
     @classmethod
-    def init(cls, config: dict) -> 'PostgreSQLStorage':
-        host = config.get('postgresql.host', 'localhost')
-        port = int(config.get('postgresql.port', 5432))
-        database = config.get('postgresql.name', 'a2a_registry')
-        user = config.get('postgresql.username', 'a2a_user')
-        password = config.get('postgresql.password', '')
-        min_size = int(config.get('postgresql.pool.min', 5))
-        max_size = int(config.get('postgresql.pool.max', 20))
+    def init(cls, config: dict) -> 'GaussDBStorage':
+        host = config.get('gauss.host', 'localhost')
+        port = int(config.get('gauss.port', 5432))
+        database = config.get('gauss.database', 'a2a_registry')
+        user = config.get('gauss.username', 'a2a_user')
+        password = config.get('gauss.password', '')
+        min_size = int(config.get('gauss.pool.min', 5))
+        max_size = int(config.get('gauss.pool.max', 20))
 
         cls._ensure_database_exists(host, port, database, user, password)
 
@@ -55,7 +64,7 @@ class PostgreSQLStorage(SqlStorageBackend):
             user=user,
             password=password
         )
-        logger.info("PostgreSQL connection pool initialized")
+        logger.info("GaussDB connection pool initialized")
 
         instance = cls(connection_pool)
         instance._ensure_table_exists(connection_pool)
@@ -83,21 +92,20 @@ class PostgreSQLStorage(SqlStorageBackend):
         conn.autocommit = True
         try:
             with conn.cursor() as cur:
-                cur.execute(PostgreSQLQueries.CREATE_TABLE.value)
-                cur.execute(PostgreSQLQueries.ADD_COLUMN_STATUS.value)
-                cur.execute(PostgreSQLQueries.ADD_COLUMN_TAGS.value)
-                cur.execute(PostgreSQLQueries.ADD_COLUMN_OWNER.value)
-                cur.execute(PostgreSQLQueries.DROP_OLD_UNIQUE_INDEX.value)
-                cur.execute(PostgreSQLQueries.CREATE_OWNER_UNIQUE_INDEX.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_ORG.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_NAME.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_STATUS.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_OWNER.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_GIN.value)
+                cur.execute(GaussDBQueries.CREATE_TABLE.value)
+                cur.execute(GaussDBQueries.ADD_COLUMN_STATUS.value)
+                cur.execute(GaussDBQueries.ADD_COLUMN_TAGS.value)
+                cur.execute(GaussDBQueries.ADD_COLUMN_OWNER.value)
+                cur.execute(GaussDBQueries.DROP_OLD_UNIQUE_INDEX.value)
+                cur.execute(GaussDBQueries.CREATE_OWNER_UNIQUE_INDEX.value)
+                cur.execute(GaussDBQueries.CREATE_INDEX_ORG.value)
+                cur.execute(GaussDBQueries.CREATE_INDEX_NAME.value)
+                cur.execute(GaussDBQueries.CREATE_INDEX_STATUS.value)
+                cur.execute(GaussDBQueries.CREATE_INDEX_OWNER.value)
                 logger.info("Table 'agent_card' and indexes created/verified")
 
-                cur.execute(PostgreSQLQueries.CREATE_TAG_TABLE.value)
-                cur.execute(PostgreSQLQueries.CREATE_TAG_INDEX_NAME.value)
+                cur.execute(GaussDBQueries.CREATE_TAG_TABLE.value)
+                cur.execute(GaussDBQueries.CREATE_TAG_INDEX_NAME.value)
                 logger.info("Table 'tag' and indexes created/verified")
         finally:
             conn_pool.putconn(conn)
@@ -110,7 +118,7 @@ class PostgreSQLStorage(SqlStorageBackend):
     def _release_conn(self, conn):
         self.pool.putconn(conn)
 
-    # ---- tag param: PG uses JSONB containment operator ----
+    # ---- tag param: GaussDB uses JSONB containment via cast ----
 
     def _to_tag_query_param(self, tag: str):
         return json.dumps([tag])
@@ -118,4 +126,4 @@ class PostgreSQLStorage(SqlStorageBackend):
     def close(self):
         if self.pool:
             self.pool.closeall()
-            logger.info("PostgreSQL connection pool closed")
+            logger.info("GaussDB connection pool closed")

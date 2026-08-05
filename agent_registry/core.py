@@ -71,7 +71,7 @@ class RegistryCore:
         if use_vectordb:
             self.vectordb = get_or_create_vectordb_tool_instance(get_vectordb_config_by_type(VectorDBType.Milvus))
             self.embedding_tool = get_embed_instance()
-        elif persistence_mode == 'postgresql':
+        elif persistence_mode in ('postgresql', 'sqlite', 'gauss'):
             self.storage = StorageRegistry.get_backend(self.persistence_mode, self.persistence_conf)
             logger.info(f"Registry initialized with {self.persistence_mode} storage")
         else:
