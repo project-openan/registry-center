@@ -1,0 +1,101 @@
+{
+  "nav": {
+    "title": "Registry Center",
+    "subtitle": "Open Autonomous Networks"
+  },
+  "registry": {
+    "title": "Agent Registry",
+    "subtitle": "Register, modify, deregister and query AgentCards",
+    "search_placeholder": "Search by agent name, description or skill...",
+    "tab_all": "All",
+    "tab_org": "By Organization",
+    "units": "AGENTS",
+    "online": "registered",
+    "skills_count": "skills",
+    "no_agents": "No agents found",
+    "no_agents_hint": "Register a new agent to get started.",
+    "view": "View",
+    "version": "v{{version}}",
+    "org": "Org",
+    "skills": "Skills",
+    "capabilities": "Capabilities",
+    "interfaces": "Interfaces",
+    "syncing": "Synchronizing...",
+    "synchronizing": "Synchronizing...",
+    "switch_to_raw": "Switch to RAW",
+    "switch_to_gui": "Switch to GUI",
+    "tab_service": "Service Layer",
+    "tab_network": "Network Layer",
+    "tab_vendor": "Vendor"
+  },
+  "detail": {
+    "title": "AgentCard Detail",
+    "switch_to_raw": "Switch to RAW",
+    "switch_to_gui": "Switch to GUI",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "toast": {
+    "load_failed": "Failed to load agents."
+  },
+  "settings": {
+    "title": "Server Connection",
+    "subtitle": "Configure the Registry Center backend endpoint",
+    "mode_direct": "Direct IP",
+    "mode_gateway": "Nginx Gateway",
+    "ip": "IP Address",
+    "port": "Port",
+    "gateway_url": "Gateway URL",
+    "gateway_example": "Example: {{url}}",
+    "use_https": "Use HTTPS (client cert)",
+    "save": "Save",
+    "saved": "Settings saved. Reloading..."
+  },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "all": "All",
+    "chars": "chars",
+    "copied": "Copied!",
+    "copy_raw_json": "Copy Raw JSON"
+  },
+  "agent_profile": {
+    "basic": "Basic Properties",
+    "advanced": "Advanced Properties",
+    "organization": "Organization",
+    "description": "Description",
+    "supported_interfaces": "Supported Interfaces",
+    "skills": "Skills",
+    "capabilities": "Capabilities",
+    "configuration": "Configuration",
+    "streaming": "Streaming",
+    "stateTransitionHistory": "State History",
+    "pushNotifications": "Push Notifications",
+    "protocolVersion": "Protocol Version",
+    "preferredTransport": "Preferred Transport",
+    "defaultInputModes": "Input Modes",
+    "defaultOutputModes": "Output Modes",
+    "documentationUrl": "Documentation",
+    "security": "Security",
+    "extensions": "Extensions"
+  },
+  "header": {
+    "theme_light": "Light theme",
+    "theme_dark": "Dark theme",
+    "lang_en": "English",
+    "lang_zh": "中文",
+    "settings": "Settings"
+  },
+  "error_boundary": {
+    "title": "Something went wrong",
+    "subtitle": "An unexpected error occurred in this view.",
+    "reset": "Try again"
+  }
+}
