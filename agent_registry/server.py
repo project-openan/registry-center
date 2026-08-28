@@ -84,7 +84,10 @@ def get_signature_validator() -> AgentCardSignatureValidator:
     global _signature_validator
     if _signature_validator is None:
         public_key_manager = PublicKeyManager()
-        jwk_fetcher = JWKFetcher(public_key_manager)
+        jwk_fetcher = JWKFetcher(
+            public_key_manager,
+            jwk_allowlist=config.get('jwk_allowlist', ''),
+        )
         validation_enabled = config.get('signature_validation_enabled', 'true').lower() == 'true'
         _signature_validator = AgentCardSignatureValidator(jwk_fetcher, signature_validation_enabled=validation_enabled)
     return _signature_validator
