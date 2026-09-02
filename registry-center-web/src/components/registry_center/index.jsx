@@ -65,7 +65,7 @@ const getAgentLayer = (agent) => {
 
 const TABS = ['all', 'service', 'network', 'vendor']
 
-const AgentRegistry = ({ isDark }) => {
+const AgentRegistry = ({ isDark, api }) => {
     const { t } = useTranslation()
     const [searchTerm, setSearchTerm] = useState('')
     const [agents, setAgents] = useState([])
@@ -85,7 +85,9 @@ const AgentRegistry = ({ isDark }) => {
     const fetchData = useCallback(async () => {
         setLoading(true)
         try {
-            const response = await getAgentCards()
+            // injectedApi: Portal plugin mode (PortalContext.api); standalone
+            // mode omits it and uses the local service instance.
+            const response = await getAgentCards(undefined, undefined, api)
             const rawList = response?.agentCards || []
             const enhancedData = rawList.map((val) => {
                 const key = val.name
