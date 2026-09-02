@@ -88,18 +88,23 @@ api.interceptors.response.use(
 )
 
 // ---- Agent queries ----
+// All queries accept an optional injected axios instance (Portal plugin mode
+// passes PortalContext.api). Falls back to this module's own instance for
+// standalone / legacy qiankun mode.
 
-export async function getAgentCards(name, organization) {
+export async function getAgentCards(name, organization, injectedApi) {
     const params = {}
     if (name) params.name = name
     if (organization) params.organization = organization
-    return api.get(`${REGISTRY_BASE()}/agent-cards`, { params })
+    const client = injectedApi || api
+    return client.get(`${REGISTRY_BASE()}/agent-cards`, { params })
 }
 
-export async function getAgentCard(name, organization) {
+export async function getAgentCard(name, organization, injectedApi) {
     const encodedOrg = encodeURIComponent(organization)
     const encodedName = encodeURIComponent(name)
-    return api.get(`${REGISTRY_BASE()}/agent-cards/${encodedOrg}/${encodedName}`)
+    const client = injectedApi || api
+    return client.get(`${REGISTRY_BASE()}/agent-cards/${encodedOrg}/${encodedName}`)
 }
 
 export async function semanticQueryAgentCards(task, topN) {

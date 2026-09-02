@@ -15,20 +15,6 @@
 //    License for the specific language governing permissions and limitations
 //    under the License.
 
-// STANDALONE entry — renders the full app with its own shell
-// (Header / theme / language / settings). The Portal-plugin entry is
-// src/index.jsx (pure content component); this file is only used when the
-// website runs by itself via `npm run dev`.
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import './index.css'
-import './i18n'
-import App from './App.jsx'
-
-createRoot(document.getElementById('root')).render(
-    <BrowserRouter>
-        <Routes>
-            <Route path="/" element={<App />} />
-        </Routes>
-    </BrowserRouter>,
-)
+export { PortalContext, usePortalContext, PortalProvider } from './plugin-context.jsx';
+export { validateManifest } from './plugin-manifest.js';
+export { loadEnabledPlugins } from './config-loader.js';
