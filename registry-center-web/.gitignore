@@ -23,3 +23,6 @@ stats.html
 .env
 .env.local
 .env.*.local
+
+dist-plugin/
+node_modules/
