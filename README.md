@@ -53,7 +53,7 @@ The Registry Center provides unified lifecycle management for **AgentCards** —
 | **Agent Approval** | Optional manual review workflow — agents start as `registered`, admins promote to `published` |
 | **Tag Management** | Independent tag entities with full CRUD, assignable to agents |
 | **TLS Security** | TLS 1.2/1.3 with strong cipher suites, mutual TLS client certificate verification |
-| **Signature Verification** | JWS-based AgentCard integrity checks (RS256, ES256), static JWK or dynamic `jku` lookup |
+| **Signature Verification** | JWS-based AgentCard integrity checks (RS256, ES256), static JWK or dynamic `jku` lookup. `jku` lookup is gated by an operator-configured host allowlist (`jwk_allowlist` in `etc/conf/server.conf`, or `REGISTRY_JWK_ALLOWLIST`); with no allowlist configured the `jku` path is disabled (fail closed) and only backend keys are used |
 | **Owner Isolation** | Per-agent ownership via TLS client certificate CN, strict or relaxed mode |
 | **Content Safety** | Prompt injection and high-risk skill blacklist filtering on registration |
 | **Rate Limiting** | Per-endpoint rate limits (configurable: 50–100 req/s, JWK endpoint: 10 req/s) with moving-window algorithm |

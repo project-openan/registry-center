@@ -15,7 +15,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 import httpx
-from typing import Optional, Callable
+from typing import Optional, Callable, Set
+from urllib.parse import urlparse
 from jwt import PyJWK
 from loguru import logger
 from agent_registry.signature.models import JWK, JWKS
@@ -27,9 +28,52 @@ class JWKFetcher:
 
     REQUEST_TIMEOUT = 10
 
-    def __init__(self, public_key_manager: Optional[PublicKeyManager] = None):
+    def __init__(
+        self,
+        public_key_manager: Optional[PublicKeyManager] = None,
+        jwk_allowlist: Optional[str] = None,
+    ):
         self.session = httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT)
         self.public_key_manager = public_key_manager
+        self.jwk_allowlist = self._parse_allowlist(jwk_allowlist or "")
+
+    @staticmethod
+    def _parse_allowlist(raw: str) -> Set[str]:
+        """Parse a comma-separated host allowlist into a normalized set."""
+        return {host.strip().lower() for host in raw.split(",") if host.strip()}
+
+    def _is_jku_host_allowed(self, jku: str) -> bool:
+        """
+        Check whether a jku URL host is permitted for key fetch.
+
+        The allowlist is the operator-declared trust boundary for signer-supplied
+        jku URLs (CWE-863). When no allowlist is configured the jku path fails
+        closed: no external key material is fetched from card-controlled input,
+        and only backend keys are used for verification.
+        """
+        if not self.jwk_allowlist:
+            logger.error(
+                "jku key fetch disabled: 'jwk_allowlist' is not configured. "
+                "Configure etc/conf/server.conf jwk_allowlist (or REGISTRY_JWK_ALLOWLIST) "
+                "to enable signer-supplied jku key lookup."
+            )
+            return False
+
+        try:
+            host = (urlparse(jku).hostname or "").lower()
+        except Exception as e:
+            logger.error(f"Failed to parse jku URL '{jku}': {e}")
+            return False
+
+        if not host:
+            logger.error(f"jku URL has no host: {jku}")
+            return False
+
+        if host in self.jwk_allowlist:
+            return True
+
+        logger.error(f"jku host '{host}' is not in the configured allowlist")
+        return False
 
     async def fetch_jwks(self, jku: str) -> Optional[JWKS]:
         """
@@ -43,6 +87,9 @@ class JWKFetcher:
         """
         try:
             logger.info(f"Fetching JWKS from: {jku}")
+
+            if not self._is_jku_host_allowed(jku):
+                return None
 
             if not jku.startswith('https://'):
                 logger.error(f"JKU must use HTTPS: {jku}")
