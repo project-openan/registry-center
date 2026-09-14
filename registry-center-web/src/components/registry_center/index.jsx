@@ -20,6 +20,7 @@
 // (response.agentCards).
 
 import { cloneElement, useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -34,6 +35,8 @@ import {
     Globe,
     CheckCircle2,
     AlertCircle,
+    LayoutGrid,
+    List,
 } from 'lucide-react'
 import { getAgentCards } from '@/service/api.js'
 import AgentCard from './agentcard_visualization/index.jsx'
@@ -65,6 +68,119 @@ const getAgentLayer = (agent) => {
 
 const TABS = ['all', 'service', 'network', 'vendor']
 
+// ── Stats cards — bold, colorful, count summary ──
+
+const StatsCard = ({ icon: Icon, label, value, accent, isDark }) => (
+    <div
+        className="relative overflow-hidden flex items-center gap-5 rounded-2xl border p-6 transition-all hover:shadow-xl hover:-translate-y-1"
+        style={{
+            background: isDark ? '#18181b' : '#fff',
+            borderColor: isDark ? '#27272a' : '#e4e4e7',
+        }}
+    >
+        {/* soft accent glow */}
+        <div
+            className="absolute -right-6 -top-6 w-28 h-28 rounded-full blur-2xl pointer-events-none"
+            style={{ background: accent + (isDark ? '26' : '1a') }}
+        />
+        <div
+            className="w-14 h-14 rounded-2xl grid place-items-center shrink-0 relative"
+            style={{ background: accent + (isDark ? '2e' : '1c'), color: accent }}
+        >
+            <Icon size={26} strokeWidth={2.1} />
+        </div>
+        <div className="leading-tight min-w-0 relative">
+            <div
+                className="text-4xl font-black tabular-nums tracking-tight"
+                style={{ color: isDark ? '#fafafa' : '#18181b' }}
+            >
+                {value}
+            </div>
+            <div
+                className="text-sm font-bold truncate mt-1"
+                style={{ color: isDark ? '#a1a1aa' : '#71717a' }}
+            >
+                {label}
+            </div>
+        </div>
+    </div>
+)
+
+const StatsBar = ({ agents, isDark }) => {
+    const { t } = useTranslation()
+    const total = agents.length
+    const service = agents.filter((a) => a.layer === 'service').length
+    const network = agents.filter((a) => a.layer === 'network').length
+    const orgs = new Set(agents.map((a) => a.provider?.organization || 'Unknown')).size
+
+    return (
+        <div className="shrink-0 grid grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+            <StatsCard icon={Layers} label={t('registry.stats_total')} value={total} accent="#3b82f6" isDark={isDark} />
+            <StatsCard icon={Radio} label={t('registry.stats_service')} value={service} accent="#6366f1" isDark={isDark} />
+            <StatsCard icon={Network} label={t('registry.stats_network')} value={network} accent="#10b981" isDark={isDark} />
+            <StatsCard icon={Globe} label={t('registry.stats_orgs')} value={orgs} accent="#f59e0b" isDark={isDark} />
+        </div>
+    )
+}
+
+// ── Table row view ──
+
+const renderTableRow = (agent, setSelectedAgent, setViewMode, themeColor, layerBadge, t) => (
+    <tr
+        key={agent.id}
+        onClick={() => {
+            setSelectedAgent(agent)
+            setViewMode('structured')
+        }}
+        className="cursor-pointer border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+    >
+        <td className="px-4 py-3">
+            <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg text-white shadow-sm ${agent.layer === 'network' ? 'bg-emerald-500' : themeColor(agent.theme)}`}>
+                    {cloneElement(agent.icon, { size: 14 })}
+                </div>
+                <div className="leading-tight">
+                    <div className="text-sm font-black text-zinc-900 dark:text-white">{agent.id}</div>
+                    <div className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate max-w-[280px]">
+                        {agent.description}
+                    </div>
+                </div>
+            </div>
+        </td>
+        <td className="px-4 py-3">
+            <span className={`text-xs font-black px-3 py-1 rounded-lg border uppercase ${layerBadge(agent.layer)}`}>
+                {agent.layer === 'network' ? 'Network' : 'Service'}
+            </span>
+        </td>
+        <td className="px-4 py-3 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+            {agent.provider?.organization}
+        </td>
+        <td className="px-4 py-3">
+            <div className="flex flex-wrap gap-1 max-w-[220px]">
+                {(agent.skills || []).slice(0, 2).map((skill) => (
+                    <span
+                        key={skill.id}
+                        className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
+                    >
+                        {skill.name}
+                    </span>
+                ))}
+                {(agent.skills || []).length > 2 && (
+                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold text-zinc-400 dark:text-zinc-500">
+                        +{agent.skills.length - 2}
+                    </span>
+                )}
+            </div>
+        </td>
+        <td className="px-4 py-3 text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">
+            v{agent.version}
+        </td>
+        <td className="px-4 py-3 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
+            {agent.skills?.length || 0} {t('registry.skills_count')}
+        </td>
+    </tr>
+)
+
 const AgentRegistry = ({ isDark, api }) => {
     const { t } = useTranslation()
     const [searchTerm, setSearchTerm] = useState('')
@@ -73,6 +189,7 @@ const AgentRegistry = ({ isDark, api }) => {
     const [activeTab, setActiveTab] = useState('all')
     const [selectedAgent, setSelectedAgent] = useState(null)
     const [viewMode, setViewMode] = useState('structured')
+    const [listMode, setListMode] = useState('cards')
 
     const [toast, setToast] = useState(null)
 
@@ -277,21 +394,42 @@ const AgentRegistry = ({ isDark, api }) => {
 
     return (
         <div className="h-full p-6 flex flex-col w-full transition-all animate-in fade-in duration-500 overflow-hidden font-sans">
-            <div className="shrink-0 flex items-center justify-start mb-6 px-2">
-                <div className="flex items-center gap-3">
-                    <div className="relative w-72">
-                        <input
-                            type="text"
-                            placeholder={t('registry.search_placeholder')}
-                            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all dark:text-white"
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            value={searchTerm}
-                        />
-                        <Search className="absolute left-3.5 top-3 text-zinc-400" size={14} />
-                    </div>
+            {/* 1. Stats cards on top */}
+            {!loading && <StatsBar agents={agents} isDark={isDark} />}
+
+            {/* 2. Search + view toggle row */}
+            <div className="shrink-0 flex items-center justify-between mb-4">
+                <div className="relative w-72">
+                    <input
+                        type="text"
+                        placeholder={t('registry.search_placeholder')}
+                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all dark:text-white"
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={searchTerm}
+                    />
+                    <Search className="absolute left-3.5 top-3 text-zinc-400" size={14} />
+                </div>
+                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                    <button
+                        onClick={() => setListMode('cards')}
+                        title={t('registry.view_cards')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listMode === 'cards' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                    >
+                        <LayoutGrid size={14} />
+                        {t('registry.view_cards_btn')}
+                    </button>
+                    <button
+                        onClick={() => setListMode('table')}
+                        title={t('registry.view_table')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listMode === 'table' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                    >
+                        <List size={14} />
+                        {t('registry.view_table_btn')}
+                    </button>
                 </div>
             </div>
 
+            {/* 3. Tabs */}
             <div className="shrink-0 flex items-center gap-1 mb-6 px-2">
                 {TABS.map((tab) => (
                     <button
@@ -319,6 +457,7 @@ const AgentRegistry = ({ isDark, api }) => {
                 ))}
             </div>
 
+            {/* Agent list — cards or table */}
             <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-2">
                 {loading ? (
                     <div className="h-full flex items-center justify-center">
@@ -327,6 +466,51 @@ const AgentRegistry = ({ isDark, api }) => {
                             <span className="text-sm font-bold uppercase tracking-wider">
                                 {t('registry.synchronizing')}
                             </span>
+                        </div>
+                    </div>
+                ) : listMode === 'table' ? (
+                    /* ── Table view (applies to all tabs) ── */
+                    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden pb-8">
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-sm">
+                                <thead>
+                                    <tr className="bg-zinc-50 dark:bg-zinc-800/50">
+                                        {[
+                                            t('registry.col_name'),
+                                            t('registry.col_layer'),
+                                            t('registry.col_org'),
+                                            t('registry.col_skills'),
+                                            t('registry.col_version'),
+                                            t('registry.col_skills_count'),
+                                        ].map((h) => (
+                                            <th
+                                                key={h}
+                                                className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500 border-b border-zinc-200 dark:border-zinc-800"
+                                            >
+                                                {h}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(activeTab === 'vendor'
+                                        ? Object.values(vendorGroups).flat()
+                                        : filteredAgents
+                                    ).map((agent) =>
+                                        renderTableRow(agent, setSelectedAgent, setViewMode, themeColor, layerBadge, t),
+                                    )}
+                                    {(activeTab === 'vendor'
+                                        ? Object.values(vendorGroups).flat()
+                                        : filteredAgents
+                                    ).length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="py-16 text-center text-zinc-400 text-sm font-bold">
+                                                {t('registry.no_agents')}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 ) : activeTab === 'vendor' ? (
@@ -367,78 +551,101 @@ const AgentRegistry = ({ isDark, api }) => {
                 )}
             </div>
 
-            {selectedAgent && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-zinc-950 w-full max-w-5xl h-[85vh] rounded-[2rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50/50 dark:bg-zinc-900/50 shrink-0">
-                            <div className="flex items-center gap-4">
-                                <div
-                                    className={`p-3 rounded-xl text-white shadow-lg ${
-                                        selectedAgent.layer === 'network'
-                                            ? 'bg-emerald-500'
-                                            : themeColor(selectedAgent.theme)
-                                    }`}
-                                >
-                                    {cloneElement(selectedAgent.icon, { size: 24 })}
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-black dark:text-white leading-none">
-                                        {selectedAgent.id}
-                                    </h2>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[10px] font-bold text-zinc-400 uppercase">
-                                            {selectedAgent.provider?.organization}
-                                        </span>
-                                        <span className="w-1 h-1 rounded-full bg-zinc-300" />
-                                        <span className="text-[10px] font-bold text-zinc-400">
-                                            V{selectedAgent.version}
-                                        </span>
-                                        <span className="w-1 h-1 rounded-full bg-zinc-300" />
-                                        <span className="text-[10px] font-bold text-zinc-400">
-                                            {selectedAgent.skills?.length} {t('registry.skills_count')}
-                                        </span>
+            {/* Detail drawer — portaled to body so it renders ABOVE the Portal shell
+                (the plugin container sits inside an overflow-hidden/relative <main>,
+                which would otherwise clip/stack beneath the Portal header). */}
+            {selectedAgent && createPortal(
+                <AnimatePresence>
+                    <>
+                        <motion.div
+                            key="overlay"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+                            onClick={() => setSelectedAgent(null)}
+                        />
+                        <motion.div
+                            key="drawer"
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'tween', duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+                            className="fixed top-0 right-0 bottom-0 z-[110] w-full max-w-2xl bg-white dark:bg-zinc-950 shadow-2xl border-l border-zinc-200 dark:border-zinc-800 flex flex-col"
+                        >
+                            {/* Drawer header */}
+                            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50/50 dark:bg-zinc-900/50 shrink-0">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div
+                                        className={`p-3 rounded-xl text-white shadow-lg shrink-0 ${
+                                            selectedAgent.layer === 'network'
+                                                ? 'bg-emerald-500'
+                                                : themeColor(selectedAgent.theme)
+                                        }`}
+                                    >
+                                        {cloneElement(selectedAgent.icon, { size: 24 })}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg font-black dark:text-white leading-none truncate">
+                                            {selectedAgent.id}
+                                        </h2>
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            <span className="text-[10px] font-bold text-zinc-400 uppercase">
+                                                {selectedAgent.provider?.organization}
+                                            </span>
+                                            <span className="w-1 h-1 rounded-full bg-zinc-300" />
+                                            <span className="text-[10px] font-bold text-zinc-400">
+                                                V{selectedAgent.version}
+                                            </span>
+                                            <span className="w-1 h-1 rounded-full bg-zinc-300" />
+                                            <span className="text-[10px] font-bold text-zinc-400">
+                                                {selectedAgent.skills?.length} {t('registry.skills_count')}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <button
+                                        onClick={() => setViewMode(viewMode === 'structured' ? 'raw' : 'structured')}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[11px] font-black uppercase shadow-sm ${
+                                            isDark
+                                                ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                                                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'
+                                        }`}
+                                    >
+                                        {viewMode === 'structured' ? <Code2 size={14} /> : <LayoutDashboard size={14} />}
+                                        {viewMode === 'structured'
+                                            ? t('registry.switch_to_raw')
+                                            : t('registry.switch_to_gui')}
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedAgent(null)}
+                                        className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                    >
+                                        <X size={20} className="text-zinc-400" />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setViewMode(viewMode === 'structured' ? 'raw' : 'structured')}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[11px] font-black uppercase shadow-sm ${
-                                        isDark
-                                            ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                                            : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'
-                                    }`}
-                                >
-                                    {viewMode === 'structured' ? <Code2 size={14} /> : <LayoutDashboard size={14} />}
-                                    {viewMode === 'structured'
-                                        ? t('registry.switch_to_raw')
-                                        : t('registry.switch_to_gui')}
-                                </button>
-                                <button
-                                    onClick={() => setSelectedAgent(null)}
-                                    className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                                >
-                                    <X size={20} className="text-zinc-400" />
-                                </button>
+                            {/* Drawer body */}
+                            <div className="flex-1 overflow-y-auto no-scrollbar">
+                                {viewMode === 'structured' ? (
+                                    <AgentCard agent={selectedAgent._raw} isDark={isDark} />
+                                ) : (
+                                    <CodeInspector
+                                        data={selectedAgent._raw}
+                                        fileName={`${selectedAgent.id} AgentCard`}
+                                        isDark={isDark}
+                                    />
+                                )}
                             </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto no-scrollbar">
-                            {viewMode === 'structured' ? (
-                                <AgentCard agent={selectedAgent._raw} isDark={isDark} />
-                            ) : (
-                                <CodeInspector
-                                    data={selectedAgent._raw}
-                                    fileName={`${selectedAgent.id} AgentCard`}
-                                    isDark={isDark}
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
+                        </motion.div>
+                    </>
+                </AnimatePresence>,
+                document.body,
             )}
 
             <AnimatePresence>
-                {toast && (
+                {toast && createPortal(
                     <motion.div
                         key={toast.id}
                         initial={{ opacity: 0, x: 24 }}
@@ -453,7 +660,8 @@ const AgentRegistry = ({ isDark, api }) => {
                         <button onClick={() => setToast(null)} className="ml-1 opacity-70 hover:opacity-100">
                             <X size={14} />
                         </button>
-                    </motion.div>
+                    </motion.div>,
+                    document.body,
                 )}
             </AnimatePresence>
         </div>

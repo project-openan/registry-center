@@ -26,7 +26,21 @@
     "switch_to_gui": "切换到图形视图",
     "tab_service": "服务层",
     "tab_network": "网络层",
-    "tab_vendor": "厂商"
+    "tab_vendor": "厂商",
+    "stats_total": "Agent 总数",
+    "stats_service": "服务层",
+    "stats_network": "网络层",
+    "stats_orgs": "组织",
+    "view_cards": "卡片视图",
+    "view_table": "表格视图",
+    "col_name": "名称",
+    "col_layer": "层级",
+    "col_org": "所属组织",
+    "col_skills": "能力标签",
+    "col_version": "版本",
+    "col_skills_count": "技能数",
+    "view_cards_btn": "卡片",
+    "view_table_btn": "表格"
   },
   "detail": {
     "title": "AgentCard 详情",
