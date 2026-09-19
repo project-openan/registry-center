@@ -146,13 +146,15 @@ class SqlOutbox(OutboxStore):
             )
         """
         self._backend._execute_write(ddl)
-        self._backend._execute_write(
+        self._backend.ensure_index(
             "CREATE INDEX IF NOT EXISTS idx_registry_events_version "
-            "ON registry_events(registry_version)"
+            "ON registry_events(registry_version)",
+            "CREATE INDEX idx_registry_events_version ON registry_events(registry_version)"
         )
-        self._backend._execute_write(
+        self._backend.ensure_index(
             "CREATE INDEX IF NOT EXISTS idx_registry_events_status "
-            "ON registry_events(status)"
+            "ON registry_events(status)",
+            "CREATE INDEX idx_registry_events_status ON registry_events(status)"
         )
         logger.info("Outbox table 'registry_events' created/verified")
 

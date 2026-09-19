@@ -394,7 +394,7 @@ class InitCommand:
     def config_persistence(self) -> dict:
         config = {}
 
-        allowed_modes = ['file', 'postgresql', 'sqlite', 'gauss']
+        allowed_modes = ['file', 'postgresql', 'sqlite', 'gauss', 'mysql']
         default_mode = self.existing_persistence_config.get('persistence.mode', 'file')
         
         while True:
@@ -464,6 +464,30 @@ class InitCommand:
             else:
                 config['gauss.password'] = self.existing_persistence_config.get('gauss.password', '')
 
+        if config['persistence.mode'] == 'mysql':
+            print("\nConfigure MySQL database connection:")
+            default_host = self.existing_persistence_config.get('mysql.host', 'localhost')
+            host_input = input(f"Enter database host mysql.host (default: {default_host}): ").strip()
+            config['mysql.host'] = host_input or default_host
+
+            default_port = self.existing_persistence_config.get('mysql.port', '3306')
+            port_input = input(f"Enter database port mysql.port (default: {default_port}): ").strip()
+            config['mysql.port'] = port_input or default_port
+
+            default_name = self.existing_persistence_config.get('mysql.name', 'registry_center')
+            name_input = input(f"Enter database name mysql.name (default: {default_name}): ").strip()
+            config['mysql.name'] = name_input or default_name
+
+            default_username = self.existing_persistence_config.get('mysql.username', 'a2a_user')
+            username_input = input(f"Enter database user mysql.username (default: {default_username}): ").strip()
+            config['mysql.username'] = username_input or default_username
+
+            password_input = getpass.getpass(f"Enter database password mysql.password: ").strip()
+            if password_input:
+                config['mysql.password'] = encrypt(password_input)
+            else:
+                config['mysql.password'] = self.existing_persistence_config.get('mysql.password', '')
+
         return config
 
     def _get_persistence_config_header(self) -> str:
@@ -484,7 +508,7 @@ class InitCommand:
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-# Persistence mode: file / postgresql / sqlite / gauss
+# Persistence mode: file / postgresql / sqlite / gauss / mysql
 """
 
     def save_persistence_config_to_file(self, config: dict):

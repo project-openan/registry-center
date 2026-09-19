@@ -132,12 +132,14 @@ class SqlSubscriptionStore(SubscriptionStore):
         return getattr(self._backend, "param_ph", "%s")
 
     def _ensure_table(self):
+        # No column DEFAULTs on TEXT: MySQL rejects them (error 1101), and the
+        # INSERT path always supplies explicit values anyway.
         self._backend._execute_write("""
             CREATE TABLE IF NOT EXISTS subscriptions (
                 subscription_id  VARCHAR(64)   PRIMARY KEY,
                 callback_url     VARCHAR(2048) NOT NULL,
-                event_types_json TEXT          NOT NULL DEFAULT '[]',
-                filters_json     TEXT          NOT NULL DEFAULT '{}',
+                event_types_json TEXT          NOT NULL,
+                filters_json     TEXT          NOT NULL,
                 secret           VARCHAR(256),
                 created_at       VARCHAR(64)   NOT NULL
             )

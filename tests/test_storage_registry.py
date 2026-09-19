@@ -46,7 +46,15 @@ class TestStorageRegistryFactory:
         StorageRegistry.get_backend("gauss", config)
         mock_init.assert_called_once_with(config)
 
-    @pytest.mark.parametrize("mode", ["", "mysql", "redis", "mongo", "FILE", "PostgreSQL"])
+    def test_mysql_mode_dispatches_to_mysql(self):
+        import agent_registry.persistence.mysql_storage as mysql_module
+        config = {"mysql.host": "localhost"}
+        with patch.object(mysql_module.MySQLStorage, "init") as mock_init:
+            mock_init.return_value = MagicMock()
+            StorageRegistry.get_backend("mysql", config)
+            mock_init.assert_called_once_with(config)
+
+    @pytest.mark.parametrize("mode", ["", "redis", "mongo", "FILE", "PostgreSQL", "MySQL"])
     def test_unknown_mode_raises_value_error(self, mode):
         with pytest.raises(ValueError, match="Unknown storage mode"):
             StorageRegistry.get_backend(mode, {})

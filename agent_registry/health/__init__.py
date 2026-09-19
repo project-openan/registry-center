@@ -106,7 +106,7 @@ def initialize_health_service(backend=None, mode: Optional[str] = None,
         if _service is None:
             config = config if config is not None else _load_config()
             mode = (mode or "file").strip().lower()
-            if backend is not None and mode in ("sqlite", "postgresql", "gauss"):
+            if backend is not None and mode in ("sqlite", "postgresql", "gauss", "mysql"):
                 store = SqlHeartbeatStore(backend)
             else:
                 store = MemoryHeartbeatStore()

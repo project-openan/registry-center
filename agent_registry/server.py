@@ -1214,7 +1214,22 @@ async def shutdown_services():
     await get_broadcast_service().stop()
 
 
-app.add_event_handler("startup", initialize_registry)
+def _initialize_registry_guarded():
+    """Startup-event wrapper: render an actionable message if storage init fails.
+
+    The synchronous pre-check in start.py normally catches this first; this
+    guard covers runs that bypass start.py (e.g. uvicorn factory usage).
+    """
+    from agent_registry.config import PERSISTENCE_CONF, PERSISTENCE_MODE
+    from agent_registry.persistence.precheck import format_storage_error
+    try:
+        initialize_registry()
+    except Exception as exc:
+        logger.error(format_storage_error(PERSISTENCE_MODE, PERSISTENCE_CONF, exc))
+        raise
+
+
+app.add_event_handler("startup", _initialize_registry_guarded)
 app.add_event_handler("startup", startup_services)
 app.add_event_handler("shutdown", close_registry)
 app.add_event_handler("shutdown", shutdown_services)

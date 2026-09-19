@@ -93,7 +93,7 @@ def _build_stores(backend, mode: Optional[str] = None) -> tuple:
     """
     mode = (mode or "file").strip().lower()
     data_dir = Path(get_root_path()) / "data"
-    if backend is not None and mode in ("sqlite", "postgresql", "gauss"):
+    if backend is not None and mode in ("sqlite", "postgresql", "gauss", "mysql"):
         return SqlOutbox(backend), SqlSubscriptionStore(backend)
     if mode == "vectordb":
         return MemoryOutbox(), MemorySubscriptionStore()

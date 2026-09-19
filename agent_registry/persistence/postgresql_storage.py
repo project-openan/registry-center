@@ -18,9 +18,15 @@
 import json
 
 import psycopg2
-from psycopg2 import pool, sql
+from psycopg2 import pool
 from loguru import logger
 
+from .connection import (
+    DEFAULT_CONNECT_TIMEOUT,
+    build_pg_pool,
+    ensure_pg_database,
+    ensure_pg_tables,
+)
 from .sql_backend import SqlStorageBackend
 from .sql_queries import PostgreSQLQueries
 
@@ -43,18 +49,12 @@ class PostgreSQLStorage(SqlStorageBackend):
         password = config.get('postgresql.password', '')
         min_size = int(config.get('postgresql.pool.min', 5))
         max_size = int(config.get('postgresql.pool.max', 20))
+        connect_timeout = int(config.get('postgresql.connect_timeout', DEFAULT_CONNECT_TIMEOUT))
 
-        cls._ensure_database_exists(host, port, database, user, password)
+        cls._ensure_database_exists(host, port, database, user, password, connect_timeout)
 
-        connection_pool = pool.ThreadedConnectionPool(
-            minconn=min_size,
-            maxconn=max_size,
-            host=host,
-            port=port,
-            database=database,
-            user=user,
-            password=password
-        )
+        connection_pool = build_pg_pool(host, port, database, user, password,
+                                        min_size, max_size, connect_timeout)
         logger.info("PostgreSQL connection pool initialized")
 
         instance = cls(connection_pool)
@@ -63,44 +63,14 @@ class PostgreSQLStorage(SqlStorageBackend):
 
     @classmethod
     def _ensure_database_exists(cls, host: str, port: int, database: str,
-                                user: str, password: str):
-        conn = psycopg2.connect(
-            host=host, port=port, database='postgres', user=user, password=password
-        )
-        conn.autocommit = True
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (database,))
-                if not cur.fetchone():
-                    cur.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(database)))
-                    logger.info(f"Database '{database}' created successfully")
-        finally:
-            conn.close()
+                                user: str, password: str,
+                                connect_timeout: int = DEFAULT_CONNECT_TIMEOUT):
+        ensure_pg_database(host, port, database, user, password, connect_timeout)
 
     @classmethod
     def _ensure_table_exists(cls, conn_pool: pool.ThreadedConnectionPool):
-        conn = conn_pool.getconn()
-        conn.autocommit = True
-        try:
-            with conn.cursor() as cur:
-                cur.execute(PostgreSQLQueries.CREATE_TABLE.value)
-                cur.execute(PostgreSQLQueries.ADD_COLUMN_STATUS.value)
-                cur.execute(PostgreSQLQueries.ADD_COLUMN_TAGS.value)
-                cur.execute(PostgreSQLQueries.ADD_COLUMN_OWNER.value)
-                cur.execute(PostgreSQLQueries.DROP_OLD_UNIQUE_INDEX.value)
-                cur.execute(PostgreSQLQueries.CREATE_OWNER_UNIQUE_INDEX.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_ORG.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_NAME.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_STATUS.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_OWNER.value)
-                cur.execute(PostgreSQLQueries.CREATE_INDEX_GIN.value)
-                logger.info("Table 'agent_card' and indexes created/verified")
-
-                cur.execute(PostgreSQLQueries.CREATE_TAG_TABLE.value)
-                cur.execute(PostgreSQLQueries.CREATE_TAG_INDEX_NAME.value)
-                logger.info("Table 'tag' and indexes created/verified")
-        finally:
-            conn_pool.putconn(conn)
+        ensure_pg_tables(conn_pool, PostgreSQLQueries,
+                         extra_statements=(PostgreSQLQueries.CREATE_INDEX_GIN.value,))
 
     # ---- connection management ----
 

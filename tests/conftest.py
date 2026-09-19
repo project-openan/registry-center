@@ -7,8 +7,8 @@
 Shared pytest fixtures for storage backend tests.
 
 Provides:
-- DB connection config fixtures (PG / GaussDB) with auto-skip when DB unavailable
-- Sample AgentCard factory reused across SQLite/PG/GaussDB test modules
+- DB connection config fixtures (PG / GaussDB / MySQL) with auto-skip when DB unavailable
+- Sample AgentCard factory reused across SQLite/PG/GaussDB/MySQL test modules
 """
 
 import os
@@ -88,6 +88,52 @@ def gauss_storage_config(gauss_config):
     }
 
 
+# ---------- MySQL availability gate ----------
+
+def _mysql_available(config: dict) -> bool:
+    try:
+        import pymysql
+    except ImportError:
+        return False
+    try:
+        conn = pymysql.connect(
+            host=config['host'], port=config['port'],
+            user=config['user'], password=config['password'],
+            connect_timeout=3
+        )
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="session")
+def mysql_config():
+    cfg = {
+        'host': os.environ.get('MYSQL_TEST_HOST', '127.0.0.1'),
+        'port': int(os.environ.get('MYSQL_TEST_PORT', '3306')),
+        'database': os.environ.get('MYSQL_TEST_DB', 'registry_center'),
+        'user': os.environ.get('MYSQL_TEST_USER', 'root'),
+        'password': os.environ.get('MYSQL_TEST_PASSWORD', ''),
+    }
+    if not _mysql_available(cfg):
+        pytest.skip("MySQL not available, set MYSQL_TEST_* env vars to enable")
+    return cfg
+
+
+@pytest.fixture
+def mysql_storage_config(mysql_config):
+    return {
+        'mysql.host': mysql_config['host'],
+        'mysql.port': mysql_config['port'],
+        'mysql.name': mysql_config['database'],
+        'mysql.username': mysql_config['user'],
+        'mysql.password': mysql_config['password'],
+        'mysql.pool.min': '2',
+        'mysql.pool.max': '5',
+    }
+
+
 # ---------- table cleanup (shared by PG & GaussDB tests) ----------
 
 @pytest.fixture
@@ -116,6 +162,31 @@ def clean_gauss_tables(gauss_storage_config):
     yield storage
     _drop_all_tables(storage)
     storage.close()
+
+
+@pytest.fixture
+def clean_mysql_tables(mysql_storage_config):
+    """Rebuild tables for isolation (drop + recreate all registry tables)."""
+    from agent_registry.persistence.mysql_storage import MySQLStorage
+    storage = MySQLStorage.init(mysql_storage_config)
+    _drop_all_mysql_tables(storage)
+    storage._ensure_table_exists(storage.pool)
+    yield storage
+    _drop_all_mysql_tables(storage)
+    storage.close()
+
+
+def _drop_all_mysql_tables(storage):
+    conn = storage._acquire_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SET FOREIGN_KEY_CHECKS=0')
+            for table in ('agent_card', 'tag', 'agent_health', 'agent_health_history',
+                          'registry_events', 'subscriptions'):
+                cur.execute(f'DROP TABLE IF EXISTS {table}')
+            cur.execute('SET FOREIGN_KEY_CHECKS=1')
+    finally:
+        storage._release_conn(conn)
 
 
 def _truncate_all_tables(storage):

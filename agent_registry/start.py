@@ -30,6 +30,7 @@ from agent_registry.config import CONN_TIMEOUT, TLS_CIPHER, FORWARDED_ALLOW_IPS,
 from agent_registry.cipher_converter import CipherConverter
 from agent_registry.internal.registry_center_internal_service import RegistryCenterInternalService
 from agent_registry.internal.tcp_internal_service import TCPInternalService
+from agent_registry.persistence.precheck import verify_storage_ready
 from agent_registry.server import app
 from common.cert.cert_validater import CertValidator
 from common.custom.custom_handle import HandlerRegistry
@@ -176,6 +177,10 @@ def main():
         )
 
     server_config = get_conf()
+
+    # Fail fast on unusable storage (wrong DB config / unreachable DB) before
+    # binding any port — including the internal UDS/TCP service below.
+    verify_storage_ready()
 
     start_internal_service(server_config)
 

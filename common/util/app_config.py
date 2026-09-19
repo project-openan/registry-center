@@ -142,4 +142,8 @@ def get_persistence_conf() -> dict:
         from common.util.cipher_util import decrypt
         decrypted = decrypt(conf['gauss.password'])
         conf['gauss.password'] = decrypted.decode('utf-8') if isinstance(decrypted, bytes) else decrypted
+    if 'mysql.password' in conf and conf['mysql.password']:
+        from common.util.cipher_util import decrypt
+        decrypted = decrypt(conf['mysql.password'])
+        conf['mysql.password'] = decrypted.decode('utf-8') if isinstance(decrypted, bytes) else decrypted
     return conf

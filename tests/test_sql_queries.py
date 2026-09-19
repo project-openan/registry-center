@@ -6,15 +6,15 @@
 """
 SQL query enum integrity tests.
 
-Verifies that all three query enums (PostgreSQL, SQLite, GaussDB) define
-the same set of operations, and that the previously-missing FIND_BY_TAG
-is now present in PostgreSQLQueries.
+Verifies that all four query enums (PostgreSQL, SQLite, GaussDB, MySQL)
+define the same set of operations, and that dialect-specific SQL stays
+within each backend's supported syntax.
 """
 
 import pytest
 
 from agent_registry.persistence.sql_queries import (
-    PostgreSQLQueries, SQLiteQueries, GaussDBQueries
+    PostgreSQLQueries, SQLiteQueries, GaussDBQueries, MySQLQueries
 )
 
 
@@ -50,8 +50,8 @@ REQUIRED_QUERY_NAMES = {
     "LIST_TAGS",
 }
 
-ALL_ENUMS = [PostgreSQLQueries, SQLiteQueries, GaussDBQueries]
-ALL_ENUM_IDS = ["postgresql", "sqlite", "gaussdb"]
+ALL_ENUMS = [PostgreSQLQueries, SQLiteQueries, GaussDBQueries, MySQLQueries]
+ALL_ENUM_IDS = ["postgresql", "sqlite", "gaussdb", "mysql"]
 
 
 @pytest.mark.parametrize("enum_cls", ALL_ENUMS, ids=ALL_ENUM_IDS)
@@ -131,6 +131,65 @@ def test_postgresql_uses_serial():
 
 def test_gaussdb_uses_serial():
     assert "SERIAL" in GaussDBQueries.CREATE_TABLE.value
+
+
+def test_mysql_uses_percent_s_placeholder():
+    assert "%s" in MySQLQueries.CREATE_AGENT_WITH_OWNER.value
+
+
+def test_mysql_uses_on_duplicate_key():
+    """MySQL has no ON CONFLICT; upsert goes through ON DUPLICATE KEY UPDATE."""
+    q = MySQLQueries.CREATE_AGENT_WITH_OWNER.value
+    assert "ON DUPLICATE KEY UPDATE" in q
+    assert "ON CONFLICT" not in q
+
+
+def test_mysql_find_by_tag_uses_json_contains():
+    q = MySQLQueries.FIND_BY_TAG.value
+    assert "JSON_CONTAINS" in q
+    assert "@>" not in q
+
+
+def test_mysql_find_by_name_lowercases_both_sides():
+    """Key columns are utf8mb4_bin, so ILIKE is replaced with LOWER() LIKE."""
+    q = MySQLQueries.FIND_BY_NAME.value
+    assert "LOWER(name)" in q
+    assert "ILIKE" not in q
+
+
+def test_mysql_no_ilike_anywhere():
+    for member in MySQLQueries:
+        assert "ILIKE" not in member.value, f"{member.name} uses ILIKE"
+
+
+def test_mysql_no_do_block():
+    """MySQL must not use PG-style DO $$ blocks."""
+    for member in MySQLQueries:
+        assert "DO $$" not in member.value, f"{member.name} uses DO block"
+
+
+def test_mysql_no_create_index_statements():
+    """MySQL has no CREATE INDEX IF NOT EXISTS; indexes are inlined in DDL."""
+    for member in MySQLQueries:
+        assert "CREATE INDEX" not in member.value, \
+            f"{member.name} uses CREATE INDEX (unsupported syntax on MySQL)"
+
+
+def test_mysql_no_nulls_last():
+    for member in MySQLQueries:
+        assert "NULLS LAST" not in member.value
+
+
+def test_mysql_finds_any_owner_orders_nulls_last():
+    assert "ORDER BY owner IS NULL, owner" in MySQLQueries.FIND_BY_KEY_ANY_OWNER.value
+
+
+def test_mysql_table_uses_native_json_and_auto_increment():
+    table = MySQLQueries.CREATE_TABLE.value.upper()
+    assert "JSON" in table
+    assert "AUTO_INCREMENT" in table
+    assert "SERIAL" not in table
+    assert "JSONB" not in table
 
 
 def test_all_enums_define_required_queries_consistently():

@@ -167,8 +167,9 @@ class SqlHeartbeatStore(HeartbeatStore):
                 PRIMARY KEY (agent_name, organization)
             )
         """)
-        self._backend._execute_write(
-            "CREATE INDEX IF NOT EXISTS idx_agent_health_status ON agent_health(status)"
+        self._backend.ensure_index(
+            "CREATE INDEX IF NOT EXISTS idx_agent_health_status ON agent_health(status)",
+            "CREATE INDEX idx_agent_health_status ON agent_health(status)"
         )
         self._backend._execute_write("""
             CREATE TABLE IF NOT EXISTS agent_health_history (
@@ -180,8 +181,10 @@ class SqlHeartbeatStore(HeartbeatStore):
                 changed_at         VARCHAR(64)  NOT NULL
             )
         """)
-        self._backend._execute_write(
+        self._backend.ensure_index(
             "CREATE INDEX IF NOT EXISTS idx_agent_health_history_agent "
+            "ON agent_health_history(agent_name, organization)",
+            "CREATE INDEX idx_agent_health_history_agent "
             "ON agent_health_history(agent_name, organization)"
         )
         logger.info("Health tables 'agent_health'/'agent_health_history' created/verified")

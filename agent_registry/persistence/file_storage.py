@@ -188,6 +188,17 @@ class FileStorage(StorageBackend):
     def count(self) -> int:
         return len(self._agents)
 
+    def check_connection(self) -> None:
+        """Verify the data directory is writable via a probe file."""
+        directory = Path(self.file_path).parent
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / f".precheck-{os.getpid()}"
+        try:
+            probe.write_text("ok", encoding='utf-8')
+        finally:
+            if probe.exists():
+                probe.unlink()
+
     def close(self):
         self._save()
         logger.info("FileStorage closed")

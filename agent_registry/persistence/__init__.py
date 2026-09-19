@@ -86,4 +86,7 @@ class StorageRegistry:
         if mode == "gauss":
             from .gaussdb_storage import GaussDBStorage
             return GaussDBStorage.init(config)
+        if mode == "mysql":
+            from .mysql_storage import MySQLStorage
+            return MySQLStorage.init(config)
         raise ValueError(f"Unknown storage mode: {mode}")

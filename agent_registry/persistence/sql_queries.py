@@ -595,3 +595,186 @@ class GaussDBQueries(str, Enum):
         SELECT tag_id, name, created_at, updated_at FROM tag
         ORDER BY created_at DESC
     """
+
+
+class MySQLQueries(str, Enum):
+    """SQL queries for MySQL backend (placeholder: %s, native JSON columns).
+
+    Dialect notes vs the PG enums:
+    - UPSERT uses ON DUPLICATE KEY UPDATE (no ON CONFLICT). The no-op
+      `id = id` update keeps affected-rows at 0 on duplicates so create()
+      returns False, mirroring ON CONFLICT DO NOTHING.
+    - Tag containment uses JSON_CONTAINS(tags, '["<tag>"]') on the native
+      JSON column (PG uses @>).
+    - MySQL has no ADD COLUMN IF NOT EXISTS / CREATE INDEX IF NOT EXISTS, so
+      indexes are inlined in CREATE TABLE and no migration DDL is defined
+      (MySQL support is fresh-install only).
+    - Key columns (name/organization/owner/tag.name) use COLLATE utf8mb4_bin
+      so exact matches and UNIQUE constraints stay case-sensitive like PG;
+      FIND_BY_NAME compensates with LOWER() on both sides.
+    - MySQL has no NULLS LAST; FIND_BY_KEY_ANY_OWNER uses the same
+      `ORDER BY owner IS NULL, owner` trick as SQLite.
+    - The tag table stores created_at/updated_at as VARCHAR(64) because
+      create_tag/update_tag pass ISO-8601 strings whose timezone suffix is
+      rejected by MySQL DATETIME columns before 8.0.19.
+    - tags JSON has no DEFAULT (MySQL < 8.0.13 forbids JSON/TEXT defaults);
+      NULL is treated as [] by the shared parsing code.
+    """
+
+    CREATE_TABLE = """
+        CREATE TABLE IF NOT EXISTS agent_card (
+            id                   BIGINT       NOT NULL AUTO_INCREMENT,
+            name                 VARCHAR(100) COLLATE utf8mb4_bin NOT NULL,
+            organization         VARCHAR(100) COLLATE utf8mb4_bin NOT NULL,
+            owner                VARCHAR(100) COLLATE utf8mb4_bin NULL,
+            description          VARCHAR(1000),
+            url                  VARCHAR(1024),
+            version              VARCHAR(50),
+            status               VARCHAR(20)  DEFAULT 'published',
+            provider_json        JSON         NOT NULL,
+            capabilities_json    JSON         NULL,
+            skills_json          JSON         NULL,
+            default_input_modes  JSON         NULL,
+            default_output_modes JSON         NULL,
+            agent_card_json      JSON         NOT NULL,
+            tags                 JSON         NULL,
+            created_at           DATETIME     DEFAULT CURRENT_TIMESTAMP,
+            updated_at           DATETIME     DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY idx_agent_owner_unique (name, organization, owner),
+            KEY idx_agent_org (organization),
+            KEY idx_agent_name (name),
+            KEY idx_agent_status (status),
+            KEY idx_agent_owner (owner)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """
+
+    CREATE_AGENT_WITH_OWNER = """
+        INSERT INTO agent_card (name, organization, owner, description, url, version, status, provider_json,
+                                capabilities_json, skills_json, default_input_modes, default_output_modes,
+                                agent_card_json, created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE id = id
+    """
+
+    FIND_BY_KEY_WITH_OWNER = """
+        SELECT agent_card_json, owner, status, tags, created_at, updated_at FROM agent_card
+        WHERE name = %s AND organization = %s AND owner = %s
+    """
+
+    FIND_BY_KEY_ANY_OWNER = """
+        SELECT agent_card_json, owner, status, tags, created_at, updated_at FROM agent_card
+        WHERE name = %s AND organization = %s
+        ORDER BY owner IS NULL, owner
+        LIMIT 1
+    """
+
+    FIND_BY_NAME = """
+        SELECT agent_card_json FROM agent_card WHERE LOWER(name) LIKE LOWER(%s)
+    """
+
+    FIND_BY_ORG = """
+        SELECT agent_card_json FROM agent_card WHERE organization = %s
+    """
+
+    FIND_BY_STATUS = """
+        SELECT agent_card_json FROM agent_card WHERE status = %s
+    """
+
+    FIND_BY_TAG = """
+        SELECT agent_card_json FROM agent_card
+        WHERE JSON_CONTAINS(tags, %s)
+    """
+
+    FIND_ALL = "SELECT agent_card_json FROM agent_card"
+
+    FIND_BY_OWNER = """
+        SELECT agent_card_json, owner FROM agent_card WHERE owner = %s
+    """
+
+    UPDATE_AGENT = """
+        UPDATE agent_card SET agent_card_json = %s, status = %s, updated_at = %s
+        WHERE name = %s AND organization = %s
+    """
+
+    UPDATE_AGENT_WITH_OWNER = """
+        UPDATE agent_card SET agent_card_json = %s, status = %s, updated_at = %s
+        WHERE name = %s AND organization = %s AND (owner = %s OR owner IS NULL)
+    """
+
+    UPDATE_STATUS = """
+        UPDATE agent_card SET status = %s, updated_at = %s
+        WHERE name = %s AND organization = %s
+    """
+
+    DELETE_AGENT = """
+        DELETE FROM agent_card WHERE name = %s AND organization = %s
+    """
+
+    DELETE_AGENT_WITH_OWNER = """
+        DELETE FROM agent_card
+        WHERE name = %s AND organization = %s AND (owner = %s OR owner IS NULL)
+    """
+
+    COUNT = "SELECT COUNT(*) FROM agent_card"
+
+    COUNT_BY_STATUS = "SELECT COUNT(*) FROM agent_card WHERE status = %s"
+
+    GET_CREATED_AT = """
+        SELECT created_at FROM agent_card
+        WHERE name = %s AND organization = %s
+    """
+
+    GET_UPDATED_AT = """
+        SELECT updated_at FROM agent_card
+        WHERE name = %s AND organization = %s
+    """
+
+    GET_AGENT_TAGS = """
+        SELECT tags FROM agent_card WHERE name = %s AND organization = %s
+    """
+
+    UPDATE_AGENT_TAGS = """
+        UPDATE agent_card SET tags = %s, updated_at = %s
+        WHERE name = %s AND organization = %s
+    """
+
+    CREATE_TAG_TABLE = """
+        CREATE TABLE IF NOT EXISTS tag (
+            tag_id      VARCHAR(50) COLLATE utf8mb4_bin NOT NULL,
+            name        VARCHAR(50) COLLATE utf8mb4_bin NOT NULL,
+            created_at  VARCHAR(64) NOT NULL DEFAULT '',
+            updated_at  VARCHAR(64) NOT NULL DEFAULT '',
+            PRIMARY KEY (tag_id),
+            UNIQUE KEY uq_tag_name (name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """
+
+    CREATE_TAG = """
+        INSERT INTO tag (tag_id, name, created_at, updated_at)
+        VALUES (%s, %s, %s, %s)
+    """
+
+    GET_TAG_BY_ID = """
+        SELECT tag_id, name, created_at, updated_at FROM tag
+        WHERE tag_id = %s
+    """
+
+    GET_TAG_BY_NAME = """
+        SELECT tag_id, name, created_at, updated_at FROM tag
+        WHERE name = %s
+    """
+
+    UPDATE_TAG = """
+        UPDATE tag SET name = %s, updated_at = %s
+        WHERE tag_id = %s
+    """
+
+    DELETE_TAG = """
+        DELETE FROM tag WHERE tag_id = %s
+    """
+
+    LIST_TAGS = """
+        SELECT tag_id, name, created_at, updated_at FROM tag
+        ORDER BY created_at DESC
+    """

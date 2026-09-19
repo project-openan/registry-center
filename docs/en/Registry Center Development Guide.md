@@ -668,6 +668,55 @@ Implement custom functionality through extended configuration, including storage
     use_vectordb=true
     ```
 
+## Storage Backends and Startup Pre-Check
+
+The Registry Center supports pluggable persistence backends selected via `persistence.mode` in `etc/conf/persistence.conf`:
+
+| Mode | Backend | Driver |
+|------|---------|--------|
+| file | Local JSON files (default) | — |
+| sqlite | Embedded SQLite database | Python stdlib sqlite3 |
+| postgresql | PostgreSQL | psycopg2 |
+| gauss | Huawei GaussDB (PG-protocol compatible) | psycopg2 |
+| mysql | MySQL 5.7+ / 8.0 | PyMySQL + DBUtils |
+
+All SQL backends share one CRUD engine (`agent_registry/persistence/sql_backend.py`) and provide their dialect-specific SQL in `agent_registry/persistence/sql_queries.py`. Adding a new database type requires: a new query enum, a `SqlStorageBackend` subclass, a factory branch in `agent_registry/persistence/__init__.py`, and a config block in `persistence.conf`.
+
+### Configuration example (MySQL)
+
+```
+persistence.mode=mysql
+mysql.host=${MYSQL_HOST:localhost}
+mysql.port=${MYSQL_PORT:3306}
+mysql.name=${MYSQL_DATABASE:registry_center}
+mysql.username=${MYSQL_USER:a2a_user}
+mysql.password=${MYSQL_PASSWORD}
+mysql.pool.min=${MYSQL_POOL_MIN:5}
+mysql.pool.max=${MYSQL_POOL_MAX:20}
+mysql.connect_timeout=${MYSQL_CONNECT_TIMEOUT:10}
+```
+
+`${ENV:default}` placeholders are resolved when the file is loaded, so any value can be overridden by an environment variable without editing the file. In containers, the common `DB_*` variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_POOL_MIN`, `DB_POOL_MAX`) are rewritten into the active backend's keys by `bin/entrypoint.sh` for postgresql/gauss/mysql; `SQLITE_PATH` works natively for sqlite.
+
+### Startup pre-check (fast fail)
+
+`python -m agent_registry.start` initializes the configured storage backend synchronously BEFORE any port is bound — including creating the database (if missing), building the connection pool, running schema DDL, and a `SELECT 1` round-trip. On failure the process prints a boxed error naming the mode, target, config file, and likely causes, then exits with code 1:
+
+```
+================================================================================
+[storage pre-check] FAILED to initialize storage backend.
+  mode    : mysql
+  target  : mysql://localhost:3306/registry_center (user: a2a_user)
+  config  : .../etc/conf/persistence.conf
+  error   : OperationalError(2003, "Can't connect to MySQL server ...")
+  Likely causes (mysql):
+    - server not running / wrong host or port (errno 2003)
+    ...
+================================================================================
+```
+
+All SQL backends accept a `<prefix>.connect_timeout` setting (default 10 seconds), so an unreachable host fails fast instead of hanging the startup.
+
 ## Custom Interface Extension Scenario
 
 ### Use Case Overview

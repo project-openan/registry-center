@@ -257,10 +257,11 @@ agent-registry>
 
 | Configuration Item | Description | Default |
 |--------------------|-------------|---------|
-| persistence.mode | Storage mode (file/postgresql) | file |
-| postgresql.host | PostgreSQL host | 127.0.0.1 |
-| postgresql.port | PostgreSQL port | 5432 |
-| postgresql.name | Database name | registry_center |
+| persistence.mode | Storage mode (file/postgresql/sqlite/gauss/mysql) | file |
+| postgresql.* | PostgreSQL connection: host/port/name/username/password/pool.min/pool.max/connect_timeout | 127.0.0.1:5432 |
+| sqlite.path | SQLite database file path | data/agents.db |
+| gauss.* | GaussDB connection: host/port/database/username/password/pool.min/pool.max/connect_timeout | localhost:5432 |
+| mysql.* | MySQL connection: host/port/name/username/password/pool.min/pool.max/connect_timeout | localhost:3306 |
 
 ### Advanced Configuration (etc/conf/server.properties)
 

@@ -29,6 +29,28 @@ class SqlStorageBackend(StorageBackend):
     _integrity_error = Exception
     # Parameter placeholder for dialect-agnostic helper queries (%s for psycopg2).
     param_ph = "%s"
+    # Whether the dialect supports `CREATE INDEX IF NOT EXISTS`. Backends that
+    # don't (e.g. MySQL) set this to False; auxiliary SQL stores use it to pick
+    # a duplicate-tolerant plain CREATE INDEX instead.
+    supports_create_index_if_not_exists = True
+
+    def ensure_index(self, ddl_if_not_exists: str, ddl_plain: str) -> None:
+        """Create an index via dialect-appropriate DDL.
+
+        Dialects without CREATE INDEX IF NOT EXISTS run the plain form and
+        tolerate ONLY the duplicate-index error (MySQL errno 1061); any other
+        failure propagates instead of being swallowed.
+        """
+        if self.supports_create_index_if_not_exists:
+            self._execute_write(ddl_if_not_exists)
+            return
+        try:
+            self._execute_write(ddl_plain)
+        except Exception as e:
+            if getattr(e, "args", None) and e.args and e.args[0] == 1061:
+                logger.debug(f"Index already exists, skipping: {e}")
+            else:
+                raise
 
     # ---- connection management (subclass implements) ----
 
@@ -75,6 +97,26 @@ class SqlStorageBackend(StorageBackend):
             cur = conn.cursor()
             cur.execute(query, params or ())
             return cur.fetchall()
+        finally:
+            if cur:
+                cur.close()
+            self._release_conn(conn)
+
+    # ---- startup pre-check ----
+
+    def check_connection(self) -> None:
+        """Round-trip sanity check used by the startup pre-check.
+
+        Raises the driver's connection/operational error when the backend is
+        unreachable. Uses explicit cursor close (not `with`) because
+        sqlite3 cursors don't support the context manager protocol.
+        """
+        conn = self._acquire_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.fetchone()
         finally:
             if cur:
                 cur.close()
