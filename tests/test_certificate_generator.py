@@ -136,7 +136,12 @@ class TestCertificateGenerator(unittest.TestCase):
 
         with open(pwd_file, 'r') as f:
             content = f.read()
-            self.assertEqual(content, "test_password_123")
+            # cipher_util now actually encrypts: versioned ciphertext on
+            # disk, plaintext recoverable via decrypt()
+            self.assertTrue(content.startswith("enc:v1:"))
+            self.assertNotIn("test_password_123", content)
+            from common.util.cipher_util import decrypt
+            self.assertEqual(decrypt(content), password)
 
     def test_set_file_permissions(self):
         cert_file = os.path.join(self.temp_dir, "server.cer")

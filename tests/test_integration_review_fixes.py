@@ -28,102 +28,10 @@ from fastapi.testclient import TestClient
 
 import agent_registry.registry_instance as registry_instance
 import agent_registry.integration.app as app_module
-from agent_registry.integration.app import integration_app
-from common.custom.custom_handle import BaseHandler, HandlerRegistry
-from common.custom.interface_type import InterfaceType
-from common.util.authenticate_util import (
-    AUTH_METHOD_TOKEN,
-    CallerRole,
-    CallerType,
-    Principal,
+from tests.fakes.integration import (
+    FakeRecord, FakeRegistry, StubAuthnHandler, make_agent_card,
+    make_third_party_principal,
 )
-
-AGENT_CARD = {
-    "name": "rv_agent",
-    "provider": {"organization": "rv_org", "url": "https://example.com"},
-    "description": "review-fix test agent",
-    "version": "1.0.0",
-    "skills": [],
-}
-
-CRED_COLLISION_CONF = """
-credential.va.identity=vendor_a
-credential.va.token_hash=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-credential.va.role=vendor_agent
-credential.va.owner=vendor_b
-
-credential.vb.identity=vendor_b
-credential.vb.token_hash=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-credential.vb.role=vendor_agent
-"""
-
-
-class _FakeRecord:
-    def __init__(self, agent_dict, owner):
-        import json
-        from a2a.types import AgentCard
-        from google.protobuf.json_format import Parse
-        self.agent_card = Parse(json.dumps(agent_dict), AgentCard())
-        self.owner = owner
-        self.status = "published"
-
-
-class _FakeRegistry:
-    def __init__(self):
-        self._records = {}
-
-    def register_with_status(self, agent, initial_status='published', owner=None):
-        key = (agent.name, agent.provider.organization)
-        if key in self._records:
-            return False
-        from google.protobuf.json_format import MessageToDict
-        self._records[key] = _FakeRecord(MessageToDict(agent), owner)
-        return True
-
-    def find_exact(self, name=None, organization=None):
-        from google.protobuf.json_format import MessageToDict
-        return [r.agent_card for (n, o), r in self._records.items()
-                if (name is None or n == name) and (organization is None or o == organization)]
-
-    def get_by_key_with_owner(self, name, organization, owner=None):
-        return self._records.get((name, organization))
-
-    def update(self, name, organization, data, owner=None):
-        key = (name, organization)
-        if key not in self._records:
-            return False
-        record = self._records[key]
-        if owner is not None and record.owner not in (owner, None):
-            return False
-        return True
-
-    def deregister(self, name, organization, owner=None):
-        key = (name, organization)
-        if key not in self._records:
-            return False
-        if owner is not None and self._records[key].owner not in (owner, None):
-            return False
-        del self._records[key]
-        return True
-
-    def count(self):
-        return len(self._records)
-
-    def get_agents(self):
-        return {k: r.agent_card for k, r in self._records.items()}
-
-    def get_status(self, name, organization):
-        record = self._records.get((name, organization))
-        return record.status if record else None
-
-
-class _StubAuthnHandler(BaseHandler):
-    def __init__(self):
-        self.principal = None
-        self.credentials = {}
-
-    async def handle(self, client_ip, request):
-        return self.principal
 
 
 class _FakeStore:
@@ -160,10 +68,38 @@ class _FakeBroadcastService:
         self.broadcast_enabled = enabled
         self.subscription_store = _FakeStore()
         self.dispatcher = _FakeDispatcher()
+from agent_registry.integration.app import integration_app
+from common.custom.custom_handle import BaseHandler, HandlerRegistry
+from common.custom.interface_type import InterfaceType
+from common.util.authenticate_util import (
+    AUTH_METHOD_TOKEN,
+    CallerRole,
+    CallerType,
+    Principal,
+)
 
+_FakeRecord = FakeRecord
+_FakeRegistry = FakeRegistry
+_StubAuthnHandler = StubAuthnHandler
 
-class _FakePrincipal:
-    """Placeholder used by monkeypatched get_broadcast_service tests."""
+AGENT_CARD = {
+    "name": "rv_agent",
+    "provider": {"organization": "rv_org", "url": "https://example.com"},
+    "description": "review-fix test agent",
+    "version": "1.0.0",
+    "skills": [],
+}
+
+CRED_COLLISION_CONF = """
+credential.va.identity=vendor_a
+credential.va.token_hash=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+credential.va.role=vendor_agent
+credential.va.owner=vendor_b
+
+credential.vb.identity=vendor_b
+credential.vb.token_hash=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+credential.vb.role=vendor_agent
+"""
 
 
 @pytest.fixture
@@ -253,7 +189,7 @@ class TestVendorOwnershipIdentityAnchor:
 
     def test_owner_collision_cannot_update_foreign_card(self, client):
         c, stub, reg = client
-        reg._records[("victim", "rv_org")] = _FakeRecord(AGENT_CARD, owner="vendor_b")
+        reg._records[("victim", "rv_org")] = _FakeRecord(make_agent_card("victim", "rv_org"), owner="vendor_b")
         stub.principal = _vendor(identity="vendor_a", owner="vendor_b")
         resp = c.put("/integration/v1/agent-cards/rv_org/victim",
                      json={"agentCards": [AGENT_CARD]}, headers=_auth_headers())
@@ -261,14 +197,14 @@ class TestVendorOwnershipIdentityAnchor:
 
     def test_owner_collision_cannot_delete_foreign_card(self, client):
         c, stub, reg = client
-        reg._records[("victim", "rv_org")] = _FakeRecord(AGENT_CARD, owner="vendor_b")
+        reg._records[("victim", "rv_org")] = _FakeRecord(make_agent_card("victim", "rv_org"), owner="vendor_b")
         stub.principal = _vendor(identity="vendor_a", owner="vendor_b")
         resp = c.delete("/integration/v1/agent-cards/rv_org/victim", headers=_auth_headers())
         assert resp.status_code == 403
 
     def test_identity_match_allowed(self, client):
         c, stub, reg = client
-        reg._records[("own", "rv_org")] = _FakeRecord(AGENT_CARD, owner="vendor_a")
+        reg._records[("own", "rv_org")] = _FakeRecord(make_agent_card("own", "rv_org"), owner="vendor_a")
         stub.principal = _vendor(identity="vendor_a", owner="vendor_a")
         resp = c.put("/integration/v1/agent-cards/rv_org/own",
                      json={"agentCards": [AGENT_CARD]}, headers=_auth_headers())

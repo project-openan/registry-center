@@ -83,9 +83,16 @@ def customized_create_ssl_context(
         cert_reqs: int,
         ca_certs: str | os.PathLike[str] | None,
         ciphers: str | None,
+        alpn_protocols: list[str] | None = None,
+        **kwargs,
 ) -> ssl.SSLContext:
+    # uvicorn may extend create_ssl_context's signature between versions
+    # (0.53 added alpn_protocols); absorb new keyword arguments so the
+    # global patch survives minor-version upgrades.
     try:
         ctx = ssl.SSLContext(ssl_version)
+        if alpn_protocols:
+            ctx.set_alpn_protocols(alpn_protocols)
         get_password = (lambda: password) if password else None
         ctx.load_cert_chain(certfile, keyfile, get_password)
         ctx.verify_mode = ssl.VerifyMode(cert_reqs)

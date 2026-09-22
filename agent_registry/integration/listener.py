@@ -49,6 +49,22 @@ _STARTUP_TIMEOUT_SECONDS = 30
 # scope["tls_peer_cert"] before the app runs. The extra scope key is benign
 # for the main port (nothing reads it there).
 # ---------------------------------------------------------------------------
+import logging as _stdlib_logging
+
+_uvicorn_records: list = []
+
+
+class _UvicornRecordSink(_stdlib_logging.Handler):
+    def emit(self, record):
+        try:
+            _uvicorn_records.append(record)
+        except Exception:
+            pass
+
+
+_stdlib_logging.getLogger("uvicorn").addHandler(_UvicornRecordSink())
+_stdlib_logging.getLogger("uvicorn.error").addHandler(_UvicornRecordSink())
+
 _cycle_run_asgi = h11_impl.RequestResponseCycle.run_asgi
 
 
@@ -98,6 +114,7 @@ class ThirdPartyAccessServer:
             self.config.get('integration.client_cert', 'false')).lower() == 'true'
         self._server: uvicorn.Server = None
         self._thread: threading.Thread = None
+        self._startup_error: Optional[BaseException] = None
 
     def start(self) -> None:
         """Start the listener. No-op when integration access is disabled."""
@@ -142,16 +159,40 @@ class ThirdPartyAccessServer:
         logger.info(f"Integration access TLS: verify_mode={cert_reqs}, "
                     f"crl_check={'on' if self.require_client_cert and len(self.conf_obj.get_crl_list()) > 0 else 'off'}")
         self._server = uvicorn.Server(uv_config)
+
+        def _run_server():
+            try:
+                self._server.run()
+            except BaseException as exc:  # noqa: BLE001 - diagnostics sink
+                self._startup_error = exc
+                raise
+
         self._thread = threading.Thread(
-            target=self._server.run, daemon=True, name="integration-access")
+            target=_run_server, daemon=True, name="integration-access")
         self._thread.start()
 
         deadline = time.time() + _STARTUP_TIMEOUT_SECONDS
         while not self._server.started and time.time() < deadline:
             if not self._thread.is_alive():
+                print(f"[integration-listener][diag] thread exited during startup; "
+                      f"startup_error={self._startup_error!r}", flush=True)
                 logger.error("Integration access server thread exited during startup")
                 return
             time.sleep(0.1)
+        if not self._server.started:
+            # The thread is alive but never completed startup — surface what
+            # uvicorn was doing when the deadline hit (diagnosability).
+            logger.error(
+                f"Integration access server startup timeout after "
+                f"{_STARTUP_TIMEOUT_SECONDS}s: thread alive={self._thread.is_alive()}, "
+                f"bind target={self._server.config.host}:{self._server.config.port}")
+        if not self._server.started:
+            # print() (not logger): pytest captures it into the CI failure report
+            uv_records = [r.getMessage() for r in _uvicorn_records]
+            print(f"[integration-listener][diag] started={self._server.started} "
+                  f"thread_alive={self._thread.is_alive()} "
+                  f"startup_error={self._startup_error!r} "
+                  f"uvicorn_records={uv_records[-10:]}", flush=True)
         if self._server.started:
             logger.info(f"Integration access server started on https://{self.host}:{self.port} "
                         f"(client cert required: {self.require_client_cert})")

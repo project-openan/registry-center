@@ -12,3 +12,6 @@ DEPLOY_ALIYUN_zh.md
 *.key
 etc/ssl/
 etc/sign_cert/
+
+# Config-secret cipher key (auto-generated, per-machine)
+**/cipher.key

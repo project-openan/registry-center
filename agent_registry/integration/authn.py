@@ -247,8 +247,13 @@ class IntrospectionBearerProvider(AuthenticationProvider):
                 raise AuthenticationError(AuthFailureReason.PROVIDER_UNAVAILABLE, _FAIL) from exc
             if not isinstance(data, dict) or data.get('active') is not True:
                 raise AuthenticationError(AuthFailureReason.INVALID_TOKEN, _FAIL)
-            expiry = float(data.get('exp', now + self.cache_seconds))
-            if expiry <= now or float(data.get('nbf', 0)) > now:
+            try:
+                expiry = float(data.get('exp', now + self.cache_seconds))
+                nbf = float(data.get('nbf', 0))
+            except (TypeError, ValueError) as exc:
+                raise AuthenticationError(
+                    AuthFailureReason.INVALID_TOKEN, _FAIL) from exc
+            if expiry <= now or nbf > now:
                 raise AuthenticationError(AuthFailureReason.INVALID_TOKEN, _FAIL)
             self._cache[credential.fingerprint] = (min(now + self.cache_seconds, expiry), data)
         if self.issuer and data.get('iss') != self.issuer:

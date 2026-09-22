@@ -27,17 +27,79 @@ Provides endpoints for:
 - Import/Export
 """
 
+import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, Path, Depends, status
+from fastapi import APIRouter, HTTPException, Query, Path, Depends, Request, status
 from fastapi.responses import JSONResponse, Response
+from limits import parse as parse_rate_limit, storage as limit_storage, strategies as limit_strategies
 from loguru import logger
 from neo4j import GraphDatabase, Driver
 
 from agent_registry.config import PERSISTENCE_CONF
+from common.custom.custom_handle import HandlerRegistry
+from common.custom.interface_type import InterfaceType
 
-knowledge_graph_router = APIRouter(prefix="/rest/v1/registry-center/knowledge-graph", tags=["Knowledge Graph"])
+# ---------------------------------------------------------------------------
+# Endpoint guard: per-IP rate limit + main-port authentication slot.
+# The knowledge-graph endpoints previously had neither; they are mounted on
+# the main app and must enforce the same access discipline as every other
+# route (auth is the AUTHENTICATE slot, so deployments with a real handler
+# are protected automatically).
+# ---------------------------------------------------------------------------
+
+_kg_strategy = limit_strategies.MovingWindowRateLimiter(limit_storage.MemoryStorage())
+_kg_rate_item = None
+
+
+def _kg_rate():
+    global _kg_rate_item
+    if _kg_rate_item is None:
+        from common.util.app_config import get_conf
+        raw = str(get_conf().get('knowledge_graph.ratelimit', '100/second')).strip()
+        _kg_rate_item = parse_rate_limit(raw if '/' in raw else f"{raw}/second")
+    return _kg_rate_item
+
+
+async def kg_guard(request: Request) -> None:
+    client_ip = request.client.host if request.client else ''
+    if not _kg_strategy.hit(_kg_rate(), 'knowledge_graph', client_ip):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="Rate limit exceeded")
+    auth_handle = HandlerRegistry.get_handler(InterfaceType.AUTHENTICATE)
+    await auth_handle.handle(client_ip, request)
+
+
+# ---------------------------------------------------------------------------
+# Cypher identifier validation.
+#
+# Cypher cannot parameterize labels, relationship types, or property keys —
+# they must be interpolated. Every such value passes this strict identifier
+# grammar before it may touch a query string (injection guard).
+# ---------------------------------------------------------------------------
+
+_IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
+
+def _validate_identifier(value: Any, kind: str) -> str:
+    if not isinstance(value, str) or not _IDENTIFIER_RE.match(value):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Invalid {kind}: must match [A-Za-z_][A-Za-z0-9_]*")
+    return value
+
+
+def _validate_labels(labels: Any) -> List[str]:
+    if not isinstance(labels, list) or not labels:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            detail="At least one valid label is required")
+    return [_validate_identifier(label, "label") for label in labels]
+
+
+knowledge_graph_router = APIRouter(
+    prefix="/rest/v1/registry-center/knowledge-graph", tags=["Knowledge Graph"],
+    dependencies=[Depends(kg_guard)])
 
 # Global Neo4j driver instance
 _neo4j_driver: Optional[Driver] = None
@@ -73,6 +135,8 @@ async def list_nodes(
     label: Optional[str] = Query(None, description="Filter by label")
 ):
     """Retrieve all nodes with optional pagination and label filtering."""
+    if label:
+        _validate_identifier(label, "label")
     driver = get_neo4j_driver()
     skip = (page - 1) * limit
     
@@ -126,14 +190,15 @@ async def create_node(node_data: Dict[str, Any]):
     """Create a new node with specified labels and properties."""
     if 'labels' not in node_data or not node_data['labels']:
         raise HTTPException(status_code=400, detail="At least one label is required")
-    
+
     if 'properties' not in node_data:
         raise HTTPException(status_code=400, detail="Properties are required")
-    
+
+    labels = _validate_labels(node_data['labels'])
     driver = get_neo4j_driver()
-    
+
     with driver.session() as session:
-        labels_str = ":".join(node_data['labels'])
+        labels_str = ":".join(labels)
         query = f"""
             CREATE (n:{labels_str} $properties)
             RETURN elementId(n) as id, labels(n) as labels, properties(n) as properties
@@ -277,6 +342,8 @@ async def list_relationships(
     type: Optional[str] = Query(None, description="Filter by relationship type")
 ):
     """Retrieve all relationships with optional pagination and type filtering."""
+    if type:
+        _validate_identifier(type, "relationship type")
     driver = get_neo4j_driver()
     skip = (page - 1) * limit
     
@@ -341,7 +408,8 @@ async def create_relationship(rel_data: Dict[str, Any]):
     
     if not rel_data['type']:
         raise HTTPException(status_code=400, detail="Relationship type cannot be empty")
-    
+
+    rel_type = _validate_identifier(rel_data['type'], "relationship type")
     driver = get_neo4j_driver()
     
     with driver.session() as session:
@@ -369,7 +437,7 @@ async def create_relationship(rel_data: Dict[str, Any]):
         query = f"""
             MATCH (start), (end)
             WHERE elementId(start) = $startId AND elementId(end) = $endId
-            CREATE (start)-[r:`{rel_data['type']}` $properties]->(end)
+            CREATE (start)-[r:`{rel_type}` $properties]->(end)
             RETURN elementId(r) as id, type(r) as type,
                    elementId(start) as startNodeId, elementId(end) as endNodeId,
                    properties(r) as properties
@@ -562,7 +630,7 @@ async def bulk_create_nodes(nodes_data: Dict[str, List[Dict[str, Any]]]):
             if 'labels' not in node or not node['labels']:
                 raise HTTPException(status_code=400, detail="Each node must have at least one label")
             nodes_to_create.append({
-                'labels': node['labels'],
+                'labels': _validate_labels(node['labels']),
                 'properties': node.get('properties', {})
             })
         
@@ -611,7 +679,7 @@ async def bulk_create_relationships(rels_data: Dict[str, List[Dict[str, Any]]]):
                 if field not in rel:
                     raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
             rels_to_create.append({
-                'type': rel['type'],
+                'type': _validate_identifier(rel['type'], "relationship type"),
                 'startNodeId': rel['startNodeId'],
                 'endNodeId': rel['endNodeId'],
                 'properties': rel.get('properties', {})
@@ -687,7 +755,8 @@ async def import_graph(import_data: Dict[str, Any]):
                     errors.append({"index": i, "message": "Missing labels"})
                     continue
                 
-                labels_str = ":".join(node_data['labels'])
+                labels = _validate_labels(node_data['labels'])
+                labels_str = ":".join(labels)
                 query = f"""
                     CREATE (n:{labels_str} $properties)
                     RETURN elementId(n) as id
@@ -708,10 +777,11 @@ async def import_graph(import_data: Dict[str, Any]):
                         errors.append({"index": i, "message": f"Missing field: {field}"})
                         continue
                 
+                rel_type = _validate_identifier(rel_data['type'], "relationship type")
                 query = f"""
                     MATCH (start), (end)
                     WHERE elementId(start) = $startId AND elementId(end) = $endId
-                    CREATE (start)-[r:`{rel_data['type']}` $properties]->(end)
+                    CREATE (start)-[r:`{rel_type}` $properties]->(end)
                     RETURN elementId(r) as id
                 """
                 result = session.run(query, startId=rel_data['startNodeId'],
@@ -756,7 +826,7 @@ async def export_graph(
         # Build query based on filters
         if 'label' in filters:
             # Filter by label
-            label = filters['label']
+            label = _validate_identifier(filters['label'], "label")
             node_query = f"""
                 MATCH (n:`{label}`)
                 RETURN elementId(n) as id, labels(n) as labels, properties(n) as properties
@@ -797,7 +867,8 @@ async def export_graph(
             # Filter by property (key:value format)
             prop_parts = filters['property'].split(':', 1)
             if len(prop_parts) == 2:
-                prop_key, prop_value = prop_parts
+                prop_key = _validate_identifier(prop_parts[0], "property key")
+                prop_value = prop_parts[1]
                 
                 node_query = f"""
                     MATCH (n)
