@@ -38,8 +38,10 @@ from loguru import logger
 from neo4j import GraphDatabase, Driver
 
 from agent_registry.config import PERSISTENCE_CONF
+from agent_registry.agent_to_graph.watcher import process
 from common.custom.custom_handle import HandlerRegistry
 from common.custom.interface_type import InterfaceType
+
 
 # ---------------------------------------------------------------------------
 # Endpoint guard: per-IP rate limit + main-port authentication slot.
@@ -124,6 +126,22 @@ def close_neo4j_driver():
         _neo4j_driver.close()
         logger.info("Neo4j driver closed")
         _neo4j_driver = None
+
+
+# Sync endpoint
+
+@knowledge_graph_router.get("/sync", summary="Trigger agent to graph synchronization")
+async def sync_agents_to_graph():
+    """Trigger the agent-to-graph watcher's process method to sync agents to the knowledge graph."""
+    try:
+        plan = process()
+        return {
+            "success": True,
+            "data": plan
+        }
+    except Exception as e:
+        logger.error(f"Agent to graph synchronization failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 
 # Node endpoints

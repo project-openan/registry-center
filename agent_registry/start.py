@@ -26,6 +26,7 @@ import uvicorn
 from loguru import logger
 from uvicorn import config
 
+from agent_registry.agent_to_graph.watcher import start_watching
 from agent_registry.config import CONN_TIMEOUT, TLS_CIPHER, FORWARDED_ALLOW_IPS, IS_WINDOWS
 from agent_registry.cipher_converter import CipherConverter
 from agent_registry.internal.registry_center_internal_service import RegistryCenterInternalService
@@ -71,6 +72,7 @@ async def record_startup_log():
 
 try:
     app.add_event_handler("startup", record_startup_log)
+    app.add_event_handler("startup", start_watching)
 except AttributeError:
     pass
 
