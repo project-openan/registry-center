@@ -19,6 +19,7 @@
 
 import os
 import subprocess
+import shutil
 from pathlib import Path
 
 import pytest
@@ -28,8 +29,15 @@ SCRIPT = Path(__file__).resolve().parents[1] / "bin" / "entrypoint.sh"
 
 
 def _run_entrypoint(tmp_path, **extra_env):
-    env = {"APP_HOME": str(tmp_path), "PATH": os.environ["PATH"], **extra_env}
-    return subprocess.run(["bash", str(SCRIPT), "true"], env=env, capture_output=True, text=True)
+    bash = os.environ.get("BASH_BIN") or shutil.which("bash")
+    if not bash:
+        pytest.skip("Bash unavailable")
+    workspace = str(tmp_path)
+    if os.name == "nt":
+        workspace = subprocess.check_output(
+            [bash, "-c", 'cygpath -u "$1"', "test", workspace], text=True).strip()
+    env = {"APP_HOME": workspace, "PATH": os.environ["PATH"], **extra_env}
+    return subprocess.run([bash, str(SCRIPT), "true"], env=env, capture_output=True, text=True)
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX container entrypoint")
@@ -65,7 +73,6 @@ def test_entrypoint_keeps_existing_model_file(tmp_path):
     assert path.read_text(encoding="utf-8") == existing
 
 
-@pytest.mark.skipif(os.name == "nt", reason="POSIX container entrypoint")
 @pytest.mark.parametrize("provider", ["aoc_signed", "unknown"])
 def test_entrypoint_rejects_provider_requiring_full_yaml(tmp_path, provider):
     (tmp_path / "etc" / "config").mkdir(parents=True)

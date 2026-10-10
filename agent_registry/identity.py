@@ -50,7 +50,8 @@ from common.cert.cert_cn_parser import extract_cn_from_subject, validate_cn
 CERTIFICATE = 'certificate'
 TRUSTED_PROXY = 'trusted_proxy'
 NONE = 'none'
-KNOWN_SOURCES = (CERTIFICATE, TRUSTED_PROXY, NONE)
+TOKEN = 'token'
+KNOWN_SOURCES = (CERTIFICATE, TRUSTED_PROXY, TOKEN, NONE)
 
 #: Config key selecting the identity source.
 OWNER_IDENTITY_MODE = 'owner.identity.mode'
@@ -167,6 +168,14 @@ def resolve_caller_identity(request: Any, config: Dict[str, Any]) -> CallerIdent
         return CallerIdentity(source=NONE, verified=False,
                               detail=f'{OWNER_IDENTITY_MODE}=none')
 
+    if source == TOKEN:
+        from common.util.authenticate_util import Principal
+        principal = scope.get('registry_principal')
+        if not isinstance(principal, Principal) or not principal.identity:
+            return CallerIdentity(source=TOKEN, detail='no authenticated token principal')
+        # owner is attribution metadata, not an authorization anchor.
+        return CallerIdentity(owner=principal.identity, source=TOKEN, verified=True)
+
     if source == CERTIFICATE:
         cn = _validated_owner(cn_from_peer_cert(scope.get(SCOPE_PEER_CERT)), validation_mode)
         if not cn:
@@ -206,6 +215,8 @@ def describe_identity_configuration(config: Dict[str, Any]) -> str:
         detail = f"trusted_proxy={','.join(sorted(ips)) or '<unset>'}"
     elif source == CERTIFICATE:
         detail = f"verify_client={str((config or {}).get('verify_client', 'true')).lower()}"
+    elif source == TOKEN:
+        detail = 'standards-first authentication provider (integration.auth.* policy)'
     else:
         detail = 'no verifiable identity source'
     return f"owner identity source: {source} ({detail})"
@@ -236,6 +247,9 @@ def identity_configuration_warnings(config: Dict[str, Any]) -> Sequence[str]:
                 f"owner.isolation.enabled=true with {OWNER_IDENTITY_MODE}=trusted_proxy but "
                 f"{OWNER_TRUSTED_PROXY_IPS} is empty: every identity header is ignored and "
                 "ownership changes will be rejected with 401.")
+    elif source == TOKEN:
+        if str(config.get('integration.auth.mode', 'static_bearer')) == 'mtls':
+            warnings.append('owner.identity.mode=token requires a token provider, not integration.auth.mode=mtls')
     else:
         warnings.append(
             "owner.isolation.enabled=true but owner.identity.mode=none: no caller identity "

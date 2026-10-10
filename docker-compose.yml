@@ -1,82 +1,48 @@
-# Local development only: anonymous access is restricted to the host loopback.
-# For production use verified caller identities and an explicit access policy.
-#
-# Configuration this file supplies, and where each value lands:
-#   build: .                      builds the image described in Dockerfile
-#   ports 127.0.0.1:5000:5000     publish on loopback only (REGISTRY_PORT below)
-#   volumes:
-#     ./data                      registry storage (file backend)
-#     ./etc/ssl                   TLS material; the image ships none
-#     ./etc/sign_cert             JWK signing material
-#     ./log                       logs and the local audit trail
-#     ${LLM_CONFIG_HOST_FILE}     model definitions, mounted read-only. Defaults to
-#                                 ./etc/config/models.yaml; if that host path does
-#                                 not exist Docker creates an empty directory in its
-#                                 place, and the service then starts with no model
-#                                 configured at all. The variable is read by Compose,
-#                                 not by the service.
-#   env_file: .env                secrets named by models.yaml `*_env` fields
-#   environment:                  REGISTRY_* overrides, applied by
-#                                 common/util/app_config.py after server.conf and
-#                                 server.properties are loaded
-#
-# etc/conf is intentionally not mounted: the container uses the copies the image
-# built from server.conf.example / persistence.conf.example and the entrypoint
-# rewrites the lines listed in bin/entrypoint.sh. Mount a prepared etc/conf
-# instead if you need server.properties or integration credentials.
-version: "3.8"
-
+# Runtime credentials and DB connection values come from the untracked .env.
+# Configure token ownership for HTTP/HTTPS-no-mTLS. See docs/transport-runtime.md.
 services:
   registry-center:
     build: .
-    container_name: registry-center
+    container_name: openan-registry-center
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:${REGISTRY_PORT:-5000}:${REGISTRY_PORT:-5000}"
     volumes:
       - ./data:/opt/registry-center/data
-      - ./etc/ssl:/opt/registry-center/etc/ssl
-      - ./etc/sign_cert:/opt/registry-center/etc/sign_cert
       - ./log:/opt/registry-center/log
-      - ${LLM_CONFIG_HOST_FILE:-./etc/config/models.yaml}:/opt/registry-center/etc/config/models.yaml:ro
+      - ./etc/ssl:/opt/registry-center/etc/ssl:ro
+      - ./etc/sign_cert:/opt/registry-center/etc/sign_cert:ro
+      - type: bind
+        source: ${LLM_CONFIG_HOST_FILE:-./etc/config/models.yaml}
+        target: /opt/registry-center/etc/config/models.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${REGISTRY_CREDENTIAL_HOST_FILE:-./etc/conf/integration_credentials.conf}
+        target: /opt/registry-center/etc/conf/integration_credentials.conf
+        read_only: true
+        bind:
+          create_host_path: false
     env_file:
       - .env
     environment:
-      - REGISTRY_IP=0.0.0.0
-      - REGISTRY_PORT=5000
-      - REGISTRY_ENABLE_HTTPS=true
-      - REGISTRY_VERIFY_CLIENT=false
-      - REGISTRY_OWNER_ISOLATION_ENABLED=false
-      - REGISTRY_AGENT_APPROVAL_ENABLED=false
-      - REGISTRY_SIGNATURE_VALIDATION_ENABLED=false
-      - REGISTRY_REGISTRY_SIGN_ENABLED=false
-      - REGISTRY_FORWARDED_ALLOW_IPS=127.0.0.1
+      REGISTRY_IP: "0.0.0.0"
+      REGISTRY_PORT: ${REGISTRY_PORT:-5000}
+      REGISTRY_ENABLE_HTTPS: ${REGISTRY_ENABLE_HTTPS:-false}
+      REGISTRY_VERIFY_CLIENT: ${REGISTRY_VERIFY_CLIENT:-false}
+      REGISTRY_OWNER_IDENTITY_MODE: ${REGISTRY_OWNER_IDENTITY_MODE:-token}
+      REGISTRY_INTEGRATION_AUTH_MODE: ${REGISTRY_INTEGRATION_AUTH_MODE:-static_bearer}
+      REGISTRY_REGISTRY_SIGN_ENABLED: ${REGISTRY_REGISTRY_SIGN_ENABLED:-true}
+      REGISTRY_FORWARDED_ALLOW_IPS: ${REGISTRY_FORWARDED_ALLOW_IPS:-127.0.0.1}
     healthcheck:
-      # The probe speaks HTTPS against 127.0.0.1. A certificate whose only subject
-      # identity is a DNS name (the repo's generated cert uses CN=agent-registry and
-      # has no SAN) cannot match an IP literal, so the container would never become
-      # healthy: either set REGISTRY_HEALTHCHECK_HOST to a name the certificate
-      # matches, or reissue the certificate with an IP SAN. See the upgrade notes.
       test: ["CMD", "python", "-m", "agent_registry.healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - openan-net
     restart: unless-stopped
-
-  # ---- Optional: PostgreSQL for production persistence ----
-  # To enable: uncomment the block below and add REGISTRY_PERSISTENCE_MODE=postgresql
-  #             + REGISTRY_POSTGRESQL_HOST=postgres to the environment above.
-  #
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: registry-postgres
-  #   environment:
-  #     - POSTGRES_DB=registry_center
-  #     - POSTGRES_USER=opena2a_t
-  #     - POSTGRES_PASSWORD=openA2A_T
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-  #   restart: unless-stopped
-  #
-  # volumes:
-  #   pgdata:
+networks:
+  openan-net:
+    external: true

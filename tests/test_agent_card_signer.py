@@ -31,18 +31,9 @@ def test_is_enabled_true():
             sign_enabled=True
         )
 
-        mock_private_key = MagicMock()
-        mock_public_key = MagicMock()
-        mock_numbers = MagicMock()
-        mock_numbers.n = 1234567890123456789012345645678901234564567890123456789012345645678901234567890123456123456789012345612345612345612345612345612345612345612345612345612345612345612345
-        mock_numbers.e = 65537
-        mock_public_key.public_numbers.return_value = mock_numbers
-        mock_private_key.public_key.return_value = mock_public_key
-
-        mock_signature = b'test_signature_data_256_bytes'
-        mock_private_key.sign.return_value = mock_signature
-
-        signer._private_key = mock_private_key
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from a2a.utils.signing import create_signature_verifier
+        signer._private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         signer._kid = "test_kid"
 
         agent_card = AgentCard()
@@ -55,6 +46,7 @@ def test_is_enabled_true():
         assert len(result.signatures) == 1
         assert result.signatures[0].protected
         assert result.signatures[0].signature
+        create_signature_verifier(lambda kid, jku: signer._private_key.public_key(), ["RS256"])(result)
 
 
 def test_is_enabled_false():

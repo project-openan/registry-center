@@ -152,7 +152,7 @@ class CustomUvicornServer:
             ssl_certfile=self.conf_obj.ssl_certfile,
             ssl_keyfile=self.conf_obj.ssl_keyfile,
             ssl_keyfile_password=load_cert_password(self.conf_obj.ssl_keyfile_password).decode(DEFAULT_ENCODING),
-            ssl_ca_certs=self.conf_obj.ssl_ca_certs,
+            ssl_ca_certs=self.conf_obj.ssl_ca_certs if self.conf_obj.verify_client != ssl.CERT_NONE else None,
             ssl_cert_reqs=self.conf_obj.verify_client,
             ssl_ciphers=CipherConverter.convert(self.server_config.get(TLS_CIPHER)),
             # Use Uvicorn's finite HTTP idle timeout. Zero races pooled clients;
@@ -245,6 +245,10 @@ def main():
     # Fail fast on unusable storage (wrong DB config / unreachable DB) before
     # binding any port — including the internal UDS/TCP service below.
     verify_storage_ready()
+
+    # Required signing must be ready before opening even the internal port.
+    from agent_registry.server import get_registry_signer
+    get_registry_signer()
 
     start_internal_service(server_config)
 

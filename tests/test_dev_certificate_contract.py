@@ -58,14 +58,12 @@ def test_generated_signing_bundle_works_with_real_agent_card_signer(tmp_path, mo
         password_path=template["jwk_private_key_password"],
     )
     card = AgentCard(name="test-agent", version="1.0")
-    canonical = signer._canonicalize_agent_card(MessageToDict(card, preserving_proto_field_name=True))
-    payload = json.dumps(canonical, separators=(",", ":"), sort_keys=True).encode()
     signed = signer.sign_agent_card(card)
     assert len(signed.signatures) == 1
     signature = signed.signatures[0].signature
     public_key = x509.load_pem_x509_certificate(Path(template["jwk_cert_path"]).read_bytes()).public_key()
-    public_key.verify(base64.urlsafe_b64decode(signature + "=" * (-len(signature) % 4)),
-                      payload, padding.PKCS1v15(), hashes.SHA256())
+    from a2a.utils.signing import create_signature_verifier
+    create_signature_verifier(lambda kid, jku: public_key, ["RS256"])(signed)
 
 
 def run_cli(monkeypatch, directory, usage="serverAuth", *options):

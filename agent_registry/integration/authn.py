@@ -137,7 +137,13 @@ _CUSTOM_EXTRACTORS: Dict[str, CredentialExtractor] = {}
 
 def register_authentication_provider(provider: AuthenticationProvider,
                                      extractor: CredentialExtractor) -> None:
-    """Register a business-owned provider without changing core request logic."""
+    """Register a shared, business-owned provider and credential extractor.
+
+    Listener handlers reuse these instances and do not close the provider.
+    Extensions must be safe for concurrent use across listener event loops;
+    loop-bound async clients must not be shared between those loops. The
+    business composition root owns resource allocation and shutdown.
+    """
     if not provider.provider_id or not provider.credential_kind:
         raise ValueError("Custom provider id and credential kind are required")
     _CUSTOM_PROVIDERS[provider.provider_id] = provider

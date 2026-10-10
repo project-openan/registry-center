@@ -298,6 +298,8 @@ class TestEndpointSurfaces:
         from agent_registry.signature.agent_card_signature_validator import AgentCardSignatureValidator
         app.dependency_overrides[server_module.get_signature_validator] = lambda: AgentCardSignatureValidator(
             None, signature_validation_enabled=False)
+        from agent_registry.agent_registry.agent_card_signer import AgentCardSigner
+        app.dependency_overrides[server_module.get_registry_signer] = lambda: AgentCardSigner(sign_enabled=False)
         client, handler_patch = self._client(vector_registry)
         with handler_patch:
             response = client.put(

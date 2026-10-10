@@ -163,6 +163,8 @@ Validation: `python -m pytest -q tests/test_token_acquisition.py tests/test_intr
 
 Private headers are not part of the core contract. Inject them through `CredentialExtractor` and `AuthenticationProvider`; see `samples/custom_auth_provider.py`. Extensions return the same `Principal`, so authorization, throttling, bans, and auditing do not inspect private request fields.
 
+`register_authentication_provider(provider, extractor)` registers shared, business-owned instances, not factories. Main-port and integration-port handlers may invoke them concurrently from different event loops; handlers do not close custom authentication providers. Keep these extensions stateless or safe across threads/event loops, and do not share a loop-bound async client between listeners. The business composition root owns their resource allocation and cleanup. Built-in authentication providers are created separately per listener. This ownership rule concerns authentication providers, not the separate token-acquisition provider lifecycle described above.
+
 Raise `AuthenticationError` with a specific invalid-credential reason only when caller credentials are actually invalid. Unclassified network/internal exceptions and invalid provider return values fail closed with 503 without incrementing bans. Custom acquisition providers must be async, cancellation-cooperative and release owned clients in `aclose()`; synchronous blocking work must not run on the event loop.
 
 ## Migration

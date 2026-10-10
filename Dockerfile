@@ -82,7 +82,7 @@ COPY agent_registry/ /opt/registry-center/agent_registry/
 COPY common/ /opt/registry-center/common/
 COPY bin/entrypoint.sh /opt/registry-center/bin/entrypoint.sh
 # Runtime configuration shipped in the image (the examples are copied to their
-# live filenames; the entrypoint rewrites individual lines in them):
+# live filenames; the Python applies environment overrides without rewriting them):
 #   etc/conf/server.conf        <- server.conf.example (IP, PORT, enable_https,
 #                                  forwarded_allow_ips, owner.validation.mode)
 #   etc/conf/persistence.conf   <- persistence.conf.example (persistence.mode, DB_*)
@@ -98,6 +98,7 @@ COPY bin/entrypoint.sh /opt/registry-center/bin/entrypoint.sh
 #                                           OPENSSL_CONF to it, the container does not)
 #   etc/ssl/*                              (server.cer, server_key.pem, cert_pwd, trust.cer)
 COPY etc/conf/server.conf.example /opt/registry-center/etc/conf/server.conf
+COPY etc/conf/server.conf.example /opt/registry-center/etc/conf/server.conf.example
 COPY etc/conf/persistence.conf.example /opt/registry-center/etc/conf/persistence.conf
 COPY etc/conf/db/ /opt/registry-center/etc/conf/db/
 COPY etc/conf/server.properties etc/conf/log_config.conf /opt/registry-center/etc/conf/
@@ -109,6 +110,7 @@ RUN useradd --uid 10001 -m appuser \
     && sed -i 's/\r$//' /opt/registry-center/bin/entrypoint.sh \
     && chmod 0755 /opt/registry-center/bin/entrypoint.sh \
     && chmod 0600 /opt/registry-center/etc/conf/*.conf \
+    && chmod 0700 /opt/registry-center/etc/ssl /opt/registry-center/etc/sign_cert \
     && chown -R appuser:appuser /opt/registry-center /opt/venv
 
 # Runtime facts an operator depends on:
@@ -116,7 +118,7 @@ RUN useradd --uid 10001 -m appuser \
 #     (etc/ssl/..., etc/conf/cipher.key) resolve as documented.
 #   - The service runs as the unprivileged user appuser (UID 10001); mounted
 #     certificates, config and data directories must be readable by that UID and
-#     etc/conf must stay writable because the entrypoint rewrites lines in it.
+#     runtime model files may be mounted read-only.
 #   - The image carries no cipher key, certificate or credential file: supply
 #     etc/ssl/*, etc/config/models.yaml and
 #     etc/conf/integration_credentials.conf at run time.

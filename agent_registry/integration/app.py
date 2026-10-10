@@ -240,8 +240,13 @@ async def integration_auth(request: Request) -> Principal:
     authentication (standard Bearer or TLS peer cert) → success counter
     reset → per-credential rate limit. Failures never expose token material.
     """
-    client_ip = request.client.host if request.client else ''
     handler = HandlerRegistry.get_handler(InterfaceType.INTEGRATION_AUTHENTICATE)
+    return await authenticate_request(request, handler)
+
+
+async def authenticate_request(request: Request, handler) -> Principal:
+    """Shared credential pipeline; each listener owns its provider instance."""
+    client_ip = request.client.host if request.client else ''
     credential_hint = handler.credential_hint(request) if hasattr(handler, 'credential_hint') else ''
     op_name = _resolve_operation(request)
     tracker = get_ban_tracker()

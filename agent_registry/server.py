@@ -64,6 +64,7 @@ from agent_registry.errors import (
     SemanticSearchUnavailable,
 )
 from agent_registry.identity import CallerIdentity, resolve_caller_identity
+from agent_registry.signature.public_address import registry_jku_url
 from agent_registry.broadcast import get_broadcast_service, initialize_broadcast_service
 from agent_registry.broadcast.events import EventType, utc_now_iso, public_event
 from agent_registry.broadcast.callback_policy import validate_callback_destination
@@ -134,12 +135,10 @@ def get_registry_signer() -> Optional[AgentCardSigner]:
             cert_path = config.get('jwk_cert_path', '')
             password_path = config.get('jwk_private_key_password', '')
             
-            ip = config.get('ip', '127.0.0.1')
-            port = config.get('port', '5000')
-            jku_url = f"https://{ip}:{port}/rest/v1/registry-center/keys"
-            
-            logger.info(f"private_key_path: '{private_key_path}', cert_path: '{cert_path}', password_path: '{password_path}'")
-            logger.info(f"jku_url: '{jku_url}' (ip='{ip}', port='{port}')")
+            try:
+                jku_url = registry_jku_url(config)
+            except ValueError as exc:
+                raise HTTPException(503, 'Registry public key address invalid') from exc
             
             if private_key_path and cert_path:
                 try:
@@ -153,10 +152,9 @@ def get_registry_signer() -> Optional[AgentCardSigner]:
                     logger.info("Registry signer initialized successfully")
                 except Exception as e:
                     logger.error(f"Failed to initialize registry signer: {e}")
-                    _registry_signer = AgentCardSigner(sign_enabled=False)
+                    raise HTTPException(status_code=503, detail="Registry signing materials unavailable") from e
             else:
-                logger.warning("Registry signer disabled: missing private_key_path or cert_path")
-                _registry_signer = AgentCardSigner(sign_enabled=False)
+                raise HTTPException(status_code=503, detail="Registry signing materials are required")
         else:
             logger.info("registry.sign.enabled is false, creating disabled signer")
             _registry_signer = AgentCardSigner(sign_enabled=False)
@@ -415,6 +413,12 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
     )
 
 # ---------- Middleware ----------
+@app.middleware("http")
+async def main_auth_middleware(request: Request, call_next):
+    from agent_registry.main_auth import main_token_middleware
+    return await main_token_middleware(request, call_next, config)
+
+
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
     """
@@ -1803,6 +1807,8 @@ _health_sweeper = None
 async def startup_services():
     """Initialize health/broadcast stores and start background tasks."""
     global _health_sweeper
+    from agent_registry.main_auth import main_token_policy
+    get_registry_signer()  # Also fail closed when launched directly by Uvicorn.
     registry = get_registry()
     backend = registry.storage if registry else None
     if registry and registry.use_vectordb:
@@ -1825,11 +1831,18 @@ async def startup_services():
             offline_ttl=health_service.offline_ttl,
         )
         _health_sweeper.start()
-    await broadcast_service.start()
+    try:
+        await main_token_policy.start(config)
+        await broadcast_service.start()
+    except BaseException:
+        await shutdown_services()
+        raise
 
 
 async def shutdown_services():
     global _health_sweeper, _signature_validator
+    from agent_registry.main_auth import main_token_policy
+    await main_token_policy.close()
     if _health_sweeper is not None:
         await _health_sweeper.stop()
         _health_sweeper = None
@@ -1859,6 +1872,19 @@ app.add_event_handler("startup", startup_services)
 app.add_event_handler("shutdown", close_registry)
 app.add_event_handler("shutdown", shutdown_services)
 
+
+@app.get('/health')
+async def health_probe():
+    """Minimal unauthenticated readiness, without a registry data snapshot."""
+    if get_registry() is None:
+        raise HTTPException(503, 'Registry storage unavailable')
+    get_registry_signer()
+    from agent_registry.identity import TOKEN, identity_mode
+    from agent_registry.main_auth import main_token_policy
+    if identity_mode(config) == TOKEN and main_token_policy.handler is None:
+        raise HTTPException(503, 'Authentication provider unavailable')
+    return {'status': 'ok'}
+
 # Include knowledge graph router
 app.include_router(knowledge_graph_router)
 
@@ -1880,14 +1906,15 @@ async def get_jwks(request: Request):
     Return public key in JWK Set format for JWT signature verification.
     This endpoint does not require authentication.
     """
-    enable_https = config.get('enable_https', 'true').lower() == 'true'
     sign_enabled = config.get('registry.sign.enabled', 'false').lower() == 'true'
 
-    if not enable_https or not sign_enabled:
+    if not sign_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="JWK endpoint is not available when HTTPS or registry signing is disabled"
+            detail="JWK endpoint is not available when registry signing is disabled"
         )
+
+    get_registry_signer()  # A declared but broken signing configuration is not ready.
 
     if jwk_rate_item and not await async_hit(jwk_rate_item, request.client.host):
         raise HTTPException(

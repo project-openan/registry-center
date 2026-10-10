@@ -20,8 +20,8 @@ Integration access port listener.
 
 Runs the integration FastAPI application on a dedicated port in a daemon
 thread (multi-listener precedent: the internal TCP service). The port is
-HTTPS-only — credentials never traverse plaintext HTTP. Disabled by
-default; enabled purely via configuration.
+HTTPS by default. Explicit HTTP deployments retain application authentication
+but send credentials in plaintext; mTLS-only policies are rejected in HTTP mode.
 """
 
 import asyncio
@@ -104,6 +104,7 @@ class ThirdPartyAccessServer:
         self.port = int(self.config.get('integration.port', DEFAULT_INTEGRATION_PORT))
         self.require_client_cert = str(
             self.config.get('integration.client_cert', 'false')).lower() == 'true'
+        self.enable_https = str(self.config.get('integration.enable_https', 'true')).lower() == 'true'
         self._server: uvicorn.Server = None
         self._thread: threading.Thread = None
         self._startup_error: Optional[BaseException] = None
@@ -118,6 +119,9 @@ class ThirdPartyAccessServer:
         if self._thread is not None:
             logger.warning("Integration access server already started")
             return
+        if not self.enable_https and (self.require_client_cert
+                or self.config.get('integration.auth.mode') == 'mtls'):
+            raise ValueError('Integration mTLS authentication requires integration.enable_https=true')
 
         # Resources are created and disposed in the listener's own event loop.
         from agent_registry.integration.authn import ThirdPartyAuthnHandler
@@ -129,19 +133,23 @@ class ThirdPartyAccessServer:
             auth_config['integration.auth.mode'] = 'mtls'
         cert_reqs = ssl.CERT_REQUIRED if self.require_client_cert else ssl.CERT_NONE
         raw_ciphers = self.config.get('tls.cipher') or ''
-        uv_config = uvicorn.Config(
-            app=integration_app,
-            host=self.host,
-            port=self.port,
-            ssl_certfile=self.conf_obj.ssl_certfile,
-            ssl_keyfile=self.conf_obj.ssl_keyfile,
-            ssl_keyfile_password=load_cert_password(
+        tls_kwargs = {}
+        if self.enable_https:
+            tls_kwargs = dict(
+                ssl_certfile=self.conf_obj.ssl_certfile,
+                ssl_keyfile=self.conf_obj.ssl_keyfile,
+                ssl_keyfile_password=load_cert_password(
                 self.conf_obj.ssl_keyfile_password).decode(DEFAULT_ENCODING),
-            ssl_ca_certs=self.conf_obj.ssl_ca_certs if self.require_client_cert else None,
-            ssl_cert_reqs=cert_reqs,
-            ssl_ciphers=CipherConverter.convert(raw_ciphers) if raw_ciphers.strip() else None,
-            ssl_context_factory=_make_ssl_context_factory(
-                self.conf_obj, self.require_client_cert),
+                ssl_ca_certs=self.conf_obj.ssl_ca_certs if self.require_client_cert else None,
+                ssl_cert_reqs=cert_reqs,
+                ssl_ciphers=CipherConverter.convert(raw_ciphers) if raw_ciphers.strip() else None,
+                ssl_context_factory=_make_ssl_context_factory(self.conf_obj, self.require_client_cert),
+            )
+        else:
+            logger.warning('Integration HTTP explicitly enabled: credentials travel in plaintext')
+        uv_config = uvicorn.Config(
+            app=integration_app, host=self.host, port=self.port,
+            **tls_kwargs,
             # Keep Uvicorn's finite idle timeout, matching the main listener.
             # Closing immediately after a response races client connection pools.
             # Uvicorn's access log includes the raw query string, even on rejected
@@ -197,7 +205,7 @@ class ThirdPartyAccessServer:
             self.stop()
             raise RuntimeError('Integration access startup timed out')
         if self._server.started:
-            logger.info(f"Integration access server started on https://{self.host}:{self.port} "
+            logger.info(f"Integration access server started on {'https' if self.enable_https else 'http'}://{self.host}:{self.port} "
                         f"(client cert required: {self.require_client_cert})")
 
     def stop(self) -> None:

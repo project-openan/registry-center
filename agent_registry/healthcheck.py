@@ -36,7 +36,7 @@ def probe() -> None:
             context.load_cert_chain(_path(cert), _path(key) if key else None)
         handlers.append(HTTPSHandler(context=context))
     authority = f'[{host}]' if ':' in host else host
-    url = f'{"https" if secure else "http"}://{authority}:{port}/rest/v1/registry-center/agent-cards'
+    url = f'{"https" if secure else "http"}://{authority}:{port}/health'
     with build_opener(*handlers).open(url, timeout=5) as response:
         if response.status != 200:
             raise RuntimeError(f'Health probe returned HTTP {response.status}')

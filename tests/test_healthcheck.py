@@ -25,7 +25,7 @@ def test_http_probe_matches_configuration(setup):
     opener, response = setup
     healthcheck.probe()
     opener.open.assert_called_once_with(
-        'http://127.0.0.1:5000/rest/v1/registry-center/agent-cards', timeout=5)
+        'http://127.0.0.1:5000/health', timeout=5)
     response.read.assert_not_called()
 
 
@@ -34,7 +34,7 @@ def test_platform_port_overrides_config_for_separate_probe_process(setup, monkey
     monkeypatch.setenv('PORT', '9090')
     healthcheck.probe()
     opener.open.assert_called_once_with(
-        'http://127.0.0.1:9090/rest/v1/registry-center/agent-cards', timeout=5)
+        'http://127.0.0.1:9090/health', timeout=5)
 
 
 def test_empty_platform_port_uses_configured_port(setup, monkeypatch):
@@ -42,7 +42,7 @@ def test_empty_platform_port_uses_configured_port(setup, monkeypatch):
     monkeypatch.setenv('PORT', '')
     healthcheck.probe()
     opener.open.assert_called_once_with(
-        'http://127.0.0.1:5000/rest/v1/registry-center/agent-cards', timeout=5)
+        'http://127.0.0.1:5000/health', timeout=5)
 
 
 def test_https_uses_ca_and_client_credentials(setup, monkeypatch):

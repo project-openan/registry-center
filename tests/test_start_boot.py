@@ -411,7 +411,7 @@ class TestMainFailurePaths:
     @pytest.fixture
     def main_patches(self, monkeypatch):
         """Patch every external effect of main() so it can run without booting anything."""
-        recorded = {"storage_precheck": 0, "internal_started": 0,
+        recorded = {"storage_precheck": 0, "signing_precheck": 0, "internal_started": 0,
                     "integration_started": 0, "audit_sink_started": 0, "stops": 0}
 
         recorder = _AuditRecorder()
@@ -420,6 +420,9 @@ class TestMainFailurePaths:
                                                         "enable_https": "true"})
         monkeypatch.setattr(start, "verify_storage_ready",
                             lambda: recorded.__setitem__("storage_precheck", 1))
+        import agent_registry.server as server_module
+        monkeypatch.setattr(server_module, "get_registry_signer",
+                            lambda: recorded.__setitem__("signing_precheck", 1))
         monkeypatch.setattr(start, "start_internal_service",
                             lambda cfg: recorded.__setitem__("internal_started", 1))
         monkeypatch.setattr(start, "start_integration_access",
@@ -463,6 +466,7 @@ class TestMainFailurePaths:
 
         assert excinfo.value.code == "agent_registry server start failed: boom"
         assert recorded["storage_precheck"] == 1
+        assert recorded["signing_precheck"] == 1
         assert recorded["internal_started"] == 1
         assert recorded["integration_started"] == 1
         assert recorded["audit_sink_started"] == 1
@@ -475,6 +479,22 @@ class TestMainFailurePaths:
         assert entry["level"] == LogLevel.DANGER
         assert entry["object_name"] == OperatorObject.SERVICE
         assert entry["details"] == {"ip": "127.0.0.1", "port": "5000"}
+
+    def test_signing_failure_prevents_all_listeners(self, main_patches, monkeypatch):
+        from fastapi import HTTPException
+        import agent_registry.server as server_module
+        recorded, _, _ = main_patches
+
+        def unavailable():
+            raise HTTPException(503, "Registry signing materials unavailable")
+
+        monkeypatch.setattr(server_module, "get_registry_signer", unavailable)
+        with pytest.raises(HTTPException, match="Registry signing materials unavailable"):
+            start.main()
+        assert recorded["storage_precheck"] == 1
+        assert recorded["internal_started"] == 0
+        assert recorded["integration_started"] == 0
+        assert recorded["audit_sink_started"] == 0
 
     def test_exits_with_validator_message_when_cert_invalid(self, main_patches, monkeypatch):
         recorded, recorder, _ = main_patches

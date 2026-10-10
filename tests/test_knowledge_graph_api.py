@@ -35,6 +35,11 @@ from unittest.mock import AsyncMock
 @pytest.fixture(autouse=True)
 def graph_operator(monkeypatch):
     """Functional tests opt into the pre-embedded graph API as an operator."""
+    import agent_registry.server as server_module
+    from agent_registry.agent_registry.agent_card_signer import AgentCardSigner
+    # This graph unit test is unrelated to signing and must not require local PKI.
+    monkeypatch.setattr(server_module, 'get_registry_signer',
+                        lambda: AgentCardSigner(sign_enabled=False))
     monkeypatch.setattr(kg_router_module, 'get_conf', lambda: {
         'knowledge_graph.enabled': 'true', 'knowledge_graph.allowed.owners': 'graph-admin'})
     monkeypatch.setitem(HandlerRegistry._instances, InterfaceType.AUTHENTICATE.value,

@@ -52,6 +52,12 @@ ssl_ca_certs=etc/ssl/trust.cer
 # Keep signing keys separate from TLS keys; production keys come from your CA/PKI.
 registry.sign.enabled=true
 
+# Public address includes any gateway prefix; never use the wildcard bind IP.
+# HTTP business endpoints can still sign with pre-provisioned trusted keys.
+registry.public.base_url=
+# Optional independent HTTPS JWKS address, overriding public.base_url.
+registry.sign.jwks_url=
+
 # Verify client certificate. Only the literal value false disables verification; every
 # other value (including a typo) keeps clients verified, so the default fails closed.
 verify_client=true
@@ -68,7 +74,7 @@ jwk_cert_path=etc/sign_cert/sign.cer
 
 # PEM private key FILE (not a directory) that signs AgentCards; required together with
 # jwk_cert_path while registry.sign.enabled=true. When the file is missing the signer is
-# skipped and only an error is logged, so cards would be issued unsigned.
+# unavailable: required signing fails closed, never emits unsigned cards.
 jwk_private_key_path=etc/sign_cert/sign_key.pem
 
 # Path to the file read verbatim as the JWK private key passphrase; empty means the
@@ -103,6 +109,10 @@ owner.validation.mode=relaxed
 
 # Certificate identity requires HTTPS with client verification.
 owner.identity.mode=certificate
+
+# token: reuse integration.auth.* providers on the main port as well.
+# Uses verified Principal.identity for ownership; provider transports are independent.
+# HTTP or HTTPS without client certificates should choose token or trusted_proxy.
 # Comma-separated IPs of reverse proxies allowed to assert X-SSL-Client-DN when
 # owner.identity.mode=trusted_proxy; empty ignores all headers (fail closed). No '*'.
 owner.trusted.proxy.ips=
@@ -115,6 +125,10 @@ startup.strict.storage=false
 
 # Optional third-party HTTPS listener; independent from main-port identity.
 integration.enabled=false
+
+# Independent of main enable_https. HTTP retains token validation but sends
+# credentials in plaintext; integration.client_cert/mtls mode requires HTTPS.
+integration.enable_https=true
 # Bind address of the third-party access port, default 127.0.0.1 (the main IP);
 # bind a routable address only behind a firewall or an authenticating proxy.
 integration.ip=127.0.0.1
