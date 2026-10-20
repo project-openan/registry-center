@@ -142,7 +142,7 @@ const renderTableRow = (agent, setSelectedAgent, setViewMode, themeColor, layerB
     const health = healthOf(agent.id, agent.provider?.organization)
     return (
         <tr
-            key={agent.id}
+            key={agent.agentKey}
             onClick={() => {
                 setSelectedAgent(agent)
                 setViewMode('structured')
@@ -279,12 +279,12 @@ const renderTableRow = (agent, setSelectedAgent, setViewMode, themeColor, layerB
                         }
                         return (
                             <button
-                                disabled={publishingKey === agent.id}
+                                disabled={publishingKey === agent.agentKey}
                                 onClick={() => openReview(agent)}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-wait text-white shadow-sm transition-colors"
                             >
                                 <ShieldCheck size={12} />
-                                {publishingKey === agent.id ? t('registry.action_publishing') : t('registry.action_publish')}
+                                {publishingKey === agent.agentKey ? t('registry.action_publishing') : t('registry.action_publish')}
                             </button>
                         )
                     })()}
@@ -334,6 +334,8 @@ const AgentRegistry = ({ isDark, api }) => {
                 return {
                     ...syncedRaw,
                     id: key,
+                    // UI identity is organization-scoped; id remains the API/display name.
+                    agentKey: JSON.stringify([val.provider?.organization, val.name]),
                     displayName: key.toUpperCase(),
                     ...ui,
                     layer,
@@ -406,7 +408,7 @@ const AgentRegistry = ({ isDark, api }) => {
         if (!agent) return
         const remark = reviewRemark.trim()
         if (!remark) return
-        setPublishingKey(agent.id)
+        setPublishingKey(agent.agentKey)
         try {
             await publishAgentCard(agent.provider?.organization, agent.id, remark, api)
             showToast('toast.publish_success', 'success')
@@ -532,7 +534,7 @@ const AgentRegistry = ({ isDark, api }) => {
         const healthStyle = health ? (STATUS_STYLES[health] || STATUS_STYLES.unknown) : null
         return (
             <div
-                key={agent.id}
+                key={agent.agentKey}
                 onClick={() => {
                     setSelectedAgent(agent)
                     setViewMode('structured')
@@ -1001,12 +1003,12 @@ const AgentRegistry = ({ isDark, api }) => {
                                 {t('registry.review_cancel')}
                             </button>
                             <button
-                                disabled={!reviewRemark.trim() || publishingKey === reviewTarget.id}
+                                disabled={!reviewRemark.trim() || publishingKey === reviewTarget.agentKey}
                                 onClick={handlePublish}
                                 className="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-md shadow-blue-500/20 transition-colors inline-flex items-center gap-1.5"
                             >
                                 <ShieldCheck size={13} />
-                                {publishingKey === reviewTarget.id ? t('registry.action_publishing') : t('registry.review_confirm')}
+                                {publishingKey === reviewTarget.agentKey ? t('registry.action_publishing') : t('registry.review_confirm')}
                             </button>
                         </div>
                     </div>

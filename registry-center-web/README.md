@@ -84,3 +84,12 @@ portal-sdk/                         ← @openan/portal-sdk 本地副本(自包�
 | POST | `/rest/v1/registry-center/agent-cards/semantic-query` | 语义检索 |
 
 认证:mTLS(浏览器自动携带客户端证书),无 token。
+
+## Organization-scoped agent identity
+
+Agent names may repeat across organizations. The registry table and cards use
+a stable JSON-encoded `[organization, name]` tuple as their React key, and the
+publish dialog uses the same identity for its pending state. Publishing one
+organization’s agent therefore does not mark another organization’s namesake
+as busy. The original name remains unchanged for display, search, visual asset
+selection, health lookup, publish requests, and review-trail requests.
