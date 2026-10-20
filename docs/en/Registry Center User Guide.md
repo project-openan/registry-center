@@ -55,7 +55,7 @@ CLI client startup example:
 # CLI command client startup and entering the interface
 [user@host registry-center-main]# python -m agent_registry.cli
 
-agent-registry v1.0.1
+agent-registry v1.0.2
 Type 'cmds' for available commands, 'exit' to quit.
 
 agent-registry>...
