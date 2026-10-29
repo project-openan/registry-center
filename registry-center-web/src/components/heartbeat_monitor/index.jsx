@@ -266,7 +266,7 @@ const HeartbeatMonitor = ({ isDark, api }) => {
                                 onClick={() => setActiveTab(tab)}
                                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wide transition-all duration-300 ${
                                     activeTab === tab
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-md'
+                                        ? 'bg-blue-500 dark:bg-white text-white dark:text-zinc-900 shadow-md shadow-blue-500/25 hover:bg-blue-600'
                                         : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                                 }`}
                             >
