@@ -51,6 +51,7 @@ from agent_registry.server import (
     get_registry_signer,
     get_signature_validator,
     _is_discoverable,
+    _is_hidden_unhealthy,
     _process_register_cards,
     _process_update_cards,
     _normalize_agent_cards,
@@ -74,7 +75,7 @@ from agent_registry.model.agent_layer import normalize_layer
 from agent_registry.persistence.milvus_layer_migration import LayerMigrationRequiredError
 import agent_registry.integration.authn  # noqa: F401 - registers the built-in authn handler
 from agent_registry.request_validation import card_batch, semantic_query as validate_semantic_query
-from common.custom.custom_handle import HandlerRegistry
+from common.custom.custom_handle import HandlerRegistry, run_retrieve_query
 from common.custom.interface_type import InterfaceType
 from common.log.audit_logger import (
     LogLevel,
@@ -629,34 +630,19 @@ async def semantic_query(
     elif "layer" in body:
         raise CustomHTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "layer cannot be null")
     async with semaphore_guard(retrieve_semaphore):
-        if layer is None:
-            retrieve_handle = HandlerRegistry.get_handler(InterfaceType.RETRIEVE)
-            agents = await retrieve_handle.handle(task, top_n)
-        else:
-            registry = get_registry_dependency()
-            try:
-                agents = registry.retrieve_by_task(task, top_n, layer=layer)
-            except LayerMigrationRequiredError as exc:
-                raise CustomHTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
-        agents = [a for a in agents if not _is_hidden_unhealthy(a.name, a.provider.organization)]
-        result = [MessageToDict(a) for a in agents]
-        await audit_integration(OperationName.QUERY_AGENT, principal, True,
-                                 {"task": task[:200], "count": len(result), "layer": layer or ''})
-        if layer is None:
-            retrieve_handle = HandlerRegistry.get_handler(InterfaceType.RETRIEVE)
-            agents = await retrieve_handle.handle(task, top_n)
-        else:
-            registry = get_registry_dependency()
-            try:
-                agents = registry.retrieve_by_task(task, top_n, layer=layer)
-            except LayerMigrationRequiredError as exc:
-                raise CustomHTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
         registry = get_registry_dependency()
+        if layer is None:
+            retrieve_handle = HandlerRegistry.get_handler(InterfaceType.RETRIEVE)
+            agents = await retrieve_handle.handle(task, top_n)
+        else:
+            try:
+                agents = await run_retrieve_query(registry.retrieve_by_task, task, top_n, layer=layer)
+            except LayerMigrationRequiredError as exc:
+                raise CustomHTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
         agents = [a for a in agents
-                  if _is_discoverable(a.name, a.provider.organization, registry)
-                  and not _is_hidden_unhealthy(a.name, a.provider.organization)]
+                  if _is_discoverable(a.name, a.provider.organization, registry)]
         result = [MessageToDict(a) for a in agents]
-        await audit_integration(OperationName.QUERY_AGENT, principal, True,
+        await audit_integration(OperationName.RETRIEVE_AGENT, principal, True,
                                 {"top_n": top_n, "count": len(result), "layer": layer or ''})
         return {"agentCards": result}
 
@@ -714,7 +700,7 @@ async def query_agent_registrations(
     ``/semantic-query`` sibling requires a non-empty ``task``.
     """
 
-    query = _parse_layer_query_body(await request.json())
+    query = _parse_layer_query_body(await _parse_json_object(request))
     semantic_endpoint = request.url.path.endswith("/semantic-query")
     if semantic_endpoint and not query["semantic"]:
         raise CustomHTTPException(
@@ -732,7 +718,8 @@ async def query_agent_registrations(
     async with semaphore_guard(retrieve_semaphore if query["semantic"] else query_semaphore):
         try:
             if query["semantic"]:
-                records = registry.retrieve_records_by_task(
+                records = await run_retrieve_query(
+                    registry.retrieve_records_by_task,
                     query["task"], query["top_n"], layer=query["layer"],
                     status="published",
                 )

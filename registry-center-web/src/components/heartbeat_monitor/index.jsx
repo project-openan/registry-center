@@ -118,7 +118,7 @@ const HeartbeatMonitor = ({ isDark, api }) => {
         let stopped = false
         const connect = () => {
             if (stopped) return
-            source = new EventSource(getHealthStreamUrl())
+            source = new EventSource(getHealthStreamUrl(api))
             source.onopen = () => setSseConnected(true)
             source.addEventListener('health_changed', () => refresh())
             source.onerror = () => {
@@ -134,7 +134,7 @@ const HeartbeatMonitor = ({ isDark, api }) => {
             if (source) source.close()
             setSseConnected(false)
         }
-    }, [enabled, refresh])
+    }, [enabled, refresh, api])
 
     const openDetail = useCallback(async (agent) => {
         setSelected(agent)
@@ -280,7 +280,7 @@ const HeartbeatMonitor = ({ isDark, api }) => {
                                         }`}
                                     />
                                 )}
-                                {t(`heartbeat.tab_${tab}`)}
+                                    {t(tab === 'all' ? 'heartbeat.tab_all' : `heartbeat.status_${tab}`)}
                                 <span
                                         className={`px-1.5 py-0.5 rounded-md text-sm font-black ${
                                         activeTab === tab

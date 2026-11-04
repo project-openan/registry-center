@@ -180,6 +180,10 @@ def validate_provider(provider: AgentProvider):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail='Agent provider organization is required and cannot be empty.')
+    if "/" in org or "\\" in org or org in {".", ".."}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail='Agent provider organization must be a single URL path segment.')
 
     # 3. Length limit
     if len(org) > ORGANIZATION_MAX_LENGTH:

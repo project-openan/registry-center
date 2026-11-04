@@ -22,7 +22,7 @@ import StatusBadge from './status_badge.jsx'
 const RISK_ORDER = { healthy: 0, suspect: 1, offline: 2, unknown: 2 }
 
 const formatRelative = (ms, t) => {
-    if (!ms || ms < 0) return '-'
+    if (!Number.isFinite(ms) || ms < 0) return '-'
     const s = Math.floor(ms / 1000)
     if (s < 60) return t('heartbeat.seconds_ago', { count: s })
     const m = Math.floor(s / 60)
@@ -90,7 +90,7 @@ const HealthTable = ({ agents, now, onSelect }) => {
                                     </div>
                                 </td>
                                 <td className="px-5 py-3.5 font-bold text-zinc-600 dark:text-zinc-300 whitespace-nowrap">
-                                    {formatRelative(now - new Date(agent.last_heartbeat_at).getTime(), t)}
+                                    {formatRelative(agent.last_heartbeat_at ? now - new Date(agent.last_heartbeat_at).getTime() : NaN, t)}
                                 </td>
                                 <td className="px-5 py-3.5 text-sm font-bold text-zinc-400 dark:text-zinc-500 whitespace-nowrap">
                                     {formatAbsolute(agent.status_changed_at)}

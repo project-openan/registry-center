@@ -1673,3 +1673,9 @@ JWKS `/rest/v1/registry-center/keys` 免应用 Token 认证，但不绕过 TLS�
   | 200 | 查询成功。        |
   | 429 | 查询失败，超过流控限制。 |
   | 500 | 查询失败，服务内部错误。 |
+
+## 管理列表的登记层级
+
+`GET /rest/v1/registry-center/agent-cards/manage` 返回各审核状态的卡片（也可用 `status` 筛选），每项附带 `publishStatus` 和 `registration.layer`。`statusCounts` 仍是未按审核状态筛选的全量审核计数。`registration.layer` 返回实际保存的厂商自定义层级字符串，旧登记未声明时为 `unknown`。管理响应用于 UI 展示，不是可直接作为签名 AgentCard 提交的登记载荷；公共 AgentCard 查询响应保持不变。
+
+原生前端仅把显式 service/service-layer、network/network-layer（兼容大小写及分隔符）归入服务层、网络层；其他自定义值保留原文，归入“其他/未指定”，缺失元数据显示“未指定”。不再根据所属厂商推断层级。应配套更新前后端；新前端连接旧管理 API 时，未返回的元数据按“未指定”展示。

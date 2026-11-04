@@ -95,7 +95,7 @@ from agent_registry.signature.agent_card_signature_validator import AgentCardSig
 from agent_registry.signature.jwk_fetcher import JWKFetcher
 from agent_registry.signature.public_key_manager import PublicKeyManager
 
-from common.custom.custom_handle import HandlerRegistry
+from common.custom.custom_handle import HandlerRegistry, run_retrieve_query
 from common.custom.interface_type import InterfaceType
 from common.log.audit_logger import OperationResult, LogLevel, OperatorObject, OperationName
 from common.util.app_config import get_conf
@@ -1079,7 +1079,7 @@ async def list_agents_exact(
 @app.get(
     "/rest/v1/registry-center/agent-cards/manage",
     response_model=None,
-    summary="Management list: all agent cards with publish status",
+    summary="Management list: all agent cards with publish status and registration layer",
 )
 async def list_agents_manage(
         request: Request,
@@ -1092,7 +1092,8 @@ async def list_agents_manage(
     """
     Management view for the review workflow: returns ALL agent cards
     (published, registered/unpublished, rejected, deprecated) with a
-    `publishStatus` field attached to every card.
+    `publishStatus` and `registration.layer` attached to every card. Registration
+    metadata is not part of the signed AgentCard; public discovery stays unchanged.
 
     Optional `status` query parameter filters to one review state; the
     response always carries `statusCounts` (per-state totals across the
@@ -1120,12 +1121,18 @@ async def list_agents_manage(
         result = []
         status_counts = {}
         for agent in agents:
-            card_status = registry.get_status(agent.name, agent.provider.organization) or 'published'
+            record = registry.get_by_key_with_owner(
+                agent.name, agent.provider.organization, use_vectordb=False)
+            if record is None:
+                # A card removed after the query must not reappear as published.
+                continue
+            card_status = record.status or 'published'
             status_counts[card_status] = status_counts.get(card_status, 0) + 1
             if status_filter is not None and card_status != status_filter:
                 continue
             agent_dict = MessageToDict(agent)
             agent_dict['publishStatus'] = card_status
+            agent_dict['registration'] = {'layer': default_layer(record.layer)}
             result.append(agent_dict)
         logger.info(f"Manage list agents result: {len(result)} agents (filtered={status_filter is not None})")
         return {"agentCards": result, "statusCounts": status_counts}
@@ -1502,7 +1509,7 @@ async def retrieve_agents_by_task(
             agents = await retrieve_handle.handle(task, top_n)
         else:
             try:
-                agents = registry.retrieve_by_task(task, top_n, layer=layer)
+                agents = await run_retrieve_query(registry.retrieve_by_task, task, top_n, layer=layer)
             except LayerMigrationRequiredError as exc:
                 raise CustomHTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
         agents = [agent for agent in agents
@@ -1626,7 +1633,8 @@ async def query_agent_registrations(
     async with semaphore_guard(retrieve_semaphore if query["semantic"] else query_semaphore):
         try:
             if query["semantic"]:
-                records = registry.retrieve_records_by_task(
+                records = await run_retrieve_query(
+                    registry.retrieve_records_by_task,
                     query["task"], query["top_n"], layer=query["layer"],
                     status="published",
                 )

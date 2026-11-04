@@ -22,67 +22,29 @@
  *
  * Loaded by the OpenAN Portal as a UMD bundle (local or remote mode).
  */
-import { useTranslation } from 'react-i18next';
-import { useEffect } from 'react';
+import { I18nextProvider } from 'react-i18next';
+import { useMemo } from 'react';
 import { usePortalContext } from '@openan/portal-sdk';
 import { ErrorBoundary } from '@/components/common/error_boundary/index.jsx';
 import AgentRegistry from '@/components/registry_center/index.jsx';
-import en from './locales/en.json';
-import zh from './locales/zh.json';
+import { PLUGIN_I18N_NAMESPACE, registerPluginI18n } from './plugin-i18n.js';
 import './index.css';
 
-// Merge this plugin's locale resources into the Portal's GLOBAL i18next instance.
-//
-// IMPORTANT: react-i18next does NOT export the i18next instance (.i18next is
-// undefined), so we get the instance from the Portal's context global —
-// window.__OPENAN_PORTAL_CONTEXT__.i18n is the exact same singleton that the
-// Portal initialized with initReactI18next and that useTranslation() resolves
-// against. The merge runs on first render (after the Portal context is set),
-// not at module load, guaranteeing ordering.
-let i18nMerged = false;
-
-function registerPluginI18n() {
-    if (i18nMerged) return;
-    try {
-        const i18n =
-            (typeof window !== 'undefined' && window.__OPENAN_PORTAL_CONTEXT__ && window.__OPENAN_PORTAL_CONTEXT__.i18n) ||
-            null;
-        if (!i18n || typeof i18n.addResourceBundle !== 'function') return;
-        if (i18n.exists('registry.title')) {
-            i18nMerged = true;
-            return;
-        }
-        i18n.addResourceBundle('en', 'translation', en, true, true);
-        i18n.addResourceBundle('zh', 'translation', zh, true, true);
-        i18nMerged = true;
-    } catch { /* i18n unavailable — labels fall back to keys */ }
-}
-
+// Scope native translations to this plugin while sharing the host language instance.
 export default function RegistryCenterPlugin() {
     const { theme, api, i18n } = usePortalContext();
-
-    // Merge locale resources on first render (Portal context guaranteed present).
-    useEffect(() => {
-        if (i18n) {
-            try {
-                if (!i18n.exists('registry.title')) {
-                    i18n.addResourceBundle('en', 'translation', en, true, true);
-                    i18n.addResourceBundle('zh', 'translation', zh, true, true);
-                }
-                i18nMerged = true;
-            } catch { /* ignore */ }
-        } else {
-            registerPluginI18n();
-        }
-    }, [i18n]);
+    const ready = useMemo(() => registerPluginI18n(i18n), [i18n]);
 
     const isDark = theme.isDark;
 
+    if (!ready) return null;
     return (
+        <I18nextProvider i18n={i18n} defaultNS={PLUGIN_I18N_NAMESPACE}>
         <div className="h-full w-full relative z-10 visible animate-in">
             <ErrorBoundary>
                 <AgentRegistry isDark={isDark} api={api} />
             </ErrorBoundary>
         </div>
+        </I18nextProvider>
     );
 }

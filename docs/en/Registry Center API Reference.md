@@ -1470,3 +1470,9 @@ Non-empty `agents` items have `{"agentCard": <complete card>, "layer": "OMC"}`. 
   | 200 | Query successful.                  |
   | 429 | Query failed, rate limit exceeded. |
   | 500 | Query failed, internal service error. |
+
+## Management list registration metadata
+
+`GET /rest/v1/registry-center/agent-cards/manage` returns all review states (or the requested `status`), with `publishStatus` and `registration.layer` on each card. `statusCounts` remains the unfiltered review-state totals. `registration.layer` is the stored vendor-defined string; legacy registrations without a declared layer return `unknown`. The management response is an envelope for the UI, not a signed AgentCard registration payload. Public AgentCard discovery responses remain unchanged.
+
+The native frontend groups only explicit service/service-layer and network/network-layer labels (case/separator variants included) into its two standard tabs. Other declared values retain their original label under Other / Unspecified; missing metadata is shown as Unspecified. Organization/vendor names are never used to infer a layer. Upgrade the backend and frontend together to display existing stored layers; a new frontend against an older management API displays missing metadata as Unspecified.
