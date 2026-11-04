@@ -26,6 +26,8 @@
     "switch_to_gui": "Switch to GUI",
     "tab_service": "Service Layer",
     "tab_network": "Network Layer",
+    "tab_other": "Other / Unspecified",
+    "layer_unknown": "Unspecified",
     "tab_vendor": "Vendor",
     "view_registry": "Agent Registry",
     "review_trail_title": "Review Trail",

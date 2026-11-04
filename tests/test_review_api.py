@@ -96,6 +96,20 @@ def test_manage_status_filter(client):
     assert bad.status_code == 422
 
 
+@pytest.mark.parametrize('layer', ['ServiceLayer', 'NetworkLayer', 'vendor-domain-layer', 'unknown'])
+def test_manage_exposes_stored_layer_without_changing_public_cards(client, layer):
+    http, core = client
+    core.register_with_status(card(name='layer-agent'), initial_status='published', layer=layer)
+    response = http.get(f'{BASE}/manage')
+    assert response.status_code == 200
+    managed = response.json()['agentCards'][0]
+    assert managed['registration'] == {'layer': layer}
+    assert managed['publishStatus'] == 'published'
+    public = http.get(BASE, params={'name':'layer-agent', 'organization':'org'}).json()['agentCards'][0]
+    assert 'registration' not in public
+    assert 'layer' not in public
+
+
 def test_approving_a_rejected_card_conflicts(client):
     http, core = client
     core.register_with_status(card(), initial_status='registered')
