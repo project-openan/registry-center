@@ -54,9 +54,7 @@ import AgentCard from './agentcard_visualization/index.jsx'
 import CodeInspector from './code_inspector/index.jsx'
 import HeartbeatMonitor from '../heartbeat_monitor/index.jsx'
 import StatusBadge, { STATUS_STYLES } from '../heartbeat_monitor/status_badge.jsx'
-
-const NETWORK_LAYER_VENDORS = ['huawei', 'ericsson', 'zte', '华为', '爱立信', '中兴']
-const SERVICE_LAYER_VENDORS = ['直真', '新大陆', '福诺', '亿阳', '移动']
+import {getAgentLayer, agentLayerLabel} from './agent-layer.js'
 
 const getAssetsBySeed = (seed, layer) => {
     const SERVICE_THEMES = ['blue', 'indigo', 'cyan']
@@ -72,14 +70,7 @@ const getAssetsBySeed = (seed, layer) => {
     }
 }
 
-const getAgentLayer = (agent) => {
-    const org = (agent.provider?.organization || '').toLowerCase()
-    if (NETWORK_LAYER_VENDORS.some((v) => org.includes(v))) return 'network'
-    if (SERVICE_LAYER_VENDORS.some((v) => org.includes(v))) return 'service'
-    return 'service'
-}
-
-const TABS = ['all', 'service', 'network', 'vendor']
+const TABS = ['all', 'service', 'network', 'other', 'vendor']
 
 // ── Stats cards — bold, colorful, count summary ──
 
@@ -164,7 +155,7 @@ const renderTableRow = (agent, setSelectedAgent, setViewMode, themeColor, layerB
             </td>
             <td className="px-4 py-3">
                 <span className={`text-xs font-black px-3 py-1 rounded-lg border uppercase ${layerBadge(agent.layer)}`}>
-                    {agent.layer === 'network' ? 'Network' : 'Service'}
+                    {agentLayerLabel(agent, t)}
                 </span>
             </td>
             <td className="px-4 py-3 text-xs font-bold text-zinc-500 dark:text-zinc-400">
@@ -334,7 +325,6 @@ const AgentRegistry = ({ isDark, api }) => {
                 return {
                     ...syncedRaw,
                     id: key,
-                    // UI identity is organization-scoped; id remains the API/display name.
                     agentKey: JSON.stringify([val.provider?.organization, val.name]),
                     displayName: key.toUpperCase(),
                     ...ui,
@@ -350,7 +340,7 @@ const AgentRegistry = ({ isDark, api }) => {
         } finally {
             setLoading(false)
         }
-    }, [showToast])
+    }, [showToast, api])
 
     useEffect(() => {
         fetchData()
@@ -432,8 +422,7 @@ const AgentRegistry = ({ isDark, api }) => {
                     (a.skills || []).some((s) => s.name?.toLowerCase().includes(term)),
             )
         }
-        if (activeTab === 'service') result = result.filter((a) => a.layer === 'service')
-        else if (activeTab === 'network') result = result.filter((a) => a.layer === 'network')
+        if (['service', 'network', 'other'].includes(activeTab)) result = result.filter((a) => a.layer === activeTab)
         result = [...result].sort((a, b) => {
             const order = { service: 0, network: 1 }
             return (order[a.layer] ?? 2) - (order[b.layer] ?? 2)
@@ -468,6 +457,7 @@ const AgentRegistry = ({ isDark, api }) => {
             all: agents.length,
             service: agents.filter((a) => a.layer === 'service').length,
             network: agents.filter((a) => a.layer === 'network').length,
+            other: agents.filter((a) => a.layer === 'other').length,
             vendor: Object.keys(vendorGroups).length,
         }),
         [agents, vendorGroups],
@@ -500,6 +490,7 @@ const AgentRegistry = ({ isDark, api }) => {
     const layerBadge = (layer) =>
         layer === 'network'
             ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+            : layer === 'other' ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
             : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
 
     const viewToggle = (
@@ -605,7 +596,7 @@ const AgentRegistry = ({ isDark, api }) => {
                         <span
                             className={`text-xs font-black px-4 py-1 rounded-lg border uppercase ${layerBadge(agent.layer)}`}
                         >
-                            {agent.layer === 'network' ? 'Network' : 'Service'}
+                            {agentLayerLabel(agent, t)}
                         </span>
                         <span
                             className={`text-xs font-black px-3 py-1 rounded-lg border ${
@@ -626,7 +617,7 @@ const AgentRegistry = ({ isDark, api }) => {
     }
 
     return (
-        <div className="h-full p-6 flex flex-col w-full transition-all animate-in fade-in duration-500 overflow-hidden font-sans">
+        <div className="h-full p-6 flex flex-col w-full transition-all animate-in fade-in duration-500 overflow-y-auto custom-scrollbar font-sans">
             {view === 'heartbeat' ? (
                 <>
                     <div className="shrink-0 flex items-center justify-end mb-6 px-2">
@@ -642,7 +633,7 @@ const AgentRegistry = ({ isDark, api }) => {
                     {!loading && <StatsBar agents={agents} isDark={isDark} />}
 
                     {/* 2. Search + view toggle row */}
-                    <div className="shrink-0 flex items-center justify-between mb-4">
+                    <div className="shrink-0 flex flex-wrap gap-3 items-center justify-between mb-4">
                         <div className="relative w-72">
                             <input
                                 type="text"
@@ -653,7 +644,7 @@ const AgentRegistry = ({ isDark, api }) => {
                             />
                             <Search className="absolute left-3.5 top-3 text-zinc-400" size={14} />
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 flex-wrap items-center gap-3">
                             <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
                                 <button
                                     onClick={() => setListMode('cards')}
@@ -677,7 +668,7 @@ const AgentRegistry = ({ isDark, api }) => {
                     </div>
 
                     {/* 3. Tabs */}
-                    <div className="shrink-0 flex items-center gap-1 mb-6 px-2">
+                    <div className="shrink-0 flex flex-wrap items-center gap-1 mb-6 px-2">
                         {TABS.map((tab) => (
                             <button
                                 key={tab}
@@ -705,7 +696,7 @@ const AgentRegistry = ({ isDark, api }) => {
                     </div>
 
                     {/* Agent list — cards or table */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-2">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar min-h-[16rem] px-2">
                         {loading ? (
                             <div className="h-full flex items-center justify-center">
                                 <div className="flex flex-col items-center gap-3 text-zinc-400">

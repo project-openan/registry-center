@@ -26,6 +26,8 @@
     "switch_to_gui": "切换到图形视图",
     "tab_service": "服务层",
     "tab_network": "网络层",
+    "tab_other": "其他/未指定",
+    "layer_unknown": "未指定",
     "tab_vendor": "厂商",
     "view_registry": "Agent 列表",
     "review_trail_title": "审核轨迹",

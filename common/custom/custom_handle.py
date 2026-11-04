@@ -87,35 +87,33 @@ class GetHandler(BaseHandler):
         owner = kwargs.get('owner')
         return get_registry().get_by_key_with_owner(*args, owner=owner)
 
+_retrieve_worker = threading.local()
+
+
+async def run_retrieve_query(query, *args, **kwargs):
+    """Run synchronous model I/O under the listener's shared worker budget."""
+    loop = asyncio.get_running_loop()
+    if getattr(_retrieve_worker, 'loop', None) is not loop:
+        _retrieve_worker.loop = loop
+        _retrieve_worker.limiter = asyncio.Semaphore(8)
+    limiter = _retrieve_worker.limiter
+    await limiter.acquire()
+
+    async def run_query():
+        try:
+            return await anyio.to_thread.run_sync(partial(query, *args, **kwargs))
+        finally:
+            limiter.release()
+
+    # Keep the slot until underlying I/O stops, even if the caller is cancelled.
+    worker = loop.create_task(run_query())
+    worker.add_done_callback(lambda task: task.exception() if not task.cancelled() else None)
+    return await asyncio.shield(worker)
+
+
 class RetrieveHandler(BaseHandler):
-    def __init__(self):
-        # Each listener runs a separate loop/thread; do not share a backend-
-        # specific semaphore across those loops.
-        self._local = threading.local()
-
     async def handle(self, *args, **kwargs):
-        loop = asyncio.get_running_loop()
-        if getattr(self._local, 'loop', None) is not loop:
-            self._local.loop = loop
-            self._local.limiter = asyncio.Semaphore(8)
-        # Only the read-only synchronous query is offloaded. Hold the slot until
-        # its underlying HTTP timeout/completion: cancelling an await cannot stop
-        # a running thread or the HTTP request, and must not free unlimited slots.
-        limiter = self._local.limiter
-        query = partial(get_registry().retrieve_by_task, *args, **kwargs)
-        await limiter.acquire()
-
-        async def run_query():
-            try:
-                return await anyio.to_thread.run_sync(query)
-            finally:
-                limiter.release()
-
-        # Shield the worker task, not the caller. A cancelled caller may leave
-        # immediately, but the bounded worker and its slot live until I/O ends.
-        worker = loop.create_task(run_query())
-        worker.add_done_callback(lambda task: task.exception() if not task.cancelled() else None)
-        return await asyncio.shield(worker)
+        return await run_retrieve_query(get_registry().retrieve_by_task, *args, **kwargs)
 
 class DeregisterHandler(BaseHandler):
     async def handle(self, *args, **kwargs):
