@@ -65,7 +65,9 @@ def make_pki(root):
     pki = root / 'pki'
     pki.mkdir(mode=0o700)
     command('openssl', 'req', '-x509', '-newkey', 'rsa:3072', '-nodes', '-sha256', '-days', '1',
-            '-subj', '/CN=SmokeCA', '-keyout', str(pki / 'ca.key'), '-out', str(pki / 'trust.cer'))
+            '-subj', '/CN=SmokeCA', '-addext', 'basicConstraints=critical,CA:TRUE',
+            '-addext', 'keyUsage=critical,keyCertSign,cRLSign',
+            '-keyout', str(pki / 'ca.key'), '-out', str(pki / 'trust.cer'))
     for name, server in [('server', True), ('vendor-a', False), ('vendor-b', False)]:
         key, csr, cert = pki / (name + '_key.pem'), pki / (name + '.csr'), pki / (name + '.cer')
         args = ['openssl', 'req', '-new', '-newkey', 'rsa:3072', '-sha256', '-subj', '/CN=' + name,
@@ -112,16 +114,21 @@ def client_context(pki, name=None):
 
 def wait_ready(container, base, context=None):
     deadline = time.monotonic() + 60
+    last_probe = None
     while time.monotonic() < deadline:
         if command('docker', 'inspect', '-f', '{{.State.Running}}', container).stdout.strip() != 'true':
             raise RuntimeError(command('docker', 'logs', container).stdout)
         try:
-            if http(base, context=context)[0] == 200:
+            status = http(base, context=context)[0]
+            if status == 200:
                 return
-        except (URLError, OSError):
-            pass
+            last_probe = 'HTTP ' + str(status)
+        except (URLError, OSError) as error:
+            last_probe = repr(error)
         time.sleep(0.25)
-    raise RuntimeError('Container service readiness timeout')
+    logs = command('docker', 'logs', container).stdout[-2000:]
+    raise RuntimeError('Container service readiness timeout; last probe: '
+                       + str(last_probe) + '\n' + logs)
 
 
 def run():
