@@ -112,16 +112,21 @@ def client_context(pki, name=None):
 
 def wait_ready(container, base, context=None):
     deadline = time.monotonic() + 60
+    last_probe = None
     while time.monotonic() < deadline:
         if command('docker', 'inspect', '-f', '{{.State.Running}}', container).stdout.strip() != 'true':
             raise RuntimeError(command('docker', 'logs', container).stdout)
         try:
-            if http(base, context=context)[0] == 200:
+            status = http(base, context=context)[0]
+            if status == 200:
                 return
-        except (URLError, OSError):
-            pass
+            last_probe = 'HTTP ' + str(status)
+        except (URLError, OSError) as error:
+            last_probe = repr(error)
         time.sleep(0.25)
-    raise RuntimeError('Container service readiness timeout')
+    logs = command('docker', 'logs', container).stdout[-2000:]
+    raise RuntimeError('Container service readiness timeout; last probe: '
+                       + str(last_probe) + '\n' + logs)
 
 
 def run():
