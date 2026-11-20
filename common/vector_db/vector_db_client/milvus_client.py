@@ -36,6 +36,12 @@ from common.vector_db.vector_db_client.config.vector_db_config import VectorDBTy
 
 VARCHAR_MAX_LENGTH = 65535
 EMBEDDING_VECTOR_DIVISION_LENGTH = 1024
+
+
+class VectorDimensionError(ValueError):
+    """Raised when an embedding does not match the collection dimension."""
+
+
 output_fields = [
     "id", "name", "description", "organization", "agent_card",
     "status", "owner", "layer",
@@ -47,10 +53,26 @@ class MilvusDBClient(VectorDBClient):
     def __init__(self, config: dict):
         super().__init__(config)
         client_uri = config["uri"]
+        # A failed connection must leave a defined state: keeping the attribute
+        # unset turned every later call into AttributeError.
+        self.client = None
         try:
             self.client = MilvusClient(uri=client_uri, token=config.get("token", ""))
         except Exception as e:
             logger.error(f"Milvus initiation failed: {e}")
+
+    def _client_ready(self) -> bool:
+        """Report whether the Milvus connection is usable, logging when it is not.
+
+        Every public operation follows the same contract: when the backend is
+        unavailable it logs and returns its empty result instead of raising
+        AttributeError, so callers can degrade to another retrieval path.
+        """
+
+        if self.client is None:
+            logger.error("Milvus client is unavailable, operation skipped")
+            return False
+        return True
 
     def _output_fields_for_collection(self, collection_name):
         """Return fields supported by the target collection schema.
@@ -76,6 +98,9 @@ class MilvusDBClient(VectorDBClient):
 
             if not collection_name:
                 raise ValueError("collection_name cannot be empty")
+
+            if not self._client_ready():
+                return False
 
             if self.client.has_collection(collection_name):
                 logger.info(f"Collection {collection_name} already exists")
@@ -140,6 +165,9 @@ class MilvusDBClient(VectorDBClient):
             if not collection_name:
                 raise ValueError("collection_name cannot be empty")
 
+            if not self._client_ready():
+                return False
+
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
                 logger.info("Collection does not exist in database, created it")
@@ -150,7 +178,8 @@ class MilvusDBClient(VectorDBClient):
             # 1. Validate embedding dimension
             embedding = insert_entity.get("embedding", [])
             if not isinstance(embedding, list) or len(embedding) != EMBEDDING_VECTOR_DIVISION_LENGTH:
-                raise ValueError(f"Vector dimension must be {EMBEDDING_VECTOR_DIVISION_LENGTH}")
+                raise VectorDimensionError(
+                    f"Vector dimension must be {EMBEDDING_VECTOR_DIVISION_LENGTH}")
 
             # 2. Execute insert
             result = self.client.insert(
@@ -169,7 +198,7 @@ class MilvusDBClient(VectorDBClient):
             logger.info(f"Insert success! insert_id:{insert_id}, insert_count:{insert_count}")
             return True
 
-        except LayerMigrationRequiredError:
+        except (LayerMigrationRequiredError, VectorDimensionError):
             raise
         except Exception as e:
             logger.error(f"Error: There is Exception in insert method: {e}")
@@ -189,6 +218,9 @@ class MilvusDBClient(VectorDBClient):
             # 1. Parameter validation
             collection_name = data.get("collection_name")
             primary_key = data.get("id")
+
+            if not self._client_ready():
+                return False
 
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
@@ -217,6 +249,9 @@ class MilvusDBClient(VectorDBClient):
             collection_name = data.get("collection_name")
             entity = data.get("entity", {})
 
+            if not self._client_ready():
+                return False
+
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
                 logger.info("Collection does not exist in database, created it")
@@ -243,10 +278,12 @@ class MilvusDBClient(VectorDBClient):
     def retrieve_entity(self, data):
         collection_name = data.get("collection_name")
         query_embedding = data.get("embedding")
-        top_n = data.get("top_n",10)
+        top_n = data.get("top_n", 10)
+        if not self._client_ready():
+            return []
         if not self.client.has_collection(collection_name):
-                self.create_collection(data)
-                logger.info("Collection does not exist in database, created it")
+            self.create_collection(data)
+            logger.info("Collection does not exist in database, created it")
         if data.get("layer") is not None:
             self._require_layer_field(collection_name)
         try:
@@ -279,6 +316,8 @@ class MilvusDBClient(VectorDBClient):
         try:
             # Build filter expression
             collection_name = data.get("collection_name")
+            if not self._client_ready():
+                return []
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
                 logger.info("Collection does not exist in database, created it")
@@ -313,6 +352,8 @@ class MilvusDBClient(VectorDBClient):
     def get_all_entities(self, data):
         try:
             collection_name = data.get("collection_name")
+            if not self._client_ready():
+                return []
             if not self.client.has_collection(collection_name):
                 self.create_collection(data)
                 logger.info("Collection does not exist in database, created it")
@@ -369,6 +410,8 @@ class MilvusDBClient(VectorDBClient):
         return record
 
     def _query_records(self, collection_name, filter_expr, limit=None, offset=None):
+        if not self._client_ready():
+            return []
         if not self.client.has_collection(collection_name):
             self.create_collection({"collection_name": collection_name})
             return []
@@ -412,6 +455,8 @@ class MilvusDBClient(VectorDBClient):
 
     def retrieve_records(self, collection_name, embedding, top_n, layer=None,
                          status=None, selector=None, task=""):
+        if not self._client_ready():
+            return []
         if not self.client.has_collection(collection_name):
             self.create_collection({"collection_name": collection_name})
             return []

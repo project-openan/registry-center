@@ -23,32 +23,64 @@ python -m agent_registry.cli
 import sys
 import platform
 
-# Fix Python 3.14 cmd.py readline.backend issue
-# Must be executed before importing other modules
+
+class FakeReadline:
+    """Minimal stand-in for the ``readline`` module.
+
+    Used when neither pyreadline3 (Windows) nor readline (POSIX) is installed.
+    ``cmd.Cmd`` and ``InteractiveCLI`` call several module-level helpers, so the
+    stub exposes all of them as no-ops rather than raising AttributeError.
+    """
+
+    backend = 'none'
+
+    def get_completer(self):
+        return None
+
+    def set_completer(self, func):
+        pass
+
+    def set_completer_delims(self, delims):
+        pass
+
+    def get_completer_delims(self):
+        return ' \t\n'
+
+    def parse_and_bind(self, s):
+        pass
+
+    def get_line_buffer(self):
+        return ''
+
+    def get_begidx(self):
+        return 0
+
+    def get_endidx(self):
+        return 0
+
+    def read_history_file(self, path):
+        pass
+
+    def write_history_file(self, path):
+        pass
+
+    def add_history(self, line):
+        pass
+
+    def get_current_history_length(self):
+        return 0
+
+
+# Fix Python 3.14 cmd.py readline.backend issue.
+# Must be executed before importing other modules.
 if platform.system() == 'Windows':
     try:
         import pyreadline3.readline as readline_module
         if not hasattr(readline_module, 'backend'):
             readline_module.backend = 'pyreadline3'
-        # Also fix standard readline name (cmd.py uses import readline)
-        import sys
+        # cmd.py uses ``import readline``, so register the module under both names.
         sys.modules['readline'] = readline_module
     except ImportError:
-        # If pyreadline3 not available, create a fake readline module
-        class FakeReadline:
-            backend = 'none'
-            def get_completer(self):
-                return None
-            def set_completer(self, func):
-                pass
-            def parse_and_bind(self, s):
-                pass
-            def get_line_buffer(self):
-                return ''
-            def get_begidx(self):
-                return 0
-            def get_endidx(self):
-                return 0
         sys.modules['readline'] = FakeReadline()
 else:
     try:
@@ -56,20 +88,6 @@ else:
         if not hasattr(readline_module, 'backend'):
             readline_module.backend = 'readline'
     except ImportError:
-        class FakeReadline:
-            backend = 'none'
-            def get_completer(self):
-                return None
-            def set_completer(self, func):
-                pass
-            def parse_and_bind(self, s):
-                pass
-            def get_line_buffer(self):
-                return ''
-            def get_begidx(self):
-                return 0
-            def get_endidx(self):
-                return 0
         sys.modules['readline'] = FakeReadline()
 
 from .core import CLI, main

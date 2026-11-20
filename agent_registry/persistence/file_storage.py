@@ -218,15 +218,20 @@ class FileStorage(StorageBackend):
         if agent_data.get("name") != name or agent_data.get("provider", {}).get("organization") != organization:
             raise ValueError("Cannot change primary key(name or organization) during update.")
 
+        # ``status`` lives in the registry metadata, not in the AgentCard proto:
+        # feeding it to Parse() raised ParseError, so callers could never change
+        # the status through update().
+        status = agent_data.get("status")
         try:
-            new_agent = Parse(json.dumps(agent_data), AgentCard())
+            card_data = {key_: value for key_, value in agent_data.items() if key_ != "status"}
+            new_agent = Parse(json.dumps(card_data), AgentCard())
         except Exception as e:
             logger.error(f"Invalid agent data for update: {e}")
             raise ValueError(f"Invalid agent data: {e}") from e
 
         self._agents[key] = new_agent
-        if 'status' in agent_data:
-            self._status_map[key] = agent_data['status']
+        if status is not None:
+            self._status_map[key] = status
         if layer is not LAYER_UNSET:
             self._layer_map[key] = normalize_layer(layer)
         self._updated_at_map[key] = datetime.now(timezone.utc).isoformat()

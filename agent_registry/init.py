@@ -21,8 +21,8 @@ import sys
 import getpass
 from pathlib import Path
 
-from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from loguru import logger
 
 from common.cert.cert_parser import parse_cer_certificate, parse_pem_files
@@ -344,7 +344,14 @@ class InitCommand:
 
             cert = cert_obj.cert_list[0]
 
-            if not isinstance(cert.public_key(), x509.RSAPublicKey):
+            # CertObj.public_key already holds the parsed key object; calling it
+            # like a method raises TypeError and made this validation always fail.
+            # RSA keys are typed via the asymmetric module (x509 has no such attr).
+            public_key = cert.public_key
+            if public_key is None:
+                return False, "Certificate has no public key"
+
+            if not isinstance(public_key, rsa.RSAPublicKey):
                 return False, "Unsupported certificate algorithm, RSA only"
 
             private_key = parse_pem_files(key_path, password.encode(DEFAULT_ENCODING))
@@ -352,7 +359,7 @@ class InitCommand:
             if private_key.public_key().public_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PublicFormat.SubjectPublicKeyInfo
-            ) != cert.public_key().public_bytes(
+            ) != public_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
             ):

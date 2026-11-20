@@ -75,26 +75,39 @@ class UDSClient:
 
         client_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         client_socket.settimeout(10)
+        connect_error = None
         try:
             client_socket.connect(self.socket_path)
         except FileNotFoundError:
-            return {
+            connect_error = {
                 "success": False,
                 "error": "Socket not found",
                 "message": f"Internal service is not running (socket: {self.socket_path})"
             }
         except PermissionError:
-            return {
+            connect_error = {
                 "success": False,
                 "error": "Permission denied",
                 "message": "You don't have permission to access registry center"
             }
         except ConnectionRefusedError:
-            return {
+            connect_error = {
                 "success": False,
                 "error": "Connection refused",
                 "message": "Internal service is not accepting connections"
             }
+        except OSError as e:
+            connect_error = {
+                "success": False,
+                "error": "Connection failed",
+                "message": str(e)
+            }
+
+        # Close on every connect failure: the socket is only handed to the
+        # finally block below once the connection succeeded.
+        if connect_error is not None:
+            client_socket.close()
+            return connect_error
 
         try:
             client_socket.sendall(json.dumps(request).encode('utf-8'))
