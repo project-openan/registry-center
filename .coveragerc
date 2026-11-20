@@ -1,0 +1,35 @@
+# Coverage configuration for registry-center.
+# Scope = the whole shippable Python backend (agent_registry + common), which is
+# what "全量代码覆盖率" means for this repository. Test code, virtualenvs and
+# generated caches are excluded; nothing else is.
+[run]
+source =
+    agent_registry
+    common
+omit =
+    tests/*
+    */tests/*
+    venv/*
+    */venv/*
+    */__pycache__/*
+    */site-packages/*
+    registry-center-web/*
+branch = False
+parallel = False
+
+[report]
+fail_under = 85
+show_missing = True
+skip_empty = True
+precision = 1
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    if TYPE_CHECKING:
+    @abstractmethod
+    \.\.\.
+
+[html]
+directory = coverage_html
+title = registry-center coverage

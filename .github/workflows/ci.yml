@@ -17,6 +17,47 @@ jobs:
 
   backend-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Real database engines, so the PG/MySQL/GaussDB storage suites actually run
+    # instead of self-skipping (they previously accounted for 82 of 90 skips).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: opena2a_t
+          POSTGRES_PASSWORD: openA2A_T
+          POSTGRES_DB: registry_center
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: registry_center
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PYTHONPATH: .
+      PG_TEST_HOST: 127.0.0.1
+      PG_TEST_PORT: '5432'
+      PG_TEST_DB: registry_center
+      PG_TEST_USER: opena2a_t
+      PG_TEST_PASSWORD: openA2A_T
+      MYSQL_TEST_HOST: 127.0.0.1
+      MYSQL_TEST_PORT: '3306'
+      MYSQL_TEST_DB: registry_center
+      MYSQL_TEST_USER: root
+      MYSQL_TEST_PASSWORD: root
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -24,13 +65,38 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run unit tests
-        run: pytest tests/ -v --tb=short
-        env:
-          PYTHONPATH: .
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Wait for database services
+        run: python tests/wait_for_services.py
+      - name: Run unit tests with coverage gate
+        run: pytest tests/ -v --tb=short --cov --cov-report=term-missing --cov-report=xml
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
       - name: Start registry and verify OAuth integration over HTTPS
         run: python tests/integration_oauth_smoke.py
+
+  mutation-guard:
+    # Coverage proves a line ran; this proves a *wrong* line would be caught.
+    # Fast (5 mutants, <1 min) and it mutates only the ephemeral checkout.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Verify tests intercept seeded defects
+        env:
+          PYTHONPATH: .
+        run: python tests/mutation_check.py
 
   frontend-lint:
     runs-on: ubuntu-latest
@@ -49,5 +115,7 @@ jobs:
         run: npm run lint
       - name: Run frontend tests
         run: npm test
+      - name: Run frontend coverage
+        run: npm run coverage
       - name: Build
         run: npm run build
