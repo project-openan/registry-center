@@ -107,11 +107,13 @@
     "config_sweep": "Sweep",
     "switch_to_history": "View history",
     "switch_to_card": "View AgentCard",
-    "timeline_hint": "Newest first, up to 50 entries",
+    "timeline_hint": "Chronological left to right, up to 10 events",
     "seconds_ago": "{{count}}s ago",
     "minutes_ago": "{{count}}m ago",
     "hours_ago": "{{count}}h ago",
-    "days_ago": "{{count}}d ago"
+    "days_ago": "{{count}}d ago",
+    "col_description": "Description",
+    "config_info": "Config info"
   },
   "detail": {
     "title": "AgentCard Detail",
