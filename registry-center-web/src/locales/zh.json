@@ -107,11 +107,13 @@
     "config_sweep": "巡检周期",
     "switch_to_history": "查看状态历史",
     "switch_to_card": "查看 AgentCard",
-    "timeline_hint": "按时间倒序，最多显示 50 条",
+    "timeline_hint": "按时间从左到右排列,最多显示 10 条",
     "seconds_ago": "{{count}} 秒前",
     "minutes_ago": "{{count}} 分钟前",
     "hours_ago": "{{count}} 小时前",
-    "days_ago": "{{count}} 天前"
+    "days_ago": "{{count}} 天前",
+    "col_description": "描述",
+    "config_info": "配置信息"
   },
   "detail": {
     "title": "AgentCard 详情",

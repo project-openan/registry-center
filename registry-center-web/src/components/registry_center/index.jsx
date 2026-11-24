@@ -56,7 +56,7 @@ import HeartbeatMonitor from '../heartbeat_monitor/index.jsx'
 import StatusBadge, { STATUS_STYLES } from '../heartbeat_monitor/status_badge.jsx'
 import {getAgentLayer, agentLayerLabel} from './agent-layer.js'
 
-const getAssetsBySeed = (seed, layer) => {
+export const getAssetsBySeed = (seed, layer) => {
     const SERVICE_THEMES = ['blue', 'indigo', 'cyan']
     const NETWORK_THEMES = ['emerald', 'amber', 'rose']
     let hash = 0
@@ -68,6 +68,19 @@ const getAssetsBySeed = (seed, layer) => {
         theme: themes[Math.abs(hash) % themes.length],
         icon: layer === 'network' ? <Network size={22} /> : <Server size={22} />,
     }
+}
+
+export const themeColor = (theme) => {
+    const map = {
+        emerald: 'bg-emerald-500',
+        blue: 'bg-blue-600',
+        indigo: 'bg-indigo-500',
+        rose: 'bg-rose-500',
+        cyan: 'bg-cyan-500',
+        amber: 'bg-amber-500',
+        violet: 'bg-violet-500',
+    }
+    return map[theme] || 'bg-blue-600'
 }
 
 const TABS = ['all', 'service', 'network', 'other', 'vendor']
@@ -463,18 +476,6 @@ const AgentRegistry = ({ isDark, api }) => {
         [agents, vendorGroups],
     )
 
-    const themeColor = (theme) => {
-        const map = {
-            emerald: 'bg-emerald-500',
-            blue: 'bg-blue-600',
-            indigo: 'bg-indigo-500',
-            rose: 'bg-rose-500',
-            cyan: 'bg-cyan-500',
-            amber: 'bg-amber-500',
-            violet: 'bg-violet-500',
-        }
-        return map[theme] || 'bg-blue-600'
-    }
     const themeBorder = (theme) => {
         const map = {
             emerald: 'hover:border-emerald-300 dark:hover:border-emerald-700',
@@ -618,55 +619,56 @@ const AgentRegistry = ({ isDark, api }) => {
 
     return (
         <div className="h-full p-6 flex flex-col w-full transition-all animate-in fade-in duration-500 overflow-y-auto custom-scrollbar font-sans">
+            {/* 1. Stats cards on top — shared layout for both views */}
+            {!loading && <StatsBar agents={agents} isDark={isDark} />}
+
+            {/* 2. Search + view toggle row — shared layout for both views */}
+            <div className="shrink-0 flex flex-wrap gap-3 items-center justify-between mb-4">
+                <div className="relative w-72">
+                    <input
+                        type="text"
+                        placeholder={t('registry.search_placeholder')}
+                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all dark:text-white"
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={searchTerm}
+                    />
+                    <Search className="absolute left-3.5 top-3 text-zinc-400" size={14} />
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                        <button
+                            onClick={() => setListMode('cards')}
+                            title={t('registry.view_cards')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listMode === 'cards' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                        >
+                            <LayoutGrid size={14} />
+                            {t('registry.view_cards_btn')}
+                        </button>
+                        <button
+                            onClick={() => setListMode('table')}
+                            title={t('registry.view_table')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listMode === 'table' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                        >
+                            <List size={14} />
+                            {t('registry.view_table_btn')}
+                        </button>
+                    </div>
+                    {viewToggle}
+                </div>
+            </div>
+
             {view === 'heartbeat' ? (
-                <>
-                    <div className="shrink-0 flex items-center justify-end mb-6 px-2">
-                        {viewToggle}
-                    </div>
-                    <div className="flex-1 min-h-0">
-                        <HeartbeatMonitor isDark={isDark} api={api} />
-                    </div>
-                </>
+                <div className="flex-1 min-h-0">
+                    {/* Heartbeat view — only the content below the buttons changes */}
+                    <HeartbeatMonitor
+                        isDark={isDark}
+                        api={api}
+                        searchTerm={searchTerm}
+                        listMode={listMode}
+                    />
+                </div>
             ) : (
                 <>
-                    {/* 1. Stats cards on top */}
-                    {!loading && <StatsBar agents={agents} isDark={isDark} />}
-
-                    {/* 2. Search + view toggle row */}
-                    <div className="shrink-0 flex flex-wrap gap-3 items-center justify-between mb-4">
-                        <div className="relative w-72">
-                            <input
-                                type="text"
-                                placeholder={t('registry.search_placeholder')}
-                                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all dark:text-white"
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                value={searchTerm}
-                            />
-                            <Search className="absolute left-3.5 top-3 text-zinc-400" size={14} />
-                        </div>
-                        <div className="flex shrink-0 flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
-                                <button
-                                    onClick={() => setListMode('cards')}
-                                    title={t('registry.view_cards')}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listMode === 'cards' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
-                                >
-                                    <LayoutGrid size={14} />
-                                    {t('registry.view_cards_btn')}
-                                </button>
-                                <button
-                                    onClick={() => setListMode('table')}
-                                    title={t('registry.view_table')}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listMode === 'table' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
-                                >
-                                    <List size={14} />
-                                    {t('registry.view_table_btn')}
-                                </button>
-                            </div>
-                            {viewToggle}
-                        </div>
-                    </div>
-
                     {/* 3. Tabs */}
                     <div className="shrink-0 flex flex-wrap items-center gap-1 mb-6 px-2">
                         {TABS.map((tab) => (
