@@ -15,7 +15,13 @@ import json
 import os
 import stat
 
+import sys
+
 import pytest
+
+_WIN_SKIP = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX 0600 file permissions cannot be reproduced on Windows")
 from a2a.types import AgentCard
 
 from agent_registry.persistence import StorageRegistry, load_from_file, save_to_file
@@ -36,6 +42,7 @@ def _card(name="agent-a", org="org-a"):
 class TestSaveToFile:
     """TC-STORE-001..004：落盘。"""
 
+    @_WIN_SKIP
     def test_writes_utf8_json_and_locks_down_permissions(self, tmp_path):
         """TC-STORE-001 | 保存后内容可读、且文件权限为 0600
 
