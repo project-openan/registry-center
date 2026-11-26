@@ -137,6 +137,14 @@ export MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_PORT=3306 MYSQL_TEST_DB=registry_cen
 | `test_jwk_fetcher_coverage.py` | TC-JWK-001…035 | 35 | JWK 拉取与缓存 |
 | `test_vector_db_coverage.py` | TC-VEC-001…079 | 79 | Milvus 客户端全路径（mock） |
 | `test_graph_coverage.py` | TC-GRAPH-001…035 | 35 | Neo4j 路由封装（mock） |
+| `test_coverage_gaps_core.py` | TC-DIGEST/CFG/CIPHER/CNCERT/PLUGIN/SSL/AUDQ/LLM/GRAPH-1xx/CARD-1xx | 60 | token_digest、config_reader、cipher_converter、cert_cn_parser、插件注册表、ssl_config、audit_query、llm 门面、图谱 agent、AgentCard 校验器全分支 |
+| `test_coverage_gaps_logsig.py` | TC-LOGSET/AUDIT-1xx/JWKPROV/STG-1xx/PKM-1xx/SCM-1xx | 34 | logger_setup（含轮转压缩）、审计日志（含轮转/线程安全）、JWK 导出、签名存储路径、公钥管理器、签名证书管理器 |
+| `test_coverage_gaps_persist.py` | TC-CONN/PG-2xx/GDB-2xx/MS-2xx/UDS-1xx/INT-1xx/SWEEP-1xx/BCAST-1xx | 41 | 连接助手、PG/GaussDB/MySQL 后端壳（替身）、UDS 客户端全路径、内部服务分发/请求处理、健康清扫器、广播装配 |
+| `test_coverage_gaps_edges.py` | TC-AUTHN/TOKEN/CRED/DBCFG/APPROVE/CSIGN/GLLM/STORE2/PRECHK/AUTHUTIL/HEALTH2/IDNT/EVBUS/SUBS/TCPI/MSRC/CERTCHK/CSPARSE/CONF | 62 | 认证提取器/提供商、token scope 与表单校验、凭证文件、数据库配置校验、审批状态机、签名校验循环守卫、LLM 模板替换、加载/预检、身份解析、事件总线消费、订阅存储 CRUD、TCP 内部服务、模型源校验、证书预检与解析 |
+| `test_branch_kg_router.py` | TC-KGG/KGD/KGS/KGN/KGR/KGB/KGI/KGE | 41 | 知识图谱 API：kg_guard 授权矩阵、Neo4j 驱动生命周期、节点/关系/批量/导入导出全分支（假驱动直调） |
+| `test_branch_broadcast_sql.py` | TC-DISP/MIG/SQLB/TAGH | 55 | Webhook 调度器（限流降级/重试/恢复/投递）、Milvus layer 迁移、SQL 后端 CRUD/事务分支、UDS tag handler 异常路径 |
+| `test_branch_small_gaps.py` | TC-ASINK/AUD-1xx/VR/LIST/INT2/MAUTH/PKM2/ALOG2/SSL2 | 20 | 审计 MySQL sink 降级/重连、审计镜像、监听器门面、内部服务 accept 循环、主端口 Token 授权矩阵、剩余部分分支 |
+| `test_stmt_gaps.py` | TC-OBX/CLIC-1xx/START-1xx/TOKIAM-1xx/SMALL-1xx | 47 | outbox 三种持久化模式（聚合状态/剪枝/损坏行/唯一索引失败）、CLI 解析与补全/帮助格式化、启动内部服务与关停信号、IAM token 获取全分支、ban/jwks/signer/watcher/app_config/custom_handle/证书生成等零散缺口 |
 
 ## 10. 缺陷修复记录（2026-11-20）
 
@@ -156,3 +164,91 @@ export MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_PORT=3306 MYSQL_TEST_DB=registry_cen
 
 已知存量 lint（非本次引入，未处理）：`init.py` 未使用的 `getpass`/`logger` 导入、
 `cli/__main__.py` 未使用的 `CLI` 导入与 `except ImportError as e`、`file_storage.py` 两处 B007。
+
+## 11. 覆盖率提升记录（2026-11-25）
+
+语句覆盖率 **93.2% → 98.5%**（12163 / 12353，未覆盖 190）；分支覆盖率（branch 模式）
+**91.5% → 93.7%**（3262 / 3482），语句+分支合并 **96.5%**。新增 8 个用例文件、360 条用例
+（登记见 §9），全部遵循本文件模板；在无 PG/MySQL 的机器上同样可运行（数据库/socket 路径
+全部以替身驱动，并读回持久化结果断言）。
+
+语句覆盖第三轮（`test_stmt_gaps.py`，47 条）补齐：outbox 三种模式全路径（含损坏行容错、
+版本唯一索引 fail-loud、计数器播种竞态）、CLI 解析/补全/帮助格式化、启动内部服务与关停
+信号、IAM token 获取全部校验分支（畸形响应/过期/非对象体/重复注册/并发播种）及 20 个
+小文件的零散缺口。
+
+分支覆盖提升主要来源（2026-11-25 第二轮，`test_branch_*.py` 三个文件、116 条用例）：
+
+| 模块 | 分支覆盖 before → after |
+|---|---|
+| `knowledge_graph_api/router.py` | 75.5% → 99%+（kg_guard 授权矩阵 + 全部端点分支） |
+| `broadcast/dispatcher.py` | 83.5% → 97%+（限流降级/重试/恢复/投递异常） |
+| `persistence/milvus_layer_migration.py` | 85.3% → 98%+ |
+| `internal/handlers/tag_handler.py` | 82.8% → 98%+（5 个 handler 异常路径） |
+| `persistence/sql_backend.py` | 93.5% → 97%+（update/delete owner 回退、tag 唯一冲突、事务 rollback-only） |
+| `internal/tcp_internal_service.py`、`registry_center_internal_service.py` | accept 循环异常/正常路径 |
+| `main_auth.py`、`health/sweeper.py`、`identity.py`、`event_bus.py`、`subscriptions.py` | → 100% |
+
+主要提升来源：
+
+| 模块 | before | after |
+|---|---|---|
+| `agent_registry/integration/token_digest.py` | 0% | 100% |
+| `common/llm/config/config_reader.py` | 0% | 100% |
+| `agent_registry/agent_to_graph/agent.py` | 36.4% | 100% |
+| `agent_registry/persistence/connection.py` | 21.9% | 100% |
+| `agent_registry/persistence/mysql_storage.py` | 34.7% | 98.7% |
+| `agent_registry/persistence/gaussdb_storage.py` / `postgresql_storage.py` | 45.8% | 100% |
+| `common/llm/llm.py` | 47.1% | 100% |
+| `agent_registry/cli/uds_client.py` | 52.4% | 100% |
+| `agent_registry/agent_registry/jwk_provider.py` | 60.9% | 96.9% |
+| `agent_registry/health/sweeper.py` | 71.2% | 100% |
+| `agent_registry/internal/handlers/approval_handler.py` | 92.3% | 100% |
+| `agent_registry/broadcast/event_bus.py` | 90.1% | 100% |
+| `agent_registry/identity.py` | 91.9% | 100% |
+| `agent_registry/model/validated_agentcard.py` | 76.1% | 100% |
+| `common/plugin_framework/registry.py` | 75.0% | 100% |
+| `common/util/conf_obj.py` / `authenticate_util.py` | 92.2% / 94.5% | 100% / 100% |
+| `agent_registry/internal/tcp_internal_service.py` | 87.0% | 98.7% |
+| `common/llm/config/model_sources.py` | 89.3% | 99.3% |
+| `common/cert/cert_cn_parser.py` | 78.3% | 100% |
+
+### 缺陷修复记录（2026-11-25）
+
+| 编号 | 位置 | 缺陷 | 修复 |
+|---|---|---|---|
+| DEFECT-JWK-1 | `agent_registry/agent_registry/jwk_provider.py` `_public_key_to_jwk_dict` | 按 `__class__.__name__ == 'EllipticCurvePublicKey'` 分派；cryptography rust 后端的具体类名是 `ECPublicKey`，EC 证书恒被拒（"Unsupported key type: ECPublicKey"），与 DEFECT-INIT-1 同类 | 改为 `isinstance` 分派（`rsa.RSAPublicKey` / `ec.EllipticCurvePublicKey`）；TC-JWKPROV-002（EC P-256）与 TC-JWKPROV-006（Ed25519/secp256k1）转为强断言回归用例 |
+| DEFECT-CRED-1 | `agent_registry/integration/credentials.py` `load_credentials` | 凭证文件经 `load_conf_as_dict` 解析，configparser strict 模式下同 id 重复条目抛 DuplicateOptionError 后被吞成 `{}`——**整个凭证文件被静默丢弃**（安全相关：一行笔误移除全部集成凭证），"Duplicate credential id; keeping first" 守卫为死代码 | credentials.py 改用专用 `_load_conf_first_wins` 解析（first-wins + 重复告警），不动全局 load_conf_as_dict 语义；`test_duplicate_credential_id_keeps_first_entry` 由 xfail(strict) 转为强断言回归用例；新增变异守卫 MUT-010 |
+
+> 说明：本轮基线环境无真实 PG16/MySQL8（端口 5432/3306 未开放），存量 DB 集成用例按设计自动
+> skip；36 个存量失败（`test_isolated_service_startup.py`、`test_persistence_layer.py` 等）
+> 在本轮改动前后完全一致，属环境性失败，非本轮引入。
+
+
+## 12. Windows 实机环境引入记录（2026-11-25）
+
+本机（Windows 企业版 Python 3.11.9）从「36 failed」修复到「0 failed」，共 5 项环境变更：
+
+| # | 变更 | 解决的失败 | 说明 |
+|---|---|---|---|
+| 1 | 禁用 Python311\\python311._pth（重命名为 .disabled-by-ut-env，可回滚） | 25 个子进程类失败的总根源 | 该文件使解释器进入隔离模式：忽略 PYTHONPATH 与 cwd，导致 test_container_entrypoint / test_isolated_service_startup / test_integration_access_logging 的子进程全部 ModuleNotFoundError |
+| 2 | site-packages\\_registry_center_dev.pth 指向仓库根 | 同上 | 等价 pip install -e .（工程无打包配置），使仓库包在任何 cwd/子进程可导入 |
+| 3 | test_cli_coverage.py 10 个 UDS/POSIX readline 用例 + test_persistence_layer.py 1 个 0600 权限用例加 win32 skip 标记 | 11 个物理不可运行用例 | AF_UNIX 与 POSIX 0600 权限在 Windows 不存在；Linux CI 仍全量执行 |
+| 4 | test_container_entrypoint.py 换行环境变量参数加 win32 skip | 1 个 | Windows 环境变量值不允许换行符；._pth 禁用后该用例在此平台触发解释器崩溃 |
+| 5 | Cloud Run 预检用例改用 -Command 捕获原始异常消息 | 1 个 | PowerShell 5.1 渲染 Write-Error 时按控制台宽度省略截断，完整消息无法到达 stderr |
+
+### 运行器稳定性问题与分块运行器
+
+环境修复后，单进程长跑（超过约 700 条测试且频繁 spawn bash/服务子进程）会触发企业版
+Python 3.11.9 的解释器级静默 exit(1)：无 traceback、无 WER 事件、faulthandler 无输出、
+崩溃点随机移动。同样测试拆成不超过 636 条的 pytest 进程则稳定全绿。
+
+因此新增 scripts/run_tests_windows.ps1：按整文件贪心分块（默认每块不超过 500 条）、
+每块独立 pytest 进程 + junitxml 报告、崩溃自动重试一次、聚合总数。实测：
+
+    TOTAL: passed=2708 skipped=112 failed=0 errors=0   （2820 条全覆盖）
+
+Linux CI 不受影响，仍按 ci.yml 的单进程方式运行。
+
+> 更新（同日）：DEFECT-CRED-1 修复后，原 113 个跳过中的 1 个 xfail 转为常规回归用例，
+> 跳过数降为 112；变异守卫增至 10 个（MUT-010）。
