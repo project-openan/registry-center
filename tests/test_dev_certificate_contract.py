@@ -137,16 +137,16 @@ def test_dangling_symlinks_are_not_overwritten(tmp_path):
     assert link.is_symlink()
 
 
-def test_bundle_cleans_only_its_new_files_when_a_race_occurs(tmp_path, monkeypatch):
+def test_bundle_cleans_only_its_new_files_when_a_race_occurs(tmp_path):
+    # A concurrent writer has already created second before this bundle
+    # starts (O_EXCL will fail on it). Patching the global os.open here is
+    # unsafe: the patched window hijacks every os.open call in the process
+    # and interacts fatally with pytest capture threads on both platforms.
     first, second = tmp_path / "first", tmp_path / "second"
-    real_open = os.open
+    second.write_bytes(b"concurrent writer")
 
-    def racing_open(path, flags, mode):
-        if path == str(second):
-            second.write_bytes(b"concurrent writer")
-        return real_open(path, flags, mode)
-
-    monkeypatch.setattr(cli.os, "open", racing_open)
+    with pytest.raises(FileExistsError):
+        cli._write_new_files({str(first): b"new", str(second): b"new"})
     with pytest.raises(FileExistsError):
         cli._write_new_files({str(first): b"new", str(second): b"new"})
     assert not first.exists()
