@@ -68,8 +68,8 @@ jobs:
         run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Wait for database services
         run: python tests/wait_for_services.py
-      - name: Run unit tests with coverage gate
-        run: pytest tests/ -v --tb=short --cov --cov-report=term-missing --cov-report=xml
+      - name: Run unit tests in chunks with coverage gate
+        run: python scripts/run_ci_shards.py
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4

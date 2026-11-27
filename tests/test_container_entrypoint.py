@@ -130,7 +130,11 @@ def test_policy_environment_overrides_reach_python_consumer(run_entry, tmp_path)
     assert 'flowcontrol.ratelimit.jwk=' not in deployment
 
 
-@pytest.mark.parametrize('port', ['0', '65536', '-1', 'word', '999999999999999', '1\nIP=evil'])
+@pytest.mark.parametrize('port', ['0', '65536', '-1', 'word', '999999999999999',
+                                  pytest.param('1\nIP=evil',
+                                               marks=pytest.mark.skipif(
+                                                   sys.platform == 'win32',
+                                                   reason='Windows 环境变量值不允许包含换行符'))])
 def test_invalid_platform_port_rejected(run_entry, port):
     result = run_entry({'PORT': port})
     assert result.returncode == 2
@@ -236,10 +240,15 @@ def test_cloud_run_default_refuses_before_cloud_operations():
     powershell = shutil.which('pwsh') or shutil.which('powershell')
     if not powershell:
         pytest.skip('PowerShell required to exercise Cloud Run preflight')
-    result = subprocess.run([powershell, '-NoProfile', '-NonInteractive', '-File', str(REPO / 'deploy-all.ps1')],
+    # 用 -Command + ErrorActionPreference=Stop 捕获原始异常消息：Write-Error 走
+    # 控制台错误渲染时会被按宽度省略截断（'...'），消息体无法完整到达 stderr
+    command = ("$ErrorActionPreference='Stop'\n"
+               "try {{ & '{script}' }} catch {{ $_.Exception.Message; exit 1 }}\n"
+               ).format(script=str(REPO / 'deploy-all.ps1'))
+    result = subprocess.run([powershell, '-NoProfile', '-NonInteractive', '-Command', command],
                             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20)
     assert result.returncode == 1
-    assert 'cannot provide verified owner identities' in result.stderr
+    assert 'cannot provide verified owner identities' in result.stdout
     assert '[1/5]' not in result.stdout
     script = (REPO / 'deploy-all.ps1').read_text(encoding='utf-8')
     assert '--no-allow-unauthenticated' in script

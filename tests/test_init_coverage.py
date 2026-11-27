@@ -606,9 +606,14 @@ class TestPathValidation:
         key = tmp_path / "key.pem"
         key.write_text("secret", encoding="utf-8")
 
-        def _denied(path):
-            raise PermissionError("denied")
+        real_stat = os.stat
 
+        def _denied(path, *args, **kwargs):
+            if "key.pem" in str(path):
+                raise PermissionError("denied")
+            return real_stat(path, *args, **kwargs)
+
+        monkeypatch.setattr(init_module.os, "name", "posix")
         monkeypatch.setattr(init_module.os, "stat", _denied)
 
         assert wizard.validate_file_permissions(str(key)) == (

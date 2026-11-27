@@ -91,7 +91,7 @@ MUTATIONS = [
         'file': 'agent_registry/cli/uds_client.py',
         'old': '        if connect_error is not None:\n            client_socket.close()\n            return connect_error',
         'new': '        if connect_error is not None:\n            return connect_error',
-        'tests': ['tests/test_cli_coverage.py'],
+        'tests': ['tests/test_cli_coverage.py', 'tests/test_backend_services_coverage.py'],
     },
     {
         'id': 'MUT-009',
@@ -100,6 +100,15 @@ MUTATIONS = [
         'old': '        if self.client is None:\n            logger.error("Milvus client is unavailable, operation skipped")\n            return False',
         'new': '        if False:\n            logger.error("Milvus client is unavailable, operation skipped")\n            return False',
         'tests': ['tests/test_vector_db_coverage.py'],
+    },
+    {
+        'id': 'MUT-010',
+        'why': 'duplicate credential keys must keep the first entry instead of '
+               'letting the last one overwrite it (DEFECT-CRED-1)',
+        'file': 'agent_registry/integration/credentials.py',
+        'old': '            if key in raw:',
+        'new': '            if False:',
+        'tests': ['tests/test_integration_edges.py'],
     },
 ]
 

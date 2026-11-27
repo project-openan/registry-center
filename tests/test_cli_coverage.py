@@ -44,6 +44,11 @@ from unittest import mock
 import pytest
 
 from agent_registry.cli import CLI
+
+_IS_POSIX = sys.platform != "win32"
+_POSIX_ONLY = pytest.mark.skipif(
+    not _IS_POSIX,
+    reason="UDS(AF_UNIX)/POSIX readline only verifiable on Linux/macOS")
 from agent_registry.cli import uds_client as uds_module
 from agent_registry.cli.base import BaseCommand
 from agent_registry.cli.commands import agent as agent_module
@@ -812,6 +817,7 @@ def _socket_factory(monkeypatch, recv_chunks=None, connect_error=None, send_erro
     return factory, sock
 
 
+@_POSIX_ONLY
 def test_uds_send_request_wire_protocol(monkeypatch):
     """TC-CLI-031 | UDS 请求的建连参数、超时、线格式与返回解析
 
@@ -839,6 +845,7 @@ def test_uds_send_request_wire_protocol(monkeypatch):
     assert sock.close.call_count == 1
 
 
+@_POSIX_ONLY
 def test_uds_send_request_custom_socket_path(monkeypatch):
     """TC-CLI-032 | 构造参数可覆盖默认 socket 路径并用于 connect
 
@@ -858,6 +865,7 @@ def test_uds_send_request_custom_socket_path(monkeypatch):
     assert "/tmp/x.sock" in result["message"]
 
 
+@_POSIX_ONLY
 def test_uds_connect_error_mapping(monkeypatch):
     """TC-CLI-033 | connect 异常到错误码/文案的映射
 
@@ -884,6 +892,7 @@ def test_uds_connect_error_mapping(monkeypatch):
     }
 
 
+@_POSIX_ONLY
 def test_uds_invalid_response_is_reported_with_reason(monkeypatch):
     """TC-CLI-034 | 非 JSON 响应返回 Invalid response 且携带解析器消息
 
@@ -902,6 +911,7 @@ def test_uds_invalid_response_is_reported_with_reason(monkeypatch):
     assert sock.close.call_count == 1
 
 
+@_POSIX_ONLY
 def test_uds_empty_response_is_invalid(monkeypatch):
     """TC-CLI-035 | 服务端立即关闭（空响应）被判为 Invalid response
 
@@ -918,6 +928,7 @@ def test_uds_empty_response_is_invalid(monkeypatch):
     assert result["error"] == "Invalid response"
 
 
+@_POSIX_ONLY
 def test_uds_accumulates_chunks_until_json_complete(monkeypatch):
     """TC-CLI-036 | 分片响应被拼接后才解析
 
@@ -934,6 +945,7 @@ def test_uds_accumulates_chunks_until_json_complete(monkeypatch):
     assert UDSClient().send_request("x", {}) == {"success": True, "data": {"x": 1}}
 
 
+@_POSIX_ONLY
 def test_uds_send_failure_maps_to_communication_error(monkeypatch):
     """TC-CLI-037 | 发送阶段异常映射为 Communication error 并关闭 socket
 
@@ -1070,6 +1082,7 @@ def test_uds_get_tag_parameter_precedence(monkeypatch, kwargs, expected_params):
     client.send_request.assert_called_once_with("get_tag", expected_params)
 
 
+@_POSIX_ONLY
 def test_uds_socket_is_closed_when_connect_fails(monkeypatch):
     """TC-CLI-043 | connect 失败时必须关闭 socket（不泄漏 fd）
 
@@ -1086,6 +1099,7 @@ def test_uds_socket_is_closed_when_connect_fails(monkeypatch):
     assert sock.close.call_count == 1
 
 
+@_POSIX_ONLY
 def test_uds_unexpected_connect_os_error_is_reported_and_closed(monkeypatch):
     """TC-CLI-053 | connect 抛其他 OSError 时同样返回错误字典并关闭 socket
 
@@ -1248,6 +1262,7 @@ def test_main_windows_with_pyreadline3_marks_backend(monkeypatch):
             sys.modules["readline"] = saved_readline
 
 
+@_POSIX_ONLY
 def test_main_posix_marks_stdlib_readline_backend(monkeypatch):
     """TC-CLI-048 | POSIX 分支导入标准库 readline 并补 backend == "readline"
 

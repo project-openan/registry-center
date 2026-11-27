@@ -23,7 +23,7 @@ from typing import Dict, Tuple
 
 from loguru import logger
 
-from common.util.app_config import get_root_path, load_conf_as_dict, resolve_env_vars
+from common.util.app_config import get_root_path, resolve_env_vars
 from common.util.authenticate_util import CallerRole
 
 _PREFIX = "credential."
@@ -44,6 +44,40 @@ def _default_file() -> str:
     return os.path.join(get_root_path(), "etc", "conf", "integration_credentials.conf")
 
 
+def _load_conf_first_wins(path: str) -> Dict[str, str]:
+    """Parse the credential file with first-wins duplicate handling.
+
+    configparser runs in strict mode, so two entries sharing a key raise
+    DuplicateOptionError, and load_conf_as_dict swallows that into {} — a single
+    operator copy/paste slip would silently remove every integration credential.
+    First-wins keeps the documented 'duplicate credential id; keeping first'
+    semantics and never discards the remaining entries.
+    """
+    raw: Dict[str, str] = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        for line_no, line in enumerate(f, 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.startswith(';') \
+                    or line.startswith('['):
+                continue
+            if '=' not in line:
+                logger.warning(f"Ignoring malformed credential line {line_no}: "
+                               "expected key=value")
+                continue
+            key, value = line.split('=', 1)
+            key = key.strip().lower()
+            value = value.strip()
+            if key in raw:
+                parts = key[len(_PREFIX):].split('.') if key.startswith(_PREFIX) else []
+                if len(parts) == 2:
+                    logger.warning(f"Duplicate credential id '{parts[0]}'; keeping first")
+                else:
+                    logger.warning(f"Duplicate credential key '{key}'; keeping first")
+                continue
+            raw[key] = value
+    return raw
+
+
 def load_credentials(path: str = '') -> Tuple[Dict[str, CredentialEntry], Dict[str, CredentialEntry]]:
     """Load entries keyed by credential id and certificate CN."""
     path = path or _default_file()
@@ -52,7 +86,7 @@ def load_credentials(path: str = '') -> Tuple[Dict[str, CredentialEntry], Dict[s
     if not os.path.exists(path):
         logger.warning(f"Credential file {path} not found; integration access has no credentials")
         return {}, {}
-    raw = resolve_env_vars(load_conf_as_dict(path))
+    raw = resolve_env_vars(_load_conf_first_wins(path))
     grouped: Dict[str, Dict[str, str]] = {}
     for key, value in raw.items():
         if not key.startswith(_PREFIX) or not value:
