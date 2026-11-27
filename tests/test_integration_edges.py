@@ -472,16 +472,16 @@ class TestCredentialLoadingEdges:
         assert list(tokens.keys()) == ['on']
         assert certs == {}
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Source bug (credentials.py): configparser runs in strict mode, so two "
-               "entries sharing a credential_id raise DuplicateOptionError inside "
-               "load_conf_as_dict, which swallows it and returns {} — the whole "
-               "credential file is silently discarded. Consequently the 'Duplicate "
-               "credential id; keeping first' guard in load_credentials is "
-               "unreachable: grouped is keyed by credential_id, so the same id can "
-               "never be visited twice.")
     def test_duplicate_credential_id_keeps_first_entry(self, tmp_path, loguru_caplog):
+        """DEFECT-CRED-1 回归：同 id 重复条目保留第一条，整个文件不再被丢弃。
+
+        输入: credential.dup.identity/token_hash/role 各定义两次（值不同）
+        预期输出: tokens['dup'].identity == 'first-identity'；告警含
+                  "Duplicate credential id"；second-identity 不出现
+        断言点: 保留值 + 告警关键字
+        防回归: 若解析回退到 configparser strict 模式（DEFECT-CRED-1），整个
+                凭证文件会被静默丢弃、本用例失败
+        """
         path = _write_conf(tmp_path,
                            'credential.dup.identity=first-identity\n'
                            f'credential.dup.token_hash={"d" * 64}\n'
