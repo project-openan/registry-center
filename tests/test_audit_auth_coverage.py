@@ -444,13 +444,15 @@ def test_mauth_authenticate_rejects_unverified_principal(monkeypatch):
     """
     import agent_registry.integration.app as app_mod
 
+    from fastapi import HTTPException
+
     policy = main_auth_mod.MainTokenPolicy()
     policy.handler = SimpleNamespace(validate_configuration=lambda: None)
     monkeypatch.setattr(app_mod, "authenticate_request",
                         async_stub(SimpleNamespace(not_a_principal=True)))
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(HTTPException) as exc:
         asyncio.run(policy.authenticate(_auth_request()))
-    assert getattr(exc.value, "status_code", None) == 503
+    assert exc.value.status_code == 503
 
 
 def async_stub(value):
