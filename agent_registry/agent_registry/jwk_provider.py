@@ -70,9 +70,14 @@ class JWKProvider:
             raise CertLoadError(f"Failed to load certificate: {e}")
 
     def _public_key_to_jwk_dict(self, public_key, kid: str) -> Dict[str, Any]:
-        if public_key.__class__.__name__ == 'RSAPublicKey':
+        # isinstance-based dispatch: the class-name check never matched the
+        # concrete rust-backend classes ('ECPublicKey' / 'RSAPublicKey'), so
+        # EC certificates were always rejected with "Unsupported key type".
+        from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
+
+        if isinstance(public_key, _rsa.RSAPublicKey):
             return self._rsa_to_jwk_dict(public_key, kid)
-        elif public_key.__class__.__name__ == 'EllipticCurvePublicKey':
+        elif isinstance(public_key, _ec.EllipticCurvePublicKey):
             return self._ec_to_jwk_dict(public_key, kid)
         else:
             raise CertLoadError(f"Unsupported key type: {public_key.__class__.__name__}")
